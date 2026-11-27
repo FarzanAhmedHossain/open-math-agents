@@ -1,8 +1,9 @@
 # Development builds on a GitHub-hosted runner (16 GB RAM) instead of the local machine.
 # Trigger: push to a cloud-dev/** branch. The job copies .oma-dev/H2Dev/*.lean into a lean_lib H2Dev of the pinned
 # formal-conjectures checkout (same toolchain and Mathlib as the checker) and runs lake build on the modules listed in
-# .oma-dev/targets.txt (one module name per line). It reports every error and every sorry, and caches the build
-# (toolchain, Mathlib cache and the compiled dev modules) so later pushes only recompile what changed.
+# .oma-dev/targets.txt (one module name per line). It reports every error and every sorry.
+# No Actions cache: a fresh runner fetches the Mathlib cache in about 90 s, and the fork's 10 GB cache quota is
+# kept for the checker (cloud-check.yml).
 # Read-only token; no secrets; it never pushes anything.
 name: cloud-dev
 on:
@@ -31,18 +32,6 @@ jobs:
           git init -q "$RUNNER_TEMP/fc" && cd "$RUNNER_TEMP/fc"
           git remote add origin https://github.com/google-deepmind/formal-conjectures
           git fetch -q --depth 1 origin "$C" && git checkout -q FETCH_HEAD
-
-      - name: Restore Lean cache
-        id: cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.elan
-            ${{ runner.temp }}/fc/.lake
-          key: dev-fc-${{ steps.fc.outputs.commit }}-${{ github.ref_name }}-${{ github.sha }}
-          restore-keys: |
-            dev-fc-${{ steps.fc.outputs.commit }}-${{ github.ref_name }}-
-            dev-fc-${{ steps.fc.outputs.commit }}-
 
       - name: Lean toolchain and Mathlib cache
         run: |
@@ -73,15 +62,6 @@ jobs:
           grep -n -A 16 'error:' "$GITHUB_WORKSPACE/build.log" | head -800 || true
           grep -n "declaration uses 'sorry'" "$GITHUB_WORKSPACE/build.log" | head -100 || true
           tail -5 "$GITHUB_WORKSPACE/build.log"
-
-      - name: Save Lean cache
-        if: ${{ !cancelled() }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.elan
-            ${{ runner.temp }}/fc/.lake
-          key: dev-fc-${{ steps.fc.outputs.commit }}-${{ github.ref_name }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
