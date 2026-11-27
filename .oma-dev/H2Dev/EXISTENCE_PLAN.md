@@ -1,6 +1,6 @@
 # Existence (Theorem E) plan
 
-Module: `.oma-dev/H2Dev/Existence.lean` (imports `H2Dev.Code`, `H2Dev.Stmt`, `Mathlib.Data.List.GetD`).
+Module: `.oma-dev/H2Dev/Existence.lean` (imports `H2Dev.Code`, `H2Dev.Stmt` only).
 Namespace `OMA.SimsLite`, `open scoped commutatorElement`. Levels are 0-based: the blueprint weight
 `w` is the Lean level `w - 1`, `lcs G 0 = ⊤`.
 
@@ -16,7 +16,7 @@ The proof never flattens lists and recovers positions afterwards. Every position
     structure Ent (G) where g : G; lv : ℕ; df : Option (Option (ℕ × ℕ)); ci : Option ℕ; st : ℕ
 
 (element, level, definition, core index, step) and lists of records are read with the total
-accessor `ent L i := L.getD i Ent.dft`. Three layers of the argument:
+accessor `ent L i := (L[i]?).getD Ent.dft` (core `List.getElem?` lemmas only; no extra import). Three layers of the argument:
 
 1. Greedy layer (Lemma G). `layer p N C` folds a candidate list `C` from the left:
    `layer p N (c :: C) = chainE p (clen p (cl (C.map Ent.g) ⊔ N) c.g) c ++ layer p N C`, where

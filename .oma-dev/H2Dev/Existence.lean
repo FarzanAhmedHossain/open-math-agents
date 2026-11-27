@@ -1,6 +1,5 @@
 import H2Dev.Code
 import H2Dev.Stmt
-import Mathlib.Data.List.GetD
 
 /-! Theorem E (existence): every group of order `p ^ m` realises some code.
 
@@ -38,18 +37,22 @@ variable {G : Type u} [Group G]
 def Ent.dft : Ent G := ⟨1, 0, none, none, 0⟩
 
 /-- Total accessor for lists of entries. -/
-def ent (L : List (Ent G)) (i : ℕ) : Ent G := L.getD i Ent.dft
+def ent (L : List (Ent G)) (i : ℕ) : Ent G := (L[i]?).getD Ent.dft
 
-lemma ent_eq (L : List (Ent G)) {i : ℕ} (h : i < L.length) : ent L i = L[i] :=
-  List.getD_eq_getElem L Ent.dft h
+lemma ent_eq (L : List (Ent G)) {i : ℕ} (h : i < L.length) : ent L i = L[i] := by
+  unfold ent
+  rw [List.getElem?_eq_getElem h]
+  rfl
 
 lemma ent_append_left (L M : List (Ent G)) {i : ℕ} (h : i < L.length) :
-    ent (L ++ M) i = ent L i :=
-  List.getD_append L M Ent.dft i h
+    ent (L ++ M) i = ent L i := by
+  unfold ent
+  rw [List.getElem?_append_left h]
 
 lemma ent_append_right (L M : List (Ent G)) {i : ℕ} (h : L.length ≤ i) :
-    ent (L ++ M) i = ent M (i - L.length) :=
-  List.getD_append_right L M Ent.dft i h
+    ent (L ++ M) i = ent M (i - L.length) := by
+  unfold ent
+  rw [List.getElem?_append_right h]
 
 lemma ent_mem (L : List (Ent G)) {i : ℕ} (h : i < L.length) : ent L i ∈ L := by
   rw [ent_eq L h]
