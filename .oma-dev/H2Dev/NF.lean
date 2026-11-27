@@ -157,7 +157,7 @@ lemma suffix_hyps (p : ℕ) (l : List G)
     exact mul_mem (cl_drop_mono l (by omega) h)
       (mem_cl_of_mem (getElem_mem_drop l (by omega) hj'))
 
-lemma cl_append_comap {Q : Type v} [Group Q] (f : G →* Q) (z : G) (hker : f.ker = zpowers z)
+lemma cl_append_comap {Q : Type v} [Group Q] (f : G →* Q) (z : G) (hker : f.ker = Subgroup.zpowers z)
     (A : List G) : cl (A ++ [z]) = (cl (A.map f)).comap f := by
   have e1 : {x | x ∈ A ++ [z]} = {x | x ∈ A} ∪ {z} := by
     ext x
