@@ -58,9 +58,9 @@ jobs:
           RC=$?
           echo "exit=$RC" >> "$GITHUB_WORKSPACE/build.log"
           echo "rc=$RC" >> "$GITHUB_OUTPUT"
-          echo "errors: $(grep -c 'error:' "$GITHUB_WORKSPACE/build.log" || true)   sorries: $(grep -c "declaration uses 'sorry'" "$GITHUB_WORKSPACE/build.log" || true)"
+          echo "errors: $(grep -c 'error:' "$GITHUB_WORKSPACE/build.log" || true)   sorries: $(grep -cE 'declaration uses .sorry.' "$GITHUB_WORKSPACE/build.log" || true)"
           grep -n -A 16 'error:' "$GITHUB_WORKSPACE/build.log" | head -800 || true
-          grep -n "declaration uses 'sorry'" "$GITHUB_WORKSPACE/build.log" | head -100 || true
+          grep -nE 'declaration uses .sorry.' "$GITHUB_WORKSPACE/build.log" | head -100 || true
           tail -5 "$GITHUB_WORKSPACE/build.log"
 
       - uses: actions/upload-artifact@v4
