@@ -138,8 +138,7 @@ lemma Shape.cnt_card_Ks_le {m : ℕ} (s : Shape m) (hs : s.Valid) (i : Fin m) :
         · intro k hk
           rw [Finset.mem_coe, s.mem_cntKs] at hk
           obtain ⟨c, hc, hle⟩ := hk
-          simp only [Finset.mem_coe, Finset.mem_range, Finset.coe_range, Set.mem_Iio, hc,
-            Option.map_some, Option.getD_some]
+          simp only [Finset.coe_range, Set.mem_Iio, hc, Option.map_some, Option.getD_some]
           omega
         · intro k1 hk1 k2 hk2 hfeq
           rw [Finset.mem_coe, s.mem_cntKs] at hk1 hk2
@@ -229,18 +228,18 @@ lemma Shape.cnt_idx_parts {m : ℕ} (s : Shape m) (hs : s.Valid) :
     simp only [Finset.mem_union]
     rcases hq2 with ⟨h0, rfl, -⟩ | ⟨h1, hi, hk, hik, hj⟩ | ⟨h2, hi, hk, hj⟩ |
       ⟨h3, hi, hk, hj⟩
-    · obtain rfl : κ = ⟨0, by omega⟩ := Fin.ext h0
+    · obtain rfl : κ = ⟨0, by decide⟩ := Fin.ext h0
       exact Or.inl (Or.inl (Or.inl (Finset.mem_image.2 ⟨(_, j), Finset.mem_univ _, rfl⟩)))
-    · obtain rfl : κ = ⟨1, by omega⟩ := Fin.ext h1
+    · obtain rfl : κ = ⟨1, by decide⟩ := Fin.ext h1
       refine Or.inl (Or.inl (Or.inr (Finset.mem_image.2 ⟨((i, k), j), ?_, rfl⟩)))
       exact Finset.mem_product.2
         ⟨(mem_cntPairs _ _).2 ⟨(s.mem_cntA i).2 hi, (s.mem_cntA k).2 hk, hik⟩,
           (s.mem_cntN j).2 (by omega)⟩
-    · obtain rfl : κ = ⟨2, by omega⟩ := Fin.ext h2
+    · obtain rfl : κ = ⟨2, by decide⟩ := Fin.ext h2
       refine Or.inl (Or.inr (Finset.mem_biUnion.2 ⟨i, (s.mem_cntB i).2 hi,
         Finset.mem_image.2 ⟨(k, j), ?_, rfl⟩⟩))
       exact Finset.mem_product.2 ⟨(s.mem_cntKs i k).2 hk, (s.mem_cntC j).2 hj⟩
-    · obtain rfl : κ = ⟨3, by omega⟩ := Fin.ext h3
+    · obtain rfl : κ = ⟨3, by decide⟩ := Fin.ext h3
       have hij : i < j := not_le.1 (fun h => by have := hs.mono j i h; omega)
       refine Or.inr (Finset.mem_image.2 ⟨((i, j), k), ?_, rfl⟩)
       exact Finset.mem_product.2
@@ -267,7 +266,7 @@ lemma Shape.cnt_idx_parts {m : ℕ} (s : Shape m) (hs : s.Valid) :
 /-! The cubic inequality and the final arithmetic -/
 
 /-- The cubic inequality of section 8, with explicit polynomial certificates. -/
-lemma cnt_cubic (a b c u : ℤ) (ha : 0 ≤ a) (hb : 0 ≤ b) (hc : 0 ≤ c) (hu : 0 ≤ u)
+lemma cnt_cubic (a b c u : ℤ) (ha : 0 ≤ a) (hb : 0 ≤ b) (hc : 0 ≤ c)
     (hua : u ≤ a) (hub : u ≤ b) :
     25 * (a ^ 2 * (b + c) + c * u * (2 * b - u + c)) ≤ 4 * (a + (b + c)) ^ 3 := by
   have hn : 0 ≤ b + c := add_nonneg hb hc
@@ -278,19 +277,19 @@ lemma cnt_cubic (a b c u : ℤ) (ha : 0 ≤ a) (hb : 0 ≤ b) (hc : 0 ≤ c) (hu
     · have P1 : 0 ≤ (2 * a - 3 * (b + c)) ^ 2 * (4 * a - (b + c)) :=
         mul_nonneg (sq_nonneg _) (by linarith)
       have P2 : 0 ≤ (b + c) * (b - c) ^ 2 := mul_nonneg hn (sq_nonneg _)
-      first | linarith | nlinarith [P1, P2, P3]
+      linarith
     · have Q1 : 0 ≤ (a + (b + c)) * ((b + c) - 4 * a) * (4 * (b + c) - a) :=
         mul_nonneg (mul_nonneg (by linarith) (by linarith)) (by linarith)
       have Q2 : 0 ≤ (b + c) * a * b := mul_nonneg (mul_nonneg hn ha) hb
       have Q3 : 0 ≤ (b + c) * c * (a - b) := mul_nonneg (mul_nonneg hn hc) (by linarith)
-      first | linarith | nlinarith [Q1, Q2, Q3, P3]
+      linarith
   · have R1 : 0 ≤ a ^ 3 := pow_nonneg ha 3
     have R2 : 0 ≤ (b + c) * (24 * a - 13 * (b + c)) ^ 2 := mul_nonneg hn (sq_nonneg _)
     have R3 : 0 ≤ (b + c) ^ 3 := pow_nonneg hn 3
     have R4 : 0 ≤ a * b * (b - a) := mul_nonneg (mul_nonneg ha hb) (by linarith)
     have R5 : 0 ≤ c * (a - u) * (2 * b - a - u + c) :=
       mul_nonneg (mul_nonneg hc (by linarith)) (by linarith)
-    first | linarith | nlinarith [R1, R2, R3, R4, R5]
+    linarith
 
 /-- The final arithmetic: `a, b, c` are the level counts, `t` the core size, `u = t - 1`. -/
 lemma cnt_final (m a b c u t X1 X3 R I : ℕ) (hm : a + b + c = m) (hua : u ≤ a) (hub : u ≤ b)
@@ -301,7 +300,7 @@ lemma cnt_final (m a b c u t X1 X3 R I : ℕ) (hm : a + b + c = m) (hua : u ≤ 
   refine (Nat.le_div_iff_mul_le (show (0 : ℕ) < 25 by norm_num)).2 ?_
   subst hm
   have hcub := cnt_cubic (a : ℤ) b c u (by positivity) (by positivity) (by positivity)
-    (by positivity) (by exact_mod_cast hua) (by exact_mod_cast hub)
+    (by exact_mod_cast hua) (by exact_mod_cast hub)
   have hua' : (u : ℤ) ≤ a := by exact_mod_cast hua
   have htu' : (t : ℤ) ≤ u + 1 := by exact_mod_cast htu
   have hX1' : 2 * (X1 : ℤ) ≤ a * a := by exact_mod_cast hX1
@@ -326,9 +325,7 @@ lemma cnt_final (m a b c u t X1 X3 R I : ℕ) (hm : a + b + c = m) (hua : u ≤ 
   have e11 : (0 : ℤ) ≤ c * c := by positivity
   have e12 : (0 : ℤ) ≤ b * c := by positivity
   have goal : (I : ℤ) * 25 ≤ 2 * ((a : ℤ) + b + c) ^ 3 + 50 * ((a : ℤ) + b + c) ^ 2 := by
-    first
-      | linarith
-      | nlinarith [hcub, e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, hI']
+    linarith
   exact_mod_cast goal
 
 /-- Every valid shape has at most `(2 m^3 + 50 m^2) / 25` indices. -/
@@ -360,9 +357,7 @@ lemma cnt_card_shape_le (m : ℕ) : Nat.card (Shape m) ≤ (m + 2) ^ (5 * m) := 
   have h3 : m ^ m ≤ (m + 2) ^ m := Nat.pow_le_pow_left (by omega) m
   have h5 : (m + 2) ^ (5 * m) =
       (m + 2) ^ m * ((m + 2) ^ (2 * m) * ((m + 2) ^ m * (m + 2) ^ m)) := by
-    first
-      | ring
-      | (rw [← pow_add, ← pow_add, ← pow_add]; congr 1; omega)
+    ring
   rw [h5]
   exact Nat.mul_le_mul h1 (Nat.mul_le_mul h2 (Nat.mul_le_mul h1 h3))
 
