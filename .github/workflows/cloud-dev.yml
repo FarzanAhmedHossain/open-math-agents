@@ -1,0 +1,94 @@
+# Development builds on a GitHub-hosted runner (16 GB RAM) instead of the local machine.
+# Trigger: push to a cloud-dev/** branch. The job copies .oma-dev/H2Dev/*.lean into a lean_lib H2Dev of the pinned
+# formal-conjectures checkout (same toolchain and Mathlib as the checker) and runs lake build on the modules listed in
+# .oma-dev/targets.txt (one module name per line). It reports every error and every sorry, and caches the build
+# (toolchain, Mathlib cache and the compiled dev modules) so later pushes only recompile what changed.
+# Read-only token; no secrets; it never pushes anything.
+name: cloud-dev
+on:
+  push:
+    branches: ["cloud-dev/**"]
+permissions:
+  contents: read
+concurrency:
+  group: cloud-dev-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Pinned formal-conjectures
+        id: fc
+        run: |
+          set -euo pipefail
+          C=$(python3 -I -c 'import json;print(json.load(open("data/catalog.json"))["meta"]["upstreamCommit"])')
+          echo "commit=$C" >> "$GITHUB_OUTPUT"
+          git init -q "$RUNNER_TEMP/fc" && cd "$RUNNER_TEMP/fc"
+          git remote add origin https://github.com/google-deepmind/formal-conjectures
+          git fetch -q --depth 1 origin "$C" && git checkout -q FETCH_HEAD
+
+      - name: Restore Lean cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.elan
+            ${{ runner.temp }}/fc/.lake
+          key: dev-fc-${{ steps.fc.outputs.commit }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            dev-fc-${{ steps.fc.outputs.commit }}-${{ github.ref_name }}-
+            dev-fc-${{ steps.fc.outputs.commit }}-
+
+      - name: Lean toolchain and Mathlib cache
+        run: |
+          retry() { for i in 1 2 3 4; do "$@" && return 0; echo "attempt $i failed: $*"; sleep $((i * 20)); done; return 1; }
+          if [ ! -x ~/.elan/bin/lake ]; then
+            retry curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+            retry sh /tmp/elan-init.sh -y --default-toolchain none
+          fi
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          cd "$RUNNER_TEMP/fc" && retry ~/.elan/bin/lake exe cache get
+
+      - name: Build dev modules
+        id: build
+        run: |
+          set -uo pipefail
+          mkdir -p "$RUNNER_TEMP/fc/H2Dev"
+          rm -f "$RUNNER_TEMP/fc/H2Dev/"*.lean
+          cp .oma-dev/H2Dev/*.lean "$RUNNER_TEMP/fc/H2Dev/"
+          cd "$RUNNER_TEMP/fc"
+          grep -q 'name = "H2Dev"' lakefile.toml || printf '\n[[lean_lib]]\nname = "H2Dev"\nglobs = ["H2Dev.+"]\n' >> lakefile.toml
+          T=$(grep -E '^[A-Za-z0-9_.]+$' "$GITHUB_WORKSPACE/.oma-dev/targets.txt" | tr '\n' ' ')
+          echo "targets: $T"
+          timeout 6000 lake build $T > "$GITHUB_WORKSPACE/build.log" 2>&1
+          RC=$?
+          echo "exit=$RC" >> "$GITHUB_WORKSPACE/build.log"
+          echo "rc=$RC" >> "$GITHUB_OUTPUT"
+          echo "errors: $(grep -c 'error:' "$GITHUB_WORKSPACE/build.log" || true)   sorries: $(grep -c "declaration uses 'sorry'" "$GITHUB_WORKSPACE/build.log" || true)"
+          grep -n -A 16 'error:' "$GITHUB_WORKSPACE/build.log" | head -800 || true
+          grep -n "declaration uses 'sorry'" "$GITHUB_WORKSPACE/build.log" | head -100 || true
+          tail -5 "$GITHUB_WORKSPACE/build.log"
+
+      - name: Save Lean cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.elan
+            ${{ runner.temp }}/fc/.lake
+          key: dev-fc-${{ steps.fc.outputs.commit }}-${{ github.ref_name }}-${{ github.sha }}
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Result
+        run: '[ "${{ steps.build.outputs.rc }}" = "0" ]'
