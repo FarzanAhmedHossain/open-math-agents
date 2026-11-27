@@ -46,6 +46,20 @@ lemma le_lv_of_start_le {m : ℕ} {s : Shape m} (hs : s.Valid) {w : ℕ} {j : Fi
     omega
   · exact hge
 
+/-- The positions of level `l` defined as commutators. -/
+def levE {D : Type u} {m : ℕ} (s : Shape m) (Z : Fin m → D) (l : ℕ) : Set D :=
+  {x | ∃ i a b, s.df i = some (some (a, b)) ∧ s.lv i = l ∧ x = Z i}
+
+lemma mem_levE {D : Type u} {m : ℕ} {s : Shape m} {Z : Fin m → D} {l : ℕ} {x : D} :
+    x ∈ levE s Z l ↔ ∃ i a b, s.df i = some (some (a, b)) ∧ s.lv i = l ∧ x = Z i := Iff.rfl
+
+/-- The free positions. -/
+def freeSet {D : Type u} {m : ℕ} (s : Shape m) (Z : Fin m → D) : Set D :=
+  {x | ∃ i, s.df i = none ∧ x = Z i}
+
+lemma mem_freeSet {D : Type u} {m : ℕ} {s : Shape m} {Z : Fin m → D} {x : D} :
+    x ∈ freeSet s Z ↔ ∃ i, s.df i = none ∧ x = Z i := Iff.rfl
+
 variable {D : Type u} [Group D]
 
 lemma mem_cl_drop_ofFn {m : ℕ} (Z : Fin m → D) {n : ℕ} (j : Fin m) (h : n ≤ j.val) :
@@ -85,20 +99,6 @@ lemma coreElt_cases {m : ℕ} {s : Shape m} (hs : s.Valid) (Z : Fin m → D) (k 
     unfold coreElt
     rw [dif_neg h]
 
-/-- The positions of level `l` defined as commutators. -/
-def levE {m : ℕ} (s : Shape m) (Z : Fin m → D) (l : ℕ) : Set D :=
-  {x | ∃ i a b, s.df i = some (some (a, b)) ∧ s.lv i = l ∧ x = Z i}
-
-lemma mem_levE {m : ℕ} {s : Shape m} {Z : Fin m → D} {l : ℕ} {x : D} :
-    x ∈ levE s Z l ↔ ∃ i a b, s.df i = some (some (a, b)) ∧ s.lv i = l ∧ x = Z i := Iff.rfl
-
-/-- The free positions. -/
-def freeSet {m : ℕ} (s : Shape m) (Z : Fin m → D) : Set D :=
-  {x | ∃ i, s.df i = none ∧ x = Z i}
-
-lemma mem_freeSet {m : ℕ} {s : Shape m} {Z : Fin m → D} {x : D} :
-    x ∈ freeSet s Z ↔ ∃ i, s.df i = none ∧ x = Z i := Iff.rfl
-
 /-- The pairs of core indices of the level-1 commutator positions. -/
 def coreP {m : ℕ} (s : Shape m) : Set (ℕ × ℕ) :=
   {ab | ∃ (i a b ka kb : Fin m), s.df i = some (some (a, b)) ∧ s.lv i = 1 ∧
@@ -113,7 +113,7 @@ relations of a valid shape has at most `p ^ m` elements. -/
 theorem card_le_of_code {p m : ℕ} (hp : 0 < p) (s : Shape m) (hs : s.Valid) (Z : Fin m → D)
     (hgen : Subgroup.closure (Set.range Z) = ⊤)
     (hN : ∃ N, lcs D N = ⊥)
-    (hpow : ∀ i, s.df i = some none → ∀ h : 0 < i.val,
+    (hpow : ∀ i, s.df i = some none → ∀ _ : 0 < i.val,
       Z i = Z ⟨i.val - 1, lt_of_le_of_lt (Nat.sub_le _ _) i.isLt⟩ ^ p)
     (hcomm : ∀ i a b, s.df i = some (some (a, b)) → Z i = ⁅Z a, Z b⁆)
     (h2 : ∀ i : Fin m, Z i ^ p ∈ cl ((List.ofFn Z).drop (i.val + 1)))
@@ -470,9 +470,9 @@ theorem rigidity {p m : Nat} (hp : p.Prime) {G G' : Type u} [Group G] [Group G']
   have hR' := h'
   obtain ⟨hcard, hgen, -⟩ := hR
   obtain ⟨hcard', hgen', -⟩ := hR'
-  haveI : Fact p.Prime := ⟨hp⟩
-  haveI : Group.IsNilpotent G := (IsPGroup.of_card hcard).isNilpotent
-  haveI : Group.IsNilpotent G' := (IsPGroup.of_card hcard').isNilpotent
+  have : Fact p.Prime := ⟨hp⟩
+  have : Group.IsNilpotent G := (IsPGroup.of_card hcard).isNilpotent
+  have : Group.IsNilpotent G' := (IsPGroup.of_card hcard').isNilpotent
   have hK := diag_card_le hp.pos X X' c h h'
   have hb1 : Function.Bijective (diagFst X X') :=
     (diagFst_surj X X' hgen).bijective_of_nat_card_le (by rw [hcard]; exact hK)
