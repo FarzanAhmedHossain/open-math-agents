@@ -88,7 +88,7 @@ theorem main : H1 → H2 → OMA.R_Erdos1160_erdos_1160_variants_sum_R2_H1_R1.H2
   have hcard : S.card ≤ m := (Finset.card_filter_le _ _).trans (Finset.card_range m).le
   have hsum : m * (4 * ∑ k ∈ S, g (2 ^ k)) ≤ m * g (2 ^ m) := by
     calc m * (4 * ∑ k ∈ S, g (2 ^ k)) = ∑ k ∈ S, 4 * m * g (2 ^ k) := by
-          rw [Finset.mul_sum, Finset.mul_sum, Finset.mul_sum]
+          rw [Finset.mul_sum, Finset.mul_sum]
           refine Finset.sum_congr rfl fun k _ => by ring
       _ ≤ ∑ _k ∈ S, g (2 ^ m) := Finset.sum_le_sum hterm
       _ = S.card * g (2 ^ m) := by rw [Finset.sum_const, smul_eq_mul]
