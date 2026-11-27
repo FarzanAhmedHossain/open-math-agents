@@ -68,13 +68,12 @@ theorem gg_three_pow (a : ℕ) : gg (3 ^ a) ^ 12 ≤ 3 ^ (a ^ 3 + 84 * (a + 1) ^
     rw [← hq] at this
     nlinarith [Nat.zero_le (a ^ 3)]
   have h12q : 12 * q ≤ a ^ 3 + 24 * a ^ 2 := Nat.le_of_mul_le_mul_left hq25 (by norm_num)
-  have h2 : (a + 2) ^ (60 * a) ≤ 3 ^ ((a + 1) * (60 * a)) := by
-    rw [pow_mul]
-    exact Nat.pow_le_pow_left (add_two_le_three_pow a) _
+  have h2 : (a + 2) ^ (60 * a) ≤ 3 ^ ((a + 1) * (60 * a)) :=
+    (Nat.pow_le_pow_left (add_two_le_three_pow a) _).trans_eq (pow_mul 3 (a + 1) (60 * a)).symm
   calc gg (3 ^ a) ^ 12 ≤ ((a + 2) ^ (5 * a) * 3 ^ q) ^ 12 := Nat.pow_le_pow_left h1 12
     _ = (a + 2) ^ (60 * a) * 3 ^ (12 * q) := by
-        rw [mul_pow, ← pow_mul, ← pow_mul]
-        ring_nf
+        rw [mul_pow, ← pow_mul, ← pow_mul, show 5 * a * 12 = 60 * a by ring,
+          show q * 12 = 12 * q by ring]
     _ ≤ 3 ^ ((a + 1) * (60 * a)) * 3 ^ (a ^ 3 + 24 * a ^ 2) :=
         Nat.mul_le_mul h2 (Nat.pow_le_pow_right (by norm_num) h12q)
     _ = 3 ^ ((a + 1) * (60 * a) + (a ^ 3 + 24 * a ^ 2)) := (pow_add _ _ _).symm
