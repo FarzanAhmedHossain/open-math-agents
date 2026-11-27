@@ -215,7 +215,7 @@ lemma layer_pow (p : ℕ) (N : Subgroup G) (C : List (Ent G)) (hC : ∀ c ∈ C,
       have hr' : r - n < (layer p N C).length := by omega
       obtain ⟨h0, h1, h2, h3⟩ := ih hC' (r - n) hr' hdf
       have e1 : r - 1 - n = r - n - 1 := by omega
-      rw [ent_append_right (chainE p n c) (layer p N C) (by rw [hlen]; exact hrn),
+      rw [ent_append_right (chainE p n c) (layer p N C) (i := r) (by rw [hlen]; exact hrn),
         ent_append_right (chainE p n c) (layer p N C) (i := r - 1) (by rw [hlen]; omega), hlen, e1]
       exact ⟨by omega, h1, h2, h3⟩
 
@@ -326,13 +326,13 @@ lemma layer_powrel (hp : p.Prime) (hG : Nat.card G = p ^ m) (w : ℕ) (C : List 
         have h' : c.g ^ p ^ n ∈ cl ((layer p (lcs G (w + 1)) C).map Ent.g) ⊔ lcs G (w + 1) := by
           rw [layer_sup hp hG w C hC']
           exact h2
-        exact (sup_le_sup_right le_sup_right _) h'
+        exact (sup_le_sup_right (le_sup_right (a := cl (((chainE p n c).map Ent.g).drop (r + 1)))) _) h'
     · push_neg at hrn
       have hr' : r - n < (layer p (lcs G (w + 1)) C).length := by omega
       rw [ent_append_right (chainE p n c) _ (by rw [hlen]; exact hrn), hlen]
       have h' := ih hC' (r - n) hr'
       rw [show r - n + 1 = r + 1 - n by omega] at h'
-      exact (sup_le_sup_right le_sup_right _) h'
+      exact (sup_le_sup_right (le_sup_right (a := cl (((chainE p n c).map Ent.g).drop (r + 1)))) _) h'
 
 /-- Y5 (head form): a candidate outside the closure of the later ones keeps its head. -/
 lemma layer_mem_head (hp : p.Prime) (hG : Nat.card G = p ^ m) (w : ℕ) (A C : List (Ent G))
@@ -547,7 +547,7 @@ theorem realizes_of_layout {p m : ℕ} (hp : 0 < p) (hG : Nat.card G = p ^ m) (X
       (List.ofFn X)[i] ^ p ∈ cl ((List.ofFn X).drop (i + 1)) := by
     intro i hi
     rw [List.getElem_ofFn]
-    exact hpow _
+    exact hpow ⟨i, by simpa using hi⟩
   have h3 : ∀ (g : G) j (hj : j < (List.ofFn X).length),
       g * (List.ofFn X)[j] * g⁻¹ * ((List.ofFn X)[j])⁻¹ ∈ cl ((List.ofFn X).drop (j + 1)) := by
     intro g j hj
@@ -1164,7 +1164,7 @@ lemma full_cut (d : Dat G) (n : ℕ) {i : ℕ} (hi : i < (d.full n).length) (v :
     have := d.off_mono hc
     omega
   · intro h
-    have := d.off_mono (Nat.succ_le_of_lt h)
+    have : d.off (w + 1) ≤ d.off v := d.off_mono h
     omega
 
 /-! ### Generic fields of `LGood` for `full n` -/
@@ -1559,7 +1559,7 @@ lemma good_comm {d : Dat G} (hd : d.Hyp m) :
     have hoff1 : d.off 1 ≤ d.off (w + 1 + 1) := d.off_mono (by omega)
     have hoffs : d.off (w + 1 + 1) = d.off (w + 1) + (d.Y (w + 1)).length := d.off_succ (w + 1)
     have hea : ent (d.full m) (d.off (w + 1) + r') = ent (d.Y (w + 1)) r' := d.ent_full hw1 hr'
-    refine ⟨by omega, lt_of_lt_of_le (hcore b' hb).1 (by omega), ⟨b', hb, rfl⟩, ?_,
+    refine ⟨by omega, lt_of_lt_of_le (show d.pos b' < d.off 1 from (hcore b' hb).1) (by omega), ⟨b', hb, rfl⟩, ?_,
       fun h => by have h' : w + 2 = 1 := h; omega, ?_⟩
     · show w + 2 = _
       rw [hea, d.Y_lv (w + 1) _ (ent_mem _ hr')]
