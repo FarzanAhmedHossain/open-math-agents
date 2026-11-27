@@ -33,7 +33,7 @@ def cl (l : List G) : Subgroup G := Subgroup.closure {x | x ∈ l}
 
 lemma cl_def (l : List G) : cl l = Subgroup.closure {x | x ∈ l} := rfl
 
-lemma mem_cl_of_mem {l : List G} {x : G} (h : x ∈ l) : x ∈ cl l := subset_closure h
+lemma mem_cl_of_mem {l : List G} {x : G} (h : x ∈ l) : x ∈ cl l := Subgroup.subset_closure h
 
 /-- A normal-form product `l[n-1]^(e (n-1)) * ... * l[0]^(e 0)`. -/
 def nf : List G → (ℕ → ℕ) → G
@@ -54,7 +54,7 @@ lemma nf_mem : ∀ (l : List G) (e : ℕ → ℕ), nf l e ∈ cl l
   | b :: l, e => by
     rw [nf_cons]
     refine mul_mem ?_ (pow_mem (mem_cl_of_mem (by simp)) _)
-    exact closure_mono (fun x hx => by simp_all) (nf_mem l _)
+    exact Subgroup.closure_mono (fun x hx => by simp_all) (nf_mem l _)
 
 lemma nf_congr : ∀ (l : List G) (e e' : ℕ → ℕ), (∀ k < l.length, e k = e' k) →
     nf l e = nf l e'
@@ -64,7 +64,7 @@ lemma nf_congr : ∀ (l : List G) (e e' : ℕ → ℕ), (∀ k < l.length, e k =
       (fun k hk => h (k + 1) (by simp; omega)), h 0 (by simp)]
 
 lemma cl_drop_mono (l : List G) {a b : ℕ} (h : a ≤ b) : cl (l.drop b) ≤ cl (l.drop a) :=
-  closure_mono fun _ hx => (List.drop_sublist_drop_left l h).subset hx
+  Subgroup.closure_mono fun _ hx => (List.drop_sublist_drop_left l h).subset hx
 
 lemma getElem_mem_drop (l : List G) {i j : ℕ} (hij : i ≤ j) (hj : j < l.length) :
     l[j] ∈ l.drop i := by
@@ -94,7 +94,7 @@ theorem nf_surj (p : ℕ) (hp : 0 < p) : ∀ (X : List G),
     have hconj : ∀ y ∈ cl Y, b * y * b⁻¹ ∈ cl Y := by
       intro y hy
       have hle : cl Y ≤ (cl Y).comap (MulAut.conj b).toMonoidHom := by
-        rw [cl_def Y, closure_le]
+        rw [cl_def Y, Subgroup.closure_le]
         intro z hz
         obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem hz
         exact hnorm 0 (j + 1) (by omega) (by simp; omega)
@@ -249,7 +249,7 @@ lemma card_Gam (hp : 0 < p) : Finite (Gam p n P C) ∧ Nat.card (Gam p n P C) �
     fun v => nf (X p n P C) (fun k => if h : k < n then (v ⟨k, h⟩ : ℕ) else 0)
   have hΦ : Function.Surjective Φ := by
     intro x
-    obtain ⟨e, he, rfl⟩ := hsurj x (by rw [cl_X]; exact mem_top x)
+    obtain ⟨e, he, rfl⟩ := hsurj x (by rw [cl_X]; exact Subgroup.mem_top x)
     refine ⟨fun k => ⟨e k, he k⟩, ?_⟩
     apply nf_congr
     intro k hk
@@ -270,7 +270,7 @@ theorem iso_Gam (hp : 0 < p) {K : Type u} [Group K] [Finite K] (l : List K) (hl 
     Nonempty (K ≃* Gam p n P C) := by
   let π := PresentedGroup.toGroup (rels_hold p n P C l hl hP hC)
   have hsurj : Function.Surjective π := by
-    rw [← MonoidHom.range_eq_top, eq_top_iff, ← htop, cl_def, closure_le]
+    rw [← MonoidHom.range_eq_top, eq_top_iff, ← htop, cl_def, Subgroup.closure_le]
     intro x hx
     obtain ⟨i, hi, rfl⟩ := List.getElem_of_mem hx
     refine ⟨PresentedGroup.of i, ?_⟩
@@ -319,8 +319,8 @@ lemma cl_append_comap {Q : Type v} [Group Q] (f : G →* Q) (z : G) (hker : f.ke
   have e2 : {x | x ∈ A.map f} = f '' {x | x ∈ A} := by
     ext x
     simp
-  rw [cl_def, cl_def, e1, e2, closure_union, ← zpowers_eq_closure, ← MonoidHom.map_closure,
-    comap_map_eq, hker]
+  rw [cl_def, cl_def, e1, e2, Subgroup.closure_union, ← Subgroup.zpowers_eq_closure, ← MonoidHom.map_closure,
+    Subgroup.comap_map_eq, hker]
 
 /-- Every group of order `p^n` has a generating list refining a central series with factors of
 order `p`. -/
@@ -355,8 +355,8 @@ theorem exists_pcgs (p : ℕ) (hp : p.Prime) : ∀ (n : ℕ) (G : Type u) [Group
     haveI hZn : (zpowers z).Normal := by
       constructor
       intro x hx g
-      have hc : x ∈ center G := (zpowers_le.mpr hzc) hx
-      rw [mem_center_iff] at hc
+      have hc : x ∈ center G := (Subgroup.zpowers_le.mpr hzc) hx
+      rw [Subgroup.mem_center_iff] at hc
       rw [hc g, mul_inv_cancel_right]
       exact hx
     have hQ : Nat.card (G ⧸ zpowers z) = p ^ n := by
@@ -391,20 +391,20 @@ theorem exists_pcgs (p : ℕ) (hp : p.Prime) : ∀ (n : ℕ) (G : Type u) [Group
       simp
     refine ⟨l' ++ [z], by simp [hl'len], ?_, ?_, ?_⟩
     · have h0 := hA 0 (Nat.zero_le _)
-      rw [List.drop_zero, List.drop_zero, hqtop, comap_top] at h0
+      rw [List.drop_zero, List.drop_zero, hqtop, Subgroup.comap_top] at h0
       exact h0
     · intro i hi
       by_cases hin : i < n
-      · rw [hA (i + 1) (by omega), mem_comap, map_pow, hget i hi hin]
+      · rw [hA (i + 1) (by omega), Subgroup.mem_comap, map_pow, hget i hi hin]
         exact hqpow i (by omega)
       · rw [hgetz i hi hin, ← hzo, pow_orderOf_eq_one]
         exact one_mem _
     · intro g j hj
       by_cases hjn : j < n
-      · rw [hA (j + 1) (by omega), mem_comap, map_mul, map_mul, map_mul, map_inv, map_inv,
+      · rw [hA (j + 1) (by omega), Subgroup.mem_comap, map_mul, map_mul, map_mul, map_inv, map_inv,
           hget j hj hjn]
         exact hqcen (mk g) j (by omega)
-      · rw [hgetz j hj hjn, mem_center_iff.mp hzc g, mul_inv_cancel_right, mul_inv_cancel]
+      · rw [hgetz j hj hjn, Subgroup.mem_center_iff.mp hzc g, mul_inv_cancel_right, mul_inv_cancel]
         exact one_mem _
 
 end Exist

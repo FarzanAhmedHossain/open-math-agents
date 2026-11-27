@@ -123,11 +123,27 @@ jobs:
             ${{ runner.temp }}/fc/.lake
           key: cloud-fc-${{ steps.fc.outputs.commit }}-${{ hashFiles('reductions/**') }}
 
+      # check.sh keeps only the last 6000 characters of the compiler output; on a rejection, recompile the file
+      # directly (imports are already built) so EVERY error is visible.
+      - name: Full error log (only when not accepted)
+        if: ${{ always() }}
+        env:
+          FILE: ${{ steps.req.outputs.file }}
+        run: |
+          V=$(python3 -I -c 'import json;print(json.load(open("verdict.json"))["verdict"])' 2>/dev/null || echo none)
+          [ "$V" = "accepted" ] && exit 0
+          cd "$RUNNER_TEMP/fc"
+          timeout 1800 lake env lean "$GITHUB_WORKSPACE/$FILE" > "$GITHUB_WORKSPACE/full.log" 2>&1 || true
+          echo "errors: $(grep -c ': error' "$GITHUB_WORKSPACE/full.log" || true)"
+          grep -n -A 14 ': error' "$GITHUB_WORKSPACE/full.log" | head -600 || true
+
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: verdict
-          path: verdict.json
+          path: |
+            verdict.json
+            full.log
           if-no-files-found: warn
 
       - name: Accepted?
