@@ -279,7 +279,7 @@ theorem strict_chain_indep (u : ℕ → G) (t : ℕ) (h : StrictChain u t) (ht :
     intro a ha
     obtain rfl : a = 0 := by omega
     exact lcs_two_le_Wk u 1 (commElem_mem_lcs_succ (n := 1) h0 (u 1))
-  · haveI := Wk_normal u k
+  · have := Wk_normal u k
     refine h.ne_succ (k := k) (by omega) (by omega)
       (le_antisymm (Wk_mono u (show k ≤ k + 1 by omega)) (Wk_succ_le ?_))
     intro a ha
