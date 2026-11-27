@@ -6,6 +6,8 @@ can be developed in parallel. DEVELOPMENT STUBS: the bodies are proved in `Lie.l
 
 namespace OMA.SimsLite
 
+open scoped commutatorElement
+
 universe u
 
 section Stmt

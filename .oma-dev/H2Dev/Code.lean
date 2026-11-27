@@ -20,6 +20,8 @@ with every core position. -/
 
 namespace OMA.SimsLite
 
+open scoped commutatorElement
+
 universe u
 
 section Code

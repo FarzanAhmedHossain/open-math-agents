@@ -6,6 +6,8 @@ Convention: Mathlib's `⁅x, y⁆ = x * y * x⁻¹ * y⁻¹`; `lcs D n` is the l
 
 namespace OMA.SimsLite
 
+open scoped commutatorElement
+
 universe u
 
 section Comm
