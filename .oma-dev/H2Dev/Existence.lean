@@ -78,6 +78,7 @@ lemma cl_nil : cl ([] : List G) = ⊥ := by
   rw [cl_def, eq_bot_iff, Subgroup.closure_le]
   intro x hx
   simp at hx
+lemma mem_sup_mid {A B N : Subgroup G} {x : G} (h : x ∈ B ⊔ N) : x ∈ A ⊔ B ⊔ N :=  (sup_le_sup_right (le_sup_right : B ≤ A ⊔ B) N) h
 
 lemma cl_le_of_forall {l : List G} {H : Subgroup G} (h : ∀ x ∈ l, x ∈ H) : cl l ≤ H := by
   rw [cl_def, Subgroup.closure_le]
@@ -326,13 +327,13 @@ lemma layer_powrel (hp : p.Prime) (hG : Nat.card G = p ^ m) (w : ℕ) (C : List 
         have h' : c.g ^ p ^ n ∈ cl ((layer p (lcs G (w + 1)) C).map Ent.g) ⊔ lcs G (w + 1) := by
           rw [layer_sup hp hG w C hC']
           exact h2
-        exact (sup_le_sup_right (le_sup_right (a := cl (((chainE p n c).map Ent.g).drop (r + 1)))) _) h'
+        exact mem_sup_mid h'
     · push_neg at hrn
       have hr' : r - n < (layer p (lcs G (w + 1)) C).length := by omega
       rw [ent_append_right (chainE p n c) _ (by rw [hlen]; exact hrn), hlen]
       have h' := ih hC' (r - n) hr'
       rw [show r - n + 1 = r + 1 - n by omega] at h'
-      exact (sup_le_sup_right (le_sup_right (a := cl (((chainE p n c).map Ent.g).drop (r + 1)))) _) h'
+      exact mem_sup_mid h'
 
 /-- Y5 (head form): a candidate outside the closure of the later ones keeps its head. -/
 lemma layer_mem_head (hp : p.Prime) (hG : Nat.card G = p ^ m) (w : ℕ) (A C : List (Ent G))
