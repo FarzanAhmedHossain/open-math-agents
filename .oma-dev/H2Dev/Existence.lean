@@ -78,7 +78,8 @@ lemma cl_nil : cl ([] : List G) = ⊥ := by
   rw [cl_def, eq_bot_iff, Subgroup.closure_le]
   intro x hx
   simp at hx
-lemma mem_sup_mid {A B N : Subgroup G} {x : G} (h : x ∈ B ⊔ N) : x ∈ A ⊔ B ⊔ N :=  (sup_le_sup_right (le_sup_right : B ≤ A ⊔ B) N) h
+lemma mem_sup_mid {A B N : Subgroup G} {x : G} (h : x ∈ B ⊔ N) : x ∈ A ⊔ B ⊔ N :=
+  (sup_le_sup_right (le_sup_right : B ≤ A ⊔ B) N) h
 
 lemma cl_le_of_forall {l : List G} {H : Subgroup G} (h : ∀ x ∈ l, x ∈ H) : cl l ≤ H := by
   rw [cl_def, Subgroup.closure_le]
@@ -1560,7 +1561,8 @@ lemma good_comm {d : Dat G} (hd : d.Hyp m) :
     have hoff1 : d.off 1 ≤ d.off (w + 1 + 1) := d.off_mono (by omega)
     have hoffs : d.off (w + 1 + 1) = d.off (w + 1) + (d.Y (w + 1)).length := d.off_succ (w + 1)
     have hea : ent (d.full m) (d.off (w + 1) + r') = ent (d.Y (w + 1)) r' := d.ent_full hw1 hr'
-    refine ⟨by omega, lt_of_lt_of_le (show d.pos b' < d.off 1 from (hcore b' hb).1) (by omega), ⟨b', hb, rfl⟩, ?_,
+    refine ⟨by omega,
+      lt_of_lt_of_le (show d.pos b' < d.off 1 from (hcore b' hb).1) (by omega), ⟨b', hb, rfl⟩, ?_,
       fun h => by have h' : w + 2 = 1 := h; omega, ?_⟩
     · show w + 2 = _
       rw [hea, d.Y_lv (w + 1) _ (ent_mem _ hr')]

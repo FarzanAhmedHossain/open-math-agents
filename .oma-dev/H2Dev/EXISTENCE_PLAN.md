@@ -44,7 +44,8 @@ fields are the `good_*` lemmas).
 
 ## Helpers
 
-Status at the time of writing: every helper below has a proof in the file; the column `deps`
+Status: every helper below is fully proved in the file (last cloud build: 0 errors, no sorry in
+Existence.lean); the column `deps`
 lists what each proof uses, so that a broken proof can be repaired in isolation. Sizes are the
 sizes of the current proofs.
 
