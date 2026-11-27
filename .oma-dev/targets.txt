@@ -1,5 +1,4 @@
-H2Dev.Lie
-H2Dev.Strict
-H2Dev.Stmt
 H2Dev.Count
 H2Dev.Rigidity
+H2Dev.ExistStmt
+H2Dev.Main
