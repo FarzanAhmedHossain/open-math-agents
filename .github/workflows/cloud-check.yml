@@ -3,7 +3,8 @@
 #
 # Trigger: push to a cloud/** branch of this fork that contains .oma-cloud/request.json, for example
 #   {"problem": "<problem or step id>", "open_pr": false, "agent": "claude-code", "model": "claude-opus-5-5"}
-# The proof checked is proofs/<problem>.lean from the pushed commit.
+# The proof checked is proofs/<problem>.lean from the pushed commit, or reductions/<problem>.lean when <problem>
+# ends in .R<n> and that reduction file exists (check only: open_pr must then be false).
 # The lease is NEVER committed (a public branch would leak it): it is read from the repository secret
 # OMA_LEASE, holding "<problem id> <lease>". The job beats it while it works, so it cannot expire mid-run.
 # With "open_pr": true and an accepted verdict, the job cuts a branch oma/<problem> holding ONLY that proof file
@@ -52,6 +53,11 @@ jobs:
               if not re.fullmatch(r"[A-Za-z0-9_.:/-]+", v):
                   raise SystemExit("bad agent/model")
           f = "proofs/" + pid + ".lean"
+          # A reduction you wrote (<id>.R<n>) is checked from reductions/; it is check-only here (no PR from the cloud).
+          if re.fullmatch(r".+\.R[0-9]+", pid) and os.path.isfile("reductions/" + pid + ".lean"):
+              f = "reductions/" + pid + ".lean"
+              if r.get("open_pr") is True:
+                  raise SystemExit("open_pr is not supported for reductions: open that pull request with tools/oma.sh submit")
           if not os.path.isfile(f):
               raise SystemExit("missing " + f)
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:

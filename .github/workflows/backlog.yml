@@ -1,9 +1,12 @@
-# Trusted stage, like verdict.yml: never checks out or runs pull request code.
-# Merges the pull requests that the Lean checker accepted but that waited under the old human-review rule
-# (label needs-human-review): for each, the latest check of its exact head commit must have passed, and the linter
-# from main is re-run on the file. Proofs of open problems show on the site as "statement being verified" until their
-# formal statement is checked (content/open_review.json). About 100 pull requests per run (GitHub API budget);
-# runs every 20 minutes and stops doing anything once the label is gone from every open pull request.
+# The merger. Trusted stage, like verdict.yml: never checks out or runs pull request code.
+# One long-running job (tools/merger_loop.sh) instead of one queued verdict job per proof:
+#  - every 30 seconds it gives each finished check-proof run its verdict (tools/verdict_one.sh: re-check the diff from
+#    the API, re-run the linter from main, comment, merge, credit), four at a time;
+#  - every 20 minutes it runs the backlog pass (tools/backlog_pass.sh): merges the pull requests that the Lean checker
+#    accepted but that waited under the old human-review rule (label needs-human-review).
+# A run lasts 5 h 40 min; the schedule keeps one queued behind it (concurrency group "merger"), so the next starts at once.
+# The API budget of GITHUB_TOKEN is shared by every job of the repository: the loop polls cheaply (see the script).
+# Free on a public repository: it holds one runner slot out of 20, and frees the slots the verdict jobs took.
 name: backlog
 on:
   schedule:
@@ -13,75 +16,21 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
-  actions: read
-  id-token: write
+  actions: write   # to re-run a check that failed on our side (fault), as verdict.yml did
+  id-token: write  # OIDC token: proves to the site that a credit request comes from this workflow on main
 concurrency:
-  group: backlog
+  group: merger
   cancel-in-progress: false
 jobs:
   merge:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
         with: { ref: main, path: base }
-      - name: Merge accepted pull requests that were waiting for review
+      - name: Verdicts and backlog, in a loop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           OMA_SITE: ${{ vars.OMA_SITE }}
-        run: |
-          set -uo pipefail
-          gh api "repos/$REPO/issues?state=open&labels=needs-human-review&per_page=100&sort=created&direction=asc" --jq '.[] | select(.pull_request) | .number' > prs.txt
-          echo "$(wc -l < prs.txt) pull requests in this batch"
-          N=0
-          while read -r PR; do
-            N=$((N+1))
-            gh api "repos/$REPO/pulls/$PR" > pr.json || continue
-            SHA=$(jq -r .head.sha pr.json)
-            gh api "repos/$REPO/pulls/$PR/files" > files.json || continue
-            if [ "$(jq 'length' files.json)" != 1 ] || [ "$(jq -r '.[0].status' files.json)" != added ]; then echo "#$PR: not a single new file, left for a person"; continue; fi
-            FPATH=$(jq -r '.[0].filename' files.json)
-            echo "$FPATH" | grep -qE '^(proofs|reductions|statements)/[A-Za-z0-9_.'"'"'-]+\.lean$' || { echo "#$PR: unexpected path"; continue; }
-            # the latest completed check of this exact commit
-            RUN=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&event=pull_request&status=completed&per_page=20" \
-                  --jq '[.workflow_runs[] | select(.name=="check-proof")] | sort_by(.created_at) | last | .id // empty')
-            [ -n "$RUN" ] || { echo "#$PR: no completed check for $SHA"; continue; }
-            rm -rf art; gh run download "$RUN" --repo "$REPO" -n verdict -D art >/dev/null 2>&1 || { echo "#$PR: no verdict artifact"; continue; }
-            [ "$(jq -r .verdict art/verdict.json)" = accepted ] || { echo "#$PR: check verdict is $(jq -r .verdict art/verdict.json)"; continue; }
-            if gh api "repos/$REPO/contents/$FPATH?ref=main" >/dev/null 2>&1; then
-              gh pr comment "$PR" --repo "$REPO" --body "Closing: \`$FPATH\` is already on main (another proof of the same target was merged first). Thank you; take the next problem." >/dev/null
-              gh pr close "$PR" --repo "$REPO" >/dev/null; gh pr edit "$PR" --repo "$REPO" --remove-label needs-human-review >/dev/null 2>&1
-              continue
-            fi
-            # the linter from main, on the exact file of the checked commit
-            mkdir -p "base/$(dirname "$FPATH")"
-            gh api "repos/$REPO/contents/$FPATH?ref=$SHA" --jq .content | base64 -d > "base/$FPATH" || continue
-            if ! (cd base && python3 -I tools/lint.py "$FPATH" data/catalog.json > /tmp/relint.json); then
-              echo "#$PR: trusted lint refused: $(jq -c .errors /tmp/relint.json)"; rm -f "base/$FPATH"; continue
-            fi
-            rm -f "base/$FPATH"
-            KIND=$(python3 -I -c 'import json;d=json.load(open("/tmp/relint.json"));print(d["type"] if d["type"] in ("reduction","statement") else d["kind"])')
-            if [ "$KIND" = open ]; then
-              MSG="**Merged.** The Lean checker had accepted this proof; it waited for a review under an old rule, now replaced. It is credited to you now. On the site it shows as *proof accepted, statement being verified* until the formal statement is checked against the original problem; then it counts as an open problem solved."
-            elif [ "$KIND" = statement ]; then
-              MSG="**Merged.** The statement compiled; it waited for a review under an old rule, now replaced. The problem is provable by everyone now and the formalization is credited to you. Its faithfulness to the source is checked separately."
-            else
-              MSG="**Merged.** The Lean checker had accepted this; it waited for a review under an old rule, now replaced. Credited to you now."
-            fi
-            [ "$(jq -r .draft pr.json)" = true ] && gh pr ready "$PR" --repo "$REPO" >/dev/null 2>&1
-            MERGED=0
-            for TRY in 1 2 3 4 5; do
-              if OUT="$(gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$SHA" 2>&1)"; then MERGED=1; break; fi
-              echo "#$PR merge attempt $TRY: ${OUT:0:160}"
-              echo "$OUT" | grep -qiE "base branch was modified|try the merge again|is not mergeable|timeout|502|503" || break
-              sleep $((3 * TRY))
-            done
-            if [ "$MERGED" = 1 ]; then
-              gh pr comment "$PR" --repo "$REPO" --body "$MSG" >/dev/null
-              gh pr edit "$PR" --repo "$REPO" --remove-label needs-human-review >/dev/null 2>&1
-              bash base/tools/credit.sh "$PR" >/dev/null 2>&1 || echo "#$PR: credit will be retried by the site"
-              echo "#$PR: merged ($KIND)"
-            fi
-          done < prs.txt
-          echo "done: $N looked at"
+        run: bash base/tools/merger_loop.sh

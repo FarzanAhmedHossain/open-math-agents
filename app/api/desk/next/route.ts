@@ -5,6 +5,12 @@ import { pointsFor } from "@/lib/points";
 import { STEP_RE, stepSkeleton } from "@/lib/steps";
 import { SITE, REPO } from "@/lib/site";
 import { teamFields } from "@/lib/collab";
+import EVENT from "@/content/event.json";
+import IMPACT from "@/content/impact.json";
+
+const IMPACT_IDS = IMPACT.groups.flatMap((g) => g.items.map((i) => i.id));
+/** True while the live event runs (content/event.json): agents that ask for nothing specific work on its problems. */
+const eventOn = (t = Date.now()) => t >= Date.parse(EVENT.start) && t < Date.parse(EVENT.end);
 
 const LEVELS: Record<string, [number, number]> = { warmup: [0, 20], solid: [20, 55], hard: [55, 85], legendary: [85, 101] };
 
@@ -30,8 +36,26 @@ async function handle(req: Request) {
 
   const [live, stats] = await Promise.all([getLiveMap(), getStats()]);
   const solved = new Set(stats.solved.map((s) => s.problem_id));
-  const wanted = get("problem");
-  const kind = get("kind") || "known";
+  let wanted = get("problem");
+  let kind = get("kind") || "known";
+  // kind=impact: the problems most useful beyond mathematics (content/impact.json). During the live event, agents that
+  // ask for nothing specific (no problem, default or broad kind) are sent to the event's problems and their open steps;
+  // event=0 opts out.
+  let event: { title: string; end: string } | null = null;
+  const routeEvent = eventOn() && get("event") !== "0" && ["", "known", "any", "open"].includes(get("kind"));
+  if (!wanted && (kind === "impact" || routeEvent)) {
+    const openOnly = (id: string) => !solved.has(id) && ["open", "unformalized"].includes(getProblem(id)?.kind ?? "");
+    let cands = (kind === "impact" ? IMPACT_IDS : EVENT.problems).filter(openOnly);
+    if (kind !== "impact") {
+      const st = (await getSteps(undefined, true)).filter((s) => !s.solved && !solved.has(s.id) && s.id.startsWith(EVENT.stepsOf));
+      cands = cands.concat(st.map((s) => s.id));
+      event = { title: EVENT.title, end: EVENT.end };
+    }
+    const choice = pick(cands.map((id) => ({ id })), live);
+    if (choice) wanted = choice.id;
+    else if (kind === "impact") return json({ error: "nothing_matches", hint: "Every problem of the impact list is solved or taken; try --kind open." }, 404);
+    if (kind === "impact") kind = "any";
+  }
   const agent = get("agent") || "unknown";
 
   // Steps (hypotheses of accepted reductions) live in the database, not in the static catalogue.
@@ -57,6 +81,7 @@ async function handle(req: Request) {
       skeleton: stepSkeleton(s, handleName),
       next: nextHints(r.lease!, `proofs/${s.id}.lean`, s.id),
       ...teamFields(r),
+      ...(event ? { event } : {}),
     });
   }
 
@@ -88,6 +113,7 @@ async function handle(req: Request) {
         "Once merged, the problem becomes provable by everyone.",
       next: nextHints(r.lease!, `statements/${fp.id}.lean`, fp.id),
       ...teamFields(r),
+      ...(event ? { event } : {}),
     });
   }
 
@@ -133,6 +159,7 @@ async function handle(req: Request) {
     disproofSkeleton: skeleton(f, "disproof", handleName),
     next: nextHints(r.lease!, proofPath(p), p.id),
     ...teamFields(r),
+    ...(event ? { event } : {}),
   });
 }
 

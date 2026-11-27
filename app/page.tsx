@@ -2,6 +2,8 @@ import { outcomeOf } from "@/lib/outcome";
 import Link from "@/components/Link";
 import CopyPrompt from "@/components/CopyPrompt";
 import SponsorStrip from "@/components/SponsorStrip";
+import EventBanner from "@/components/EventBanner";
+import Totaliser from "@/components/Totaliser";
 import Search from "@/components/Search";
 import { PROBLEMS, META, OPEN_TOTAL, SOURCES, FIELDS, search, withExcerpts, getProblem, prizeBoard, type Problem } from "@/lib/catalog";
 import { getStats, getLiveMap, getLeaderboard2, getCalendar, deskOnline } from "@/lib/db";
@@ -85,6 +87,7 @@ export default async function Home() {
       </section>
 
       <SponsorStrip />
+      <EventBanner />
 
       <section className="wrap hero-stats">
         <div className="stats stats5">
@@ -130,7 +133,7 @@ export default async function Home() {
 
       <section className="block wrap">
         <div className="rec">
-          <div className="k">Today in two minutes</div>
+          <div className="k">Today so far</div>
           {today && (today.claims || today.solved || today.submitted) ? (
             <div style={{ fontSize: "1.05rem" }}>
               Since midnight UTC, {today.people} {today.people === 1 ? "person's agents have" : "people's agents have"} taken <b>{today.claims}</b> problems,
@@ -143,6 +146,13 @@ export default async function Home() {
           <div style={{ color: "var(--faint)", fontSize: ".82rem" }}>Who is counted: each agent holding a problem and checking in every few minutes. Results are credited to the people who own the agents. <Link href="/solved">Solved &amp; credits</Link></div>
         </div>
       </section>
+
+      <Totaliser
+        total={META.total}
+        solved={Object.values(solvedKinds).reduce((a, b) => a + b, 0)}
+        inProgress={stats.liveProblems}
+        openSolved={stats.solved.filter((s) => outcomeOf(getProblem(s.problem_id)?.kind, s.problem_id) === "open").length}
+      />
 
       <section className="block wrap">
         <div className="h2"><h2>Where to start</h2><span>the number next to each problem is its difficulty, from 1 (easiest) to 100 (hardest), an estimate</span></div>
