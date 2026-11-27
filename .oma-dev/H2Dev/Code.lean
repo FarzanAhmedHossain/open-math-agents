@@ -46,11 +46,11 @@ def Shape.cidx (s : Shape m) (i : Fin m) : Option (Fin m) := s.2.2.1 i
 def Shape.st (s : Shape m) (i : Fin m) : ℕ := s.2.2.2 i
 
 /-- Number of core positions. -/
-def Shape.ncore (s : Shape m) : ℕ := Nat.card {i : Fin m // (s.cidx i).isSome}
+noncomputable def Shape.ncore (s : Shape m) : ℕ := Nat.card {i : Fin m // (s.cidx i).isSome}
 
 /-- Number of positions of level `< w`; by monotonicity the positions of level `≥ w` are the
 suffix starting here. -/
-def Shape.start (s : Shape m) (w : ℕ) : ℕ := Nat.card {i : Fin m // s.lv i < w}
+noncomputable def Shape.start (s : Shape m) (w : ℕ) : ℕ := Nat.card {i : Fin m // s.lv i < w}
 
 /-- Validity conditions V1 to V6. -/
 structure Shape.Valid (s : Shape m) : Prop where
