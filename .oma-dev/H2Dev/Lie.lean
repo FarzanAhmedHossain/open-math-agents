@@ -125,7 +125,7 @@ theorem lie_lemma (t : ℕ) (u : ℕ → D) (H1 : Set D) (P : Set (ℕ × ℕ)) 
     exact Subgroup.mem_top g
   -- A(0): the commutator subgroup lies in `lieM E 1`
   have hA0 : lcs D 1 ≤ lieM E 1 := by
-    haveI := hMn 1 le_rfl
+    have := hMn 1 le_rfl
     rw [show lcs D 1 = ⁅(⊤ : Subgroup D), ⊤⁆ from lcs_succ 0, Subgroup.commutator_le]
     intro x _ g _
     refine lie_sup_comm ?_ ?_ x (hg x)
@@ -139,8 +139,8 @@ theorem lie_lemma (t : ℕ) (u : ℕ → D) (H1 : Set D) (P : Set (ℕ × ℕ)) 
       exact lieM_sup_right (commElem_mem_lcs_succ hy g)
   -- B(1), by strong induction on the core index
   have hB1 : ∀ k, k < t → ∀ x ∈ lieM E 1, ⁅x, u k⁆ ∈ lieM E 2 := by
-    haveI := hMn 1 le_rfl
-    haveI := hMn 2 (by omega)
+    have := hMn 1 le_rfl
+    have := hMn 2 (by omega)
     intro k
     induction k using Nat.strong_induction_on with
     | _ k ih =>
@@ -165,7 +165,7 @@ theorem lie_lemma (t : ℕ) (u : ℕ → D) (H1 : Set D) (P : Set (ℕ × ℕ)) 
     · have hl1 : l = 1 := by omega
       subst hl1
       exact hB1 k hk
-    · haveI := hMn (l + 1) (by omega)
+    · have := hMn (l + 1) (by omega)
       refine lie_sup_comm ?_ ?_
       · intro z hz
         exact hH3 l h z hz k hk
@@ -175,7 +175,7 @@ theorem lie_lemma (t : ℕ) (u : ℕ → D) (H1 : Set D) (P : Set (ℕ × ℕ)) 
   have hred : ∀ l, 1 ≤ l → (∀ x ∈ E l, ∀ h ∈ H1, ⁅x, h⁆ ∈ lieM E (l + 1)) →
       ∀ x ∈ lieM E l, ∀ g : D, ⁅x, g⁆ ∈ lieM E (l + 1) := by
     intro l hl hgen x hx g
-    haveI := hMn (l + 1) (by omega)
+    have := hMn (l + 1) (by omega)
     refine lie_sup_comm ?_ ?_ x hx
     · intro y hy
       refine lie_sup_comm_right ?_ ?_ g (hg g)
@@ -191,8 +191,8 @@ theorem lie_lemma (t : ℕ) (u : ℕ → D) (H1 : Set D) (P : Set (ℕ × ℕ)) 
     induction l, hl using Nat.le_induction with
     | base =>
       refine hred 1 le_rfl ?_
-      haveI := hMn 1 le_rfl
-      haveI := hMn 2 (by omega)
+      have := hMn 1 le_rfl
+      have := hMn 2 (by omega)
       intro x hx h _
       rw [hE1] at hx
       obtain ⟨ab, hab, rfl⟩ := hx
@@ -201,9 +201,9 @@ theorem lie_lemma (t : ℕ) (u : ℕ → D) (H1 : Set D) (P : Set (ℕ × ℕ)) 
         (hA0 (hc1 _ _)) (hB 1 le_rfl ab.1 (by omega)) (hA0 (hc1 _ _)) (hB 1 le_rfl ab.2 hab2)
     | succ j hj ih =>
       refine hred (j + 1) (by omega) ?_
-      haveI := hMn 1 le_rfl
-      haveI := hMn (j + 1) (by omega)
-      haveI := hMn (j + 1 + 1) (by omega)
+      have := hMn 1 le_rfl
+      have := hMn (j + 1) (by omega)
+      have := hMn (j + 1 + 1) (by omega)
       intro x hx h _
       obtain ⟨y, hy, bi, hbi, rfl⟩ := hL2 j hj x hx
       have hyM : y ∈ lieM E j := Subgroup.mem_sup_left hy
