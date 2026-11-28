@@ -1611,8 +1611,3 @@ theorem ncard_classes_le_fiber_pw {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0
 end FiberCount
 
 end OMA.SimsLite
-
-#print axioms OMA.SimsLite.ncard_classes_le_fiber_pw
-#print axioms OMA.SimsLite.ncard_classes_le_fiber_pred
-#print axioms OMA.SimsLite.classes_finite
-#print axioms OMA.SimsLite.SimsGen.brB_eq_powerWords
