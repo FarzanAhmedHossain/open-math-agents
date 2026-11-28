@@ -21,12 +21,22 @@ of alternating `F_2`-matrices on `F_2^r1` whose values span `F_2^r2` and whose S
 
 Hypotheses:
 * `H1` (CNT3): Theorem 6.3 / (55) / (54) at class `3`, with Lemma 2.3, Lemma 6.1 and (126).
-* `H2` (MULT3): Corollary 14.1 (Props 13.1, 13.2, Remark 6.4) at class `3`, `δ ≤ 1`.
+* `H2` (MULT3): Propositions 13.1 and 13.2 with Remark 6.4 (the argument of Corollary 14.1) at
+  class `3` and defect `δ = 0`, for `C(s-1, 2) ≤ r2` (saturated range or binary endpoint).
 * `H3` (N2A): Theorem 7.1 (i) at `p = 2`.
-* `H4` (N2B): Theorem 7.1 (ii) (`p = 2`, binary endpoint `r2 = C(s-1, 2)`).
-`main` is the Part III arithmetic (Thm 11.3, Lemmas 11.1, 11.2, (129)-(130), Prop 12.1 (ii),
-(145)-(146), Lemma 14.2, (157), the case split of Thm 14.3) at class `3`, plus the sum over the
-parameters and the `24`-factor glue.
+Theorem 7.1 (ii) (Section 10) is not needed: at the binary endpoint `r2 = C(s-1, 2)` the
+multiplicity bound `H2` is used instead.
+
+`main` is the Part III arithmetic at class `3` (class-three forms of Theorem 11.3, (129)-(130),
+Prop 12.1 (ii), Lemma 14.2, (157) and the case split of Theorem 14.3), plus the sum over the
+parameters and the `24`-factor glue.  The case split (`per_param`):
+* `r2 < C(s-1, 2)` and `s > H`: `H1` with the `B` term and `H3` (`ns_assembly`, `ns_cubic`);
+* otherwise `s^2 ≤ 8 m` (`sq_le_of_sat`, or `s ≤ H`), and
+  * `δ ≥ 1`: `H1` with the `A` term (`lam_pos_case`: `sat_A_bound`, `psi_bound`, `lam_close`);
+  * `δ = 0`, `s r2 < 2 r1`: `H1` with the `A` term (`small_core`, `small_core_size`,
+    `core_small_of_le`);
+  * `δ = 0`, `2 r1 ≤ s r2` (so `s > H` and `C(s-1, 2) ≤ r2`): `H2` (`mult_case`: `sat_A_bound`,
+    `mult_close`, `psi_bound`).
 -/
 
 open Subgroup Filter CategoryTheory
@@ -86,16 +96,24 @@ def H1 : Prop :=
             ((r1.choose 2 : ℝ) - r2) * ((m2 : ℝ) - m3 - r2) + ((r1.choose 2 : ℝ) - r2) * m3 +
             (s : ℝ) * b2 * ((r2 : ℝ) + m3 - b2 + 1))
 
-/-- MULT3, the class-three multiplicity count (Li-Qiao, Corollary 14.1, (153), pp.81-82, from
-Proposition 13.1 (p.80), Proposition 13.2 (pp.80-81) and Remark 6.4 (p.43)), in the saturated
-range `C(s-1, 2) < r2` (134) with defect `δ = s1 - r1 ≤ 1`.
 
-The bound is stated with the class-three commutator exponent `A b2` of (55) (the exponent from
-which (85) is derived) in place of `F_{1/2} + 2 m2 e + r1 δ`: for some core breadth `b2`, some
-`z = dim Z_0` with `max {0, r1 - s - δ} ≤ z ≤ r1 - s` and some `k = dim K ≤ r1 - s`,
-`log_2 #classes ≤ C m (log_2 m + 1) + PW + A b2 - z^2 + k (r1 + z - k - s r2)`.
-The term `C m (log_2 m + 1)` absorbs the data, breadth, `dim Z_0`, `dim K` choices and the
-constant `2 log_2 π_∞(2)^{-1}`. -/
+/-- MULT3, the class-three multiplicity count at defect `δ = s1 - r1 = 0`, for
+`C(s-1, 2) ≤ r2` (the saturated range `C(s-1, 2) < r2` of (134) together with the binary
+endpoint `r2 = C(s-1, 2)`).
+
+Source: Li-Qiao, Proposition 13.1 (p.80; multiplicity `≥ π_∞(2) 2^((dim Z_0)^2 - dim Z_0 dim K)`
+of the family (148) of Section 13.1), Proposition 13.2 (pp.80-81, (151); the core-centralizer
+`K` of (149), `dim K ≤ r1 - s` (150), and the saving `s (dim K) r2` of Remark 6.4, p.43) and
+Proposition 2.4, assembled as in the proof of Corollary 14.1 ((153), pp.81-82).  None of
+Section 13.1, Propositions 13.1, 13.2 or Remark 6.4 uses saturation (Remark 6.4 states the saving
+for the commutator exponent (55) and for (85) with `Δ_p` omitted, in every range); Corollary 14.1
+states the saturated range only because it is applied there.  At class three the commutator
+exponent is `A b2` of (55) (`H1`), and at `δ = 0` the group `L_1 = G/γ_2` is elementary abelian,
+so `Z_≥2 = 0`, `dim Z_core = s` and `dim Z_0 = r1 - s` exactly (Section 13.1).  With
+`k = dim K ≤ r1 - s` the exponent is `PW + A b2 - (r1 - s)^2 + k (2 r1 - s - k - s r2)`, i.e.
+(153) with `z = dim Z_0 = r1 - s` and `PW + A b2` in place of `F_(1/2) + 2 m2 e + r1 δ`.
+The term `C m (log_2 m + 1)` absorbs the recorded data, the breadth, `dim K`, and the constant
+`2 log_2 π_∞(2)^(-1)`. -/
 def H2 : Prop :=
   ∃ C : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 : ℕ, ∀ S : Set FiniteGrp.{0},
     S = {G : FiniteGrp.{0} | Nat.card G = 2 ^ m ∧
@@ -111,16 +129,15 @@ def H2 : Prop :=
         Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2 ∧
         Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3 ∧
         Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3} →
-    s1 ≤ r1 + 1 → (s - 1).choose 2 < r2 → S.Nonempty →
-    ∃ b2 z k : ℕ, m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3 ∧
-      r1 - s - (s1 - r1) ≤ z ∧ z ≤ r1 - s ∧ k ≤ r1 - s ∧
+    s1 = r1 → (s - 1).choose 2 ≤ r2 → S.Nonempty →
+    ∃ b2 k : ℕ, m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3 ∧ k ≤ r1 - s ∧
       Real.logb 2 ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' S).ncard : ℝ) ≤
         C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1) +
         ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
           (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
         (((r1.choose 2 : ℝ) - r2) * m2 +
           (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) -
-        (z : ℝ) ^ 2 + (k : ℝ) * ((r1 : ℝ) + z - k - (s : ℝ) * r2)
+        ((r1 - s : ℕ) : ℝ) ^ 2 + (k : ℝ) * (2 * (r1 : ℝ) - s - k - (s : ℝ) * r2)
 
 /-- N2A: Li-Qiao, Theorem 7.1 (i) (p.44; proof p.66 via (123) and Proposition 9.2) at `p = 2`:
 for `2 ≤ s ≤ r1` and `s - 1 ≤ r2 < C(s-1, 2)`, the number of surjective alternating maps
@@ -137,28 +154,13 @@ def H3 : Prop :=
           ∃ x ∈ U, ∃ y ∈ U, w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤} = s}.ncard ≤
       2 ^ ((r2 + 1 - s) * r1.choose 2 + C3 * (r1 ^ 2 + r2 ^ 2))
 
-/-- N2B: Li-Qiao, Theorem 7.1 (ii) (p.44, (90); proof pp.66-67 via (123), Proposition 10.1 (p.53)
-and Proposition 10.4 (p.54)): for `2 ≤ s ≤ r1`, `s - 1 ≤ r2 = C(s-1, 2)` and
-`a_* = min (⌊2 (s-1)^2 / 5⌋, ⌊r1 / 2⌋)`, the number of surjective alternating maps
-`∧² F_2^r1 → F_2^r2` of Sims rank `s` is at most
-`2^((r2 - s + 1) C(r1,2) + (s - 1) a_* (2 r1 - 2 a_* - 1) + O(r1^2 + r2^2))`. -/
-def H4 : Prop :=
-  ∃ C4 : ℕ, ∀ r1 r2 s a : ℕ, 2 ≤ s → s ≤ r1 → s - 1 ≤ r2 → r2 = (s - 1).choose 2 →
-    a = min (2 * (s - 1) ^ 2 / 5) (r1 / 2) →
-    {β : Fin r2 → Matrix (Fin r1) (Fin r1) (ZMod 2) |
-      (∀ k, (∀ i, β k i i = 0) ∧ ∀ i j, β k j i = -β k i j) ∧
-      Submodule.span (ZMod 2) {w : Fin r2 → ZMod 2 |
-        ∃ x ∈ (⊤ : Submodule (ZMod 2) (Fin r1 → ZMod 2)),
-          ∃ y ∈ (⊤ : Submodule (ZMod 2) (Fin r1 → ZMod 2)), w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤ ∧
-      sInf {d | ∃ U : Submodule (ZMod 2) (Fin r1 → ZMod 2), Module.finrank (ZMod 2) U = d ∧
-        Submodule.span (ZMod 2) {w : Fin r2 → ZMod 2 |
-          ∃ x ∈ U, ∃ y ∈ U, w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤} = s}.ncard ≤
-      2 ^ ((r2 + 1 - s) * r1.choose 2 + (s - 1) * a * (2 * r1 - 2 * a - 1) +
-        C4 * (r1 ^ 2 + r2 ^ 2))
 
 /-! ## Lemmas for `main` (stated, `sorry` in this draft)
 
-### Group-level glue (Mathlib only) -/
+`PW`, `A b2`, `B b2` are the three exponents of `H1`; `e = m2 - m3 - r2`, `λ = δ = s1 - r1`,
+`h = s - 1`, `Ψ(r1, m2) = r1^2 m2 / 2 + r1 m2 / 2 - m2^2 - r1^2 / 2`.
+
+### L0 group-level glue (Mathlib only) -/
 
 /-- Class exactly three in the target's form: `¬ γ_2 ≤ Z(G)` and `γ_3 ≤ Z(G)` give
 `γ_3 ≠ 1` and `γ_4 = 1`. -/
@@ -167,182 +169,278 @@ lemma class_three {G : Type} [Group G] (h1 : ¬commutator G ≤ Subgroup.center 
     (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧ (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ := by
   sorry
 
-/-- Order facts on a member of a parameter set: `m = s1 + m2`, `m3 ≤ m2`, `m3 ≥ 1`. -/
-lemma param_facts {m s1 m2 m3 : ℕ} (G : FiniteGrp.{0}) (hc : Nat.card G = 2 ^ m)
+/-- A member of a parameter set has `m3 ≥ 1` (`γ_3 ≠ 1`). -/
+lemma param_m3_pos {m s1 m2 m3 : ℕ} (G : FiniteGrp.{0})
     (h3 : (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥)
-    (hi : ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1)
-    (hm2 : Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2)
-    (hm3 : Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3) :
-    s1 + m2 = m ∧ m3 ≤ m2 ∧ 1 ≤ m3 := by
+    (hm3 : Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3) : 1 ≤ m3 := by
   sorry
 
-/-- The target classes are covered by the parameter sets, with `r1, r2, s, r3 ≤ 2^m`
-(`Group.rank_le` on `Finset.univ`, and `s ≤ r1` from `H = ⊤`) and `s1, m2, m3 ≤ m`
-(`Nat.dvd_prime_pow` for subgroup orders and indices). -/
-lemma target_le_sum (m : ℕ) :
-    (Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' {G : FiniteGrp.{0} | Nat.card G = 2^m ∧ ¬commutator G ≤ Subgroup.center G ∧
+/-- L0 + L1: the target classes are covered by the parameter sets with `m/7 < r1 ≤ 2^m`,
+`r2, s, r3 ≤ 2^m` (`Group.rank_le` on `Finset.univ`) and `s1, m2, m3 ≤ m` (`Nat.dvd_prime_pow`
+for subgroup orders and indices, `Subgroup.card_mul_index`), each class lying in the set of its
+own parameters (`class_three`); hence a uniform bound `X` on the class counts of these sets
+gives `N ≤ (2^m + 1)^4 (m + 1)^3 X`. -/
+lemma target_le_box (m : ℕ) (X : ℝ) (hX : 0 ≤ X)
+    (h : ∀ r1 r2 s s1 m2 m3 r3 : ℕ, m / 7 < r1 →
+      ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) ''
+        {G : FiniteGrp.{0} | Nat.card G = 2 ^ m ∧
+          (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧
+          (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧
+          Group.rank G = r1 ∧
+          Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
+            ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
+              ((⊤ : Subgroup G).lowerCentralSeries 1)) = r2 ∧
+          sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
+            ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} = s ∧
+          ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1 ∧
+          Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2 ∧
+          Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3 ∧
+          Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3}).ncard : ℝ) ≤ X) :
+    ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) ''
+      {G : FiniteGrp.{0} | Nat.card G = 2^m ∧ ¬commutator G ≤ Subgroup.center G ∧
         2 < Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) ∧
-        m / 7 < Group.rank G ∧ (⊤ : Subgroup G).lowerCentralSeries 2 ≤ Subgroup.center G}).ncard ≤
-    ∑ r1 ∈ Finset.range (2 ^ m + 1), ∑ r2 ∈ Finset.range (2 ^ m + 1),
-      ∑ s ∈ Finset.range (2 ^ m + 1), ∑ s1 ∈ Finset.range (m + 1),
-      ∑ m2 ∈ Finset.range (m + 1), ∑ m3 ∈ Finset.range (m + 1),
-      ∑ r3 ∈ Finset.range (2 ^ m + 1),
-        (Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' {G : FiniteGrp.{0} | Nat.card G = 2 ^ m ∧
-            (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧
-            (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧
-            Group.rank G = r1 ∧
-            Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
-              ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
-                ((⊤ : Subgroup G).lowerCentralSeries 1)) = r2 ∧
-            sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
-              ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} = s ∧
-            ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1 ∧
-            Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2 ∧
-            Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3 ∧
-            Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3}).ncard := by
+        m / 7 < Group.rank G ∧ (⊤ : Subgroup G).lowerCentralSeries 2 ≤ Subgroup.center G}).ncard : ℝ) ≤
+      ((2 ^ m + 1) ^ 4 * (m + 1) ^ 3 : ℝ) * X := by
   sorry
 
-/-! ### Real-arithmetic glue -/
+/-! ### L1 real-arithmetic glue -/
 
 /-- `n ≤ 2^E` gives `log_2 n ≤ E` (also for `n = 0`, where `logb 2 0 = 0`). -/
 lemma logb_le_of_le_pow {n E : ℕ} (h : n ≤ 2 ^ E) : Real.logb 2 (n : ℝ) ≤ E := by
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · simp
+  · have h' : (n : ℝ) ≤ (2 : ℝ) ^ E := by exact_mod_cast h
+    have hn' : (0 : ℝ) < n := by exact_mod_cast hn
+    calc Real.logb 2 (n : ℝ) ≤ Real.logb 2 ((2 : ℝ) ^ E) :=
+          Real.logb_le_logb_of_le (by norm_num) hn' h'
+      _ = E := by rw [Real.logb_pow, Real.logb_self_eq_one (by norm_num), mul_one]
+
+/-- `log_2 n ≤ E` gives `n ≤ 2^E` (for `n = 0` trivially). -/
+lemma le_rpow_of_logb_le {n : ℕ} {E : ℝ} (h : Real.logb 2 (n : ℝ) ≤ E) :
+    (n : ℝ) ≤ 2 ^ E := by
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · simp only [Nat.cast_zero]
+    positivity
+  · have hn' : (0 : ℝ) < n := by exact_mod_cast hn
+    calc (n : ℝ) = 2 ^ Real.logb 2 (n : ℝ) := (Real.rpow_logb (by norm_num) (by norm_num) hn').symm
+      _ ≤ 2 ^ E := Real.rpow_le_rpow_of_exponent_le (by norm_num) h
+
+/-- The number of parameter tuples in `target_le_box`. -/
+lemma box_card (m : ℕ) : ((2 ^ m + 1) ^ 4 * (m + 1) ^ 3 : ℝ) ≤ 2 ^ (8 * (m : ℝ) + 8) := by
   sorry
 
-/-- `log_2 n ≤ E` gives `n ≤ 2^E`. -/
-lemma le_rpow_of_logb_le {n : ℕ} {E : ℝ} (h : Real.logb 2 (n : ℝ) ≤ E) : (n : ℝ) ≤ 2 ^ E := by
-  sorry
-
-/-- The final inequality: a total of `2^(8m+8)` parameter tuples, each contributing at most
-`2^((2/27) m^3 - (7/18) m^2 + C m (log_2 m + 1))` classes, fits the target
-`log_2 N ≤ (2/27) m^3 - m^2/3 - log_2 24` (`7/18 > 1/3`). -/
+/-- The final inequality: `2^(8m+8)` parameter tuples, each contributing at most
+`2^((2/27) m^3 - (7/18) m^2 + C m (log_2 m + 1))` classes, fit the target
+`log_2 N ≤ (2/27) m^3 - m^2/3 - log_2 24` for large `m` (`7/18 > 1/3`). -/
 lemma final_ineq (C : ℝ) : ∀ᶠ m : ℕ in atTop, ∀ N : ℕ,
     (N : ℝ) ≤ 2 ^ (8 * (m : ℝ) + 8) *
       2 ^ (2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 + C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1)) →
     (24 * N) ^ 27 * 2 ^ (9 * m ^ 2) ≤ 2 ^ (2 * m ^ 3) := by
   sorry
 
-/-- The number of parameter tuples in `target_le_sum`. -/
-lemma box_card (m : ℕ) : ((2 ^ m + 1) ^ 4 * (m + 1) ^ 3 : ℝ) ≤ 2 ^ (8 * (m : ℝ) + 8) := by
-  sorry
+/-! ### L2-L10 Part III arithmetic at class three
 
-/-! ### Part III arithmetic at class three
+Common hypotheses: the constraints of `H1`, `s1 + m2 = m`, `1 ≤ m3 ≤ m2`, and an admissible
+breadth `b2`. -/
 
-Common hypotheses: the constraints of `H1`, `m = s1 + m2`, `1 ≤ m3 ≤ m2`, and an admissible
-breadth `b2`.  `PW`, `A`, `B` are as in `H1`. -/
-
-/-- Nonsaturated range, large Sims rank (Li-Qiao, Theorem 11.3 (pp.69-71) for `h = s - 1 ≥ H`):
-with `N_2` bounded by Theorem 7.1 (i)/(ii), `PW + B ≤ (2/27) m^3 - (s - 1) m^2 / 200 + C' m^2`.
-Case (i): `B ≤ ½ r1² (m - r1 - h) + h m2²/4 + O(m²)` and
-`min_x (φ(x)/x - ψ(x)) > 1/20` for `φ(x) = 2/27 - x²(1-x)/2`, `ψ(x) = (1-x)²/4 - x²/2`
-(the analogue of (129)-(130) for `B`, `h ≤ r1`).  Case (ii): `h² ≤ 3m`, so `B` is at most the
-(42)-expression of p.70 plus `O(m²)`, and Lemma 11.1 (p.67, (124)) gives `11/1602 > 1/200`. -/
-lemma nonsat_large (C3 C4 : ℕ) : ∃ C' : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, ∀ N : ℝ,
+/-- L2, the power word exponent: `(r1 - 1) δ ≤ r1 δ`, `(r2 - 1) e = r2 e - e` (`r2 ≥ 1`) and
+`(r3 - 1)(m3 - r3) ≤ (m3 - 1)^2 / 4`. -/
+lemma pw_le : ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ,
     (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
       m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
     s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
-    r2 ≤ (s - 1).choose 2 →
-    (r2 < (s - 1).choose 2 → N ≤ (((r2 + 1 - s) * r1.choose 2 + C3 * (r1 ^ 2 + r2 ^ 2) : ℕ) : ℝ)) →
-    (r2 = (s - 1).choose 2 → N ≤ (((r2 + 1 - s) * r1.choose 2 +
-        (s - 1) * min (2 * (s - 1) ^ 2 / 5) (r1 / 2) * (2 * r1 - 2 * min (2 * (s - 1) ^ 2 / 5) (r1 / 2) - 1) +
-        C4 * (r1 ^ 2 + r2 ^ 2) : ℕ) : ℝ)) →
     ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
-      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) + (N +
+      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) ≤
+      (r1 : ℝ) * m2 + (r1 : ℝ) * ((s1 - r1 : ℕ) : ℝ) + (r2 : ℝ) * m3 +
+        (r2 : ℝ) * ((m2 - m3 - r2 : ℕ) : ℝ) - ((m2 - m3 - r2 : ℕ) : ℝ) + ((m3 : ℝ) - 1) ^ 2 / 4 := by
+  sorry
+
+/-- L3, the nonsaturated cubic (class-three analogue of (129)-(130)): for `0 ≤ h ≤ r` and
+`h ≤ m - r`, `(r^2/2)(m - r - h) + h (m - r)^2 / 4 + h m^2 / 20 ≤ (2/27) m^3`.  Identity:
+`(2/27) m^3 - (r^2/2)(m - r) = (1/2)(r - 2m/3)^2 (r + m/3)`; the minimum of the slack over the
+admissible `h/m` is about `0.0529 m^3 > m^3/20 ·(h/m)`. -/
+lemma ns_cubic (m r h : ℝ) (h0 : 0 ≤ h) (hr : h ≤ r) (hm : h ≤ m - r) :
+    r ^ 2 / 2 * (m - r - h) + h * (m - r) ^ 2 / 4 + h * m ^ 2 / 20 ≤ 2 / 27 * m ^ 3 := by
+  sorry
+
+/-- L4, nonsaturated assembly (class-three form of Theorem 11.3 (pp.69-71)): with
+`N_2 ≤ (r2 - s + 1) C(r1, 2) + Cn (r1^2 + r2^2)` (`H3`),
+`PW + B b2 ≤ (2/27) m^3 - (s - 1) m^2 / 20 + K m^2`.  Steps:
+`N_2 + (C(r1,2) - r2)(s2 - r2) + (C(r1,2) - r2) m3 ≤ C(r1,2)(m2 - h) + 2 Cn m^2`,
+`s b2 (r2 + m3 + 1 - b2) ≤ s (m2 + 1)^2 / 4`, `h ≤ r2 ≤ m2 ≤ m - r1`, `h ≤ r1`, then `ns_cubic`
+with `r = r1`. -/
+lemma ns_assembly (Cn : ℕ) : ∃ K : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, ∀ N : ℝ,
+    (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
+      m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
+    s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
+    r2 < (s - 1).choose 2 →
+    N ≤ (((r2 + 1 - s) * r1.choose 2 + Cn * (r1 ^ 2 + r2 ^ 2) : ℕ) : ℝ) →
+    ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
+      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
+    (N +
       ((r1.choose 2 : ℝ) - r2) * ((m2 : ℝ) - m3 - r2) + ((r1.choose 2 : ℝ) - r2) * m3 +
       (s : ℝ) * b2 * ((r2 : ℝ) + m3 - b2 + 1)) ≤
-      2 / 27 * (m : ℝ) ^ 3 - ((s : ℝ) - 1) * (m : ℝ) ^ 2 / 200 + C' * (m : ℝ) ^ 2 := by
+      2 / 27 * (m : ℝ) ^ 3 - ((s : ℝ) - 1) * (m : ℝ) ^ 2 / 20 + K * (m : ℝ) ^ 2 := by
   sorry
 
-/-- Bounded second-layer rank (Li-Qiao, Lemma 11.2, pp.68-69, at class three, through `A`):
-`PW + A ≤ (2/27) (K/(K+1)) m^3 + C' m^2` when `r2 ≤ K` (uses `s ≤ r2 + 1`, `m3 ≤ s b2`,
-`s2 ≤ r2 (δ + 1)`, (125)-(126)). -/
-lemma bounded_r2 (K : ℕ) : ∃ C' : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ,
+/-- L5, the `A` term in the saturated regime (class-three form of Prop 12.1 (ii), (139)): if
+`P = C(r1 - s, 2) - s (m2 + 1) ≥ 3 s m2`, then
+`PW + A b2 ≤ Ψ(r1, m2) + 2 m2 e + r1 δ + 5 s m`.  Steps: `m2 = r2 + e + m3`,
+`-r2^2 ≤ -m2^2 + 2 m2 (m3 + e)`, `X ≤ -b2 P ≤ -P - 3 (b2 - 1) s m2` with `s b2 ≥ m3`,
+`r1^2/2 - C(r1 - s, 2) ≤ r1 s + r1/2`. -/
+lemma sat_A_bound : ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ,
     (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
       m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
     s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
-    r2 ≤ K →
+    3 * s * m2 + s * (m2 + 1) ≤ (r1 - s).choose 2 →
     ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
-      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) + (((r1.choose 2 : ℝ) - r2) * m2 +
+      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
+    (((r1.choose 2 : ℝ) - r2) * m2 +
       (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) ≤
-      2 / 27 * ((K : ℝ) / (K + 1)) * (m : ℝ) ^ 3 + C' * (m : ℝ) ^ 2 := by
+      (r1 : ℝ) ^ 2 * m2 / 2 + (r1 : ℝ) * m2 / 2 - (m2 : ℝ) ^ 2 - (r1 : ℝ) ^ 2 / 2 +
+        2 * (m2 : ℝ) * ((m2 - m3 - r2 : ℕ) : ℝ) + (r1 : ℝ) * ((s1 - r1 : ℕ) : ℝ) +
+        5 * (s : ℝ) * m := by
   sorry
 
-/-- Saturated range, defect `δ ≥ 2` (Li-Qiao, Prop 12.1 (ii) (p.74), (139), (145)-(146) (p.77),
-first step of the proof of Thm 14.3 (p.84)): `PW + A ≤ F_{1/2} + 2 m2 e + r1 δ` at class three,
-and then `≤ (2/27) m^3 - (7/18) m^2` for large `m` (`(2/27)·3δ ≥ 4/9 > 7/18`). -/
-lemma sat_defect_two : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, m0 ≤ m →
-    (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
-      m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
-    s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
-    (s - 1).choose 2 < r2 → r1 + 2 ≤ s1 →
-    ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
-      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) + (((r1.choose 2 : ℝ) - r2) * m2 +
-      (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) ≤
-      2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 := by
+/-- L6, the cubic for `Ψ` (class-three form of (145)-(146)), with `n = r1 + m2`:
+`Ψ ≤ (2/27) n^3 - (2/9) n^2 + n/24` and `Ψ - r1^2 ≤ (2/27) n^3 - (2/3) n^2 + 4 n`
+(slacks `n (2d + 1)^2 / 24 + d^2 r1 / 2 + 2 d^2` and `d^2 r1 / 2 + 3 d^2 + n (d^2/6 + 3d/2 + 4)`,
+up to the exact forms, for `d = r1 - 2n/3`). -/
+lemma psi_bound (r1 m2 : ℝ) (h1 : 0 ≤ r1) (h2 : 0 ≤ m2) :
+    r1 ^ 2 * m2 / 2 + r1 * m2 / 2 - m2 ^ 2 - r1 ^ 2 / 2 ≤
+        2 / 27 * (r1 + m2) ^ 3 - 2 / 9 * (r1 + m2) ^ 2 + (r1 + m2) / 24 ∧
+      r1 ^ 2 * m2 / 2 + r1 * m2 / 2 - m2 ^ 2 - r1 ^ 2 / 2 - r1 ^ 2 ≤
+        2 / 27 * (r1 + m2) ^ 3 - 2 / 3 * (r1 + m2) ^ 2 + 4 * (r1 + m2) := by
   sorry
 
-/-- Saturated range, small core (Li-Qiao, Lemma 14.2 (pp.82-84) with `Λ = 2`, `D = 1`):
-`δ ≤ 1` and `s r2 < 2 r1` give `PW + A ≤ (2/27) m^3 - (7/18) m^2` for large `m`. -/
+/-- L7, closing for `δ ≥ 1` (`m^3 - n^3 = λ (m^2 + m n + n^2)`; split `λ < 32`, where
+`e ≤ 465`, from `λ ≥ 32`, where `2 m2 e ≤ 2 m^2`). -/
+lemma lam_close (m lam r1 m2 e : ℝ) (hl : 1 ≤ lam) (hn : r1 + m2 = m - lam) (h1 : 0 ≤ r1)
+    (h2 : 0 ≤ m2) (he0 : 0 ≤ e) (he : e ≤ lam * (lam - 1) / 2) (hem : e ≤ m2) :
+    2 / 27 * (m - lam) ^ 3 - 2 / 9 * (m - lam) ^ 2 + (m - lam) / 24 + 2 * m2 * e + r1 * lam ≤
+      2 / 27 * m ^ 3 - 4 / 9 * m ^ 2 + 40 * m := by
+  sorry
+
+/-- L8, the multiplicity saving at `δ = 0` (Li-Qiao (156)-(158)): if `2 r1 ≤ s r2` and
+`0 ≤ k ≤ r1 - s` then `-(r1 - s)^2 + k (2 r1 - s - k - s r2) ≤ -r1^2 + 2 r1 s`. -/
+lemma mult_close (r1 s r2 k : ℝ) (hs : 0 ≤ s) (hk0 : 0 ≤ k) (hk : k ≤ r1 - s)
+    (hsr : 2 * r1 ≤ s * r2) :
+    -(r1 - s) ^ 2 + k * (2 * r1 - s - k - s * r2) ≤ -r1 ^ 2 + 2 * r1 * s := by
+  have h1 : 0 ≤ k * (s * r2 - 2 * r1) := mul_nonneg hk0 (sub_nonneg.mpr hsr)
+  nlinarith [mul_nonneg hk0 hs, sq_nonneg s, sq_nonneg k]
+
+/-- L9, small core at `δ = 0` (class-three form of Lemma 14.2 (pp.82-84)): if `m < 7 r1` and
+`12 s^2 ≤ m` then `PW + A b2 ≤ (2/27) m^3 - m^2` for large `m`.  Split: `m2 < m/12` gives a cubic
+gap `7 m^3 / 216`; otherwise `m3 = m2 - r2 ≥ m/24` (`e = 0`, `r2 ≤ s^2/2`), so
+`X ≤ -(m3 / s) P ≤ -c m^(5/2)`. -/
 lemma small_core : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, m0 ≤ m →
     (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
       m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
     s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
-    (s - 1).choose 2 < r2 → s1 ≤ r1 + 1 → s * r2 < 2 * r1 →
+    s1 = r1 → m < 7 * r1 → 12 * s ^ 2 ≤ m →
     ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
-      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) + (((r1.choose 2 : ℝ) - r2) * m2 +
+      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
+    (((r1.choose 2 : ℝ) - r2) * m2 +
+      (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) ≤
+      2 / 27 * (m : ℝ) ^ 3 - (m : ℝ) ^ 2 := by
+  sorry
+
+/-- L10 (a): `C(s-1, 2) ≤ r2 ≤ m` gives `s^2 ≤ 8 m` (for `m ≥ 2`). -/
+lemma sq_le_of_sat (m s r2 : ℕ) (hm : 2 ≤ m) (h : (s - 1).choose 2 ≤ r2) (hr : r2 ≤ m) :
+    s ^ 2 ≤ 8 * m := by
+  sorry
+
+/-- L10 (b): `C(s-1, 2) ≤ r2`, `s r2 < 2 r1 ≤ 2 m` give `(s - 2)^3 < 4 m`, hence `12 s^2 ≤ m`
+for large `m`. -/
+lemma small_core_size : ∃ m0 : ℕ, ∀ m s r1 r2 : ℕ, m0 ≤ m → (s - 1).choose 2 ≤ r2 →
+    s * r2 < 2 * r1 → r1 ≤ m → 12 * s ^ 2 ≤ m := by
+  sorry
+
+/-- L10 (c): bounded Sims rank forces a small core: `s ≤ H`, `r2 ≤ C(s, 2)`, `m < 7 r1` and
+`7 H^3 < 4 m` give `s r2 < 2 r1`. -/
+lemma core_small_of_le (H m s r1 r2 : ℕ) (hs : s ≤ H) (hr : r2 ≤ s.choose 2) (h7 : m < 7 * r1)
+    (hH : 7 * H ^ 3 < 4 * m) : s * r2 < 2 * r1 := by
+  sorry
+
+/-! ### Regime bounds -/
+
+/-- Defect `δ ≥ 1` (CNT3 alone; class-three form of the first step of the proof of Thm 14.3):
+`sat_A_bound` (its `P`-condition holds for large `m` from `m < 7 r1`, `s^2 ≤ 8 m`), `psi_bound`
+with `n = m - δ`, `lam_close`, and `40 m + 5 s m ≤ m^2 / 18`. -/
+lemma lam_pos_case : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, m0 ≤ m →
+    (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
+      m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
+    s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
+    r1 + 1 ≤ s1 → m < 7 * r1 → s ^ 2 ≤ 8 * m →
+    ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
+      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
+    (((r1.choose 2 : ℝ) - r2) * m2 +
       (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) ≤
       2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 := by
   sorry
 
-/-- Saturated range with multiplicities (Li-Qiao, proof of Thm 14.3, pp.84-86: (152), (156),
-identity (157), (158) and Prop 12.1 (ii) at `η = -5/6`): `δ ≤ 1`, `2 r1 ≤ s r2`,
-`max {0, r1 - s - δ} ≤ z ≤ r1 - s`, `k ≤ r1 - s` give
-`PW + A - z^2 + k (r1 + z - k - s r2) ≤ (2/27) m^3 - (7/18) m^2` for large `m`. -/
-lemma mult_case : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 z k : ℕ, m0 ≤ m →
+/-- Defect `δ = 0` with multiplicities (`H2`; class-three form of (152)-(158) and Prop 12.1 (ii)
+at `η = -5/6`): `sat_A_bound`, `mult_close`, the second bound of `psi_bound` with `n = m`, and
+`4 m + 7 s m ≤ (2/3 - 7/18) m^2`. -/
+lemma mult_case : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 k : ℕ, m0 ≤ m →
     (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
       m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) →
     s1 + m2 = m → m3 ≤ m2 → 1 ≤ m3 → (m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3) →
-    (s - 1).choose 2 < r2 → s1 ≤ r1 + 1 → 2 * r1 ≤ s * r2 →
-    r1 - s - (s1 - r1) ≤ z → z ≤ r1 - s → k ≤ r1 - s →
+    s1 = r1 → m < 7 * r1 → s ^ 2 ≤ 8 * m → 2 * r1 ≤ s * r2 → k ≤ r1 - s →
     ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
-      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) + (((r1.choose 2 : ℝ) - r2) * m2 +
+      (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
+    (((r1.choose 2 : ℝ) - r2) * m2 +
       (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) -
-      (z : ℝ) ^ 2 + (k : ℝ) * ((r1 : ℝ) + z - k - (s : ℝ) * r2) ≤
+      ((r1 - s : ℕ) : ℝ) ^ 2 + (k : ℝ) * (2 * (r1 : ℝ) - s - k - (s : ℝ) * r2) ≤
       2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 := by
   sorry
 
-/-- The per-parameter bound: the case split of Li-Qiao's proof of Thm 14.3 at class three
-(nonsaturated with `s - 1 ≥ H` by `nonsat_large`, `H3`, `H4`; nonsaturated with `s - 1 < H`,
-so `r2 ≤ C(H-1, 2)`, by `bounded_r2`; saturated with `δ ≥ 2` by `sat_defect_two`; saturated with
-`δ ≤ 1` by `small_core` or, through `H2`, by `mult_case`). -/
-lemma per_param (h1 : H1) (h2 : H2) (h3 : H3) (h4 : H4) :
-    ∃ C : ℝ, ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 : ℕ, m0 ≤ m → ∀ S : Set FiniteGrp.{0},
+/-- L11, the per-parameter bound (the case split of the proof of Thm 14.3 at class three).
+Take `C`, `C'` from `H1`, `H2`, `Cn` from `H3`, `K` from `ns_assembly Cn`, and
+`H = ⌈20 (K + 1)⌉ + 2`.  For large `m` and a nonempty set (constraints from `H1`,
+`param_m3_pos`, `cnt3`'s `m = s1 + m2`, `r2 ≤ m`):
+* `r2 < C(s-1, 2)`, `s > H`: `H1` (`min ≤ B`), `H3`, `logb_le_of_le_pow`, `ns_assembly`;
+* else `s^2 ≤ 8 m` (`sq_le_of_sat`, or `s ≤ H`), and `δ ≥ 1`: `H1` (`min ≤ A`), `lam_pos_case`;
+* `δ = 0`, `s r2 < 2 r1`: `12 s^2 ≤ m` (`small_core_size`, or `s ≤ H`), `H1`, `small_core`;
+* `δ = 0`, `2 r1 ≤ s r2`: `s > H` (`core_small_of_le`), so `C(s-1, 2) ≤ r2`; `H2`, `mult_case`.
+An empty set has `logb 2 0 = 0`. -/
+lemma per_param (h1 : H1) (h2 : H2) (h3 : H3) :
+    ∃ C : ℝ, ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 : ℕ, m0 ≤ m → m / 7 < r1 →
+    ∀ S : Set FiniteGrp.{0},
     S = {G : FiniteGrp.{0} | Nat.card G = 2 ^ m ∧
-        (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧
-        (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧
-        Group.rank G = r1 ∧
-        Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
-          ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
-            ((⊤ : Subgroup G).lowerCentralSeries 1)) = r2 ∧
-        sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
-          ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} = s ∧
-        ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1 ∧
-        Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2 ∧
-        Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3 ∧
-        Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3} →
+      (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧
+      (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧
+      Group.rank G = r1 ∧
+      Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
+        ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
+          ((⊤ : Subgroup G).lowerCentralSeries 1)) = r2 ∧
+      sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
+        ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} = s ∧
+      ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1 ∧
+      Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2 ∧
+      Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3 ∧
+      Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3} →
     Real.logb 2 ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' S).ncard : ℝ) ≤
       2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 + C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1) := by
   sorry
 
-/-- Reduction A: CNT3, MULT3, N2A and N2B give the class-three, rank `> m/7` estimate.
-(Dev draft: the target body of `...R1.H3.R2.H1` is restated; proof: `per_param`,
-`target_le_sum`, `le_rpow_of_logb_le`, `box_card`, `final_ineq`.) -/
-theorem main : H1 → H2 → H3 → H4 →
+/-- Reduction A: CNT3, MULT3 and N2A give the class-three, rank `> m/7` estimate.
+(Dev draft: the target body of `...R1.H3.R2.H1` is restated.) -/
+theorem main : H1 → H2 → H3 →
     ∀ᶠ m : ℕ in atTop,
       (24 * (Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) ''
         {G : FiniteGrp.{0} | Nat.card G = 2^m ∧ ¬commutator G ≤ Subgroup.center G ∧
           2 < Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) ∧
           m / 7 < Group.rank G ∧ (⊤ : Subgroup G).lowerCentralSeries 2 ≤ Subgroup.center G}).ncard)^27 *
           2^(9*m^2) ≤ 2^(2*m^3) := by
-  sorry
+  intro h1 h2 h3
+  obtain ⟨C, m0, hC⟩ := per_param h1 h2 h3
+  filter_upwards [final_ineq C, eventually_ge_atTop m0] with m hfin hm
+  apply hfin
+  have hX : (0 : ℝ) ≤ 2 ^ (2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 +
+      C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1)) := by positivity
+  refine (target_le_box m _ hX fun r1 r2 s s1 m2 m3 r3 hr1 =>
+    le_rpow_of_logb_le (hC m r1 r2 s s1 m2 m3 r3 hm hr1 _ rfl)).trans ?_
+  exact mul_le_mul_of_nonneg_right (box_card m) hX
 
 end OMA.R_Erdos1160_erdos_1160_variants_sum_R1_H2_R1_H2_R1_H2_R1_H3_R2_H1_R1
