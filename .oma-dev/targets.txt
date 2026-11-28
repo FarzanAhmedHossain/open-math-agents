@@ -10,3 +10,5 @@ H2Dev.Alt2
 H2Dev.Bridge
 H2Dev.Alt2Bridge
 H2Dev.CNT3Stmt
+H2Dev.Lift
+H2Dev.Isotropic
