@@ -209,7 +209,7 @@ theorem SimsGen.c3_r2_eq (hp : p.Prime) (hS : SimsGen p u d X r) (h4 : lcs G 3 =
     rw [hcomm, sup_bot_eq, h4, bot_sup_eq, MonoidHom.map_closure, ← Set.range_comp]
     refine congrArg Subgroup.closure (congrArg Set.range ?_)
     funext g
-    simp
+    exact map_pow (lcs G 2).subtype g p
   have hc1 : Nat.card ((pPhi p (lcs G 2)).map (lcs G 2).subtype) =
       Nat.card (pPhi p (lcs G 2)) :=
     (Nat.card_congr (Subgroup.equivMapOfInjective _ _ (lcs G 2).subtype_injective).toEquiv).symm
@@ -263,8 +263,7 @@ theorem mem_cnt3Codes {D : RecData m} :
       ∃ x : (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)) ×
         (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)),
         SimsCode Nat.prime_two m G (⟨D, x⟩ : FullData 2 m) := by
-  unfold cnt3Codes
-  exact Finset.mem_filter.trans (and_iff_right (Finset.mem_univ _))
+  simp only [cnt3Codes, Finset.mem_filter, Finset.mem_univ, true_and]
 
 /-- Every group of `cnt3Set` has a Sims code whose recorded data lie in `cnt3Codes`. -/
 theorem cnt3_hI : ∀ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3, ∃ D : FullData 2 m,
