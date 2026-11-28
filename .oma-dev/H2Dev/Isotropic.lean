@@ -269,7 +269,7 @@ lemma piQ_le_isoQ (hx0 : 0 ≤ x) (hx1 : x ≤ 1) {R h : ℕ} (hh : h ≤ R) : p
     _ ≤ isoQ x R h := by
         refine Finset.prod_le_prod (fun t _ => one_sub_pow_nonneg hx0 hx1 _) (fun t ht => ?_)
         have := Finset.mem_range.1 ht
-        exact sub_le_sub_left (pow_le_pow_of_le_one hx0 hx1 (by omega)) 1
+        exact sub_le_sub_left (pow_le_pow_of_le_one hx0 hx1 (by omega : h - 1 - t + 1 ≤ R - t)) 1
 
 lemma isoQ_pos (hx0 : 0 ≤ x) (hx1 : x < 1) {R h : ℕ} (hh : h ≤ R) : 0 < isoQ x R h :=
   Finset.prod_pos fun t ht => by
@@ -498,13 +498,15 @@ lemma mem_orth_of_forall {A : Matrix (Fin R) (Fin R) F} {i : ℕ} {u : Fin i →
   have hle : Submodule.span F (Set.range u) ≤ LinearMap.ker ((Matrix.toBilin' A).flip y) := by
     rw [Submodule.span_le]
     rintro _ ⟨s, rfl⟩
-    rw [SetLike.mem_coe, LinearMap.mem_ker, LinearMap.flip_apply, Matrix.toBilin'_apply',
-      ← bfL_apply]
+    rw [SetLike.mem_coe, LinearMap.mem_ker]
+    show Matrix.toBilin' A (u s) y = 0
+    rw [Matrix.toBilin'_apply', ← bfL_apply]
     exact hy s
   rw [LinearMap.BilinForm.mem_orthogonal_iff]
   intro n hn
   have := hle hn
-  rwa [LinearMap.mem_ker, LinearMap.flip_apply] at this
+  rw [LinearMap.mem_ker] at this
+  exact this
 
 lemma isotropic_span {A : Matrix (Fin R) (Fin R) F} {i : ℕ} {v : Fin i → (Fin R → F)}
     (hv : PairOrth A v) : Isotropic A (Submodule.span F (Set.range v)) := by
@@ -816,7 +818,11 @@ noncomputable def fiberEquiv (A : Matrix (Fin R) (Fin R) F) {h : ℕ}
     {v : Fin h → (Fin R → F) //
       (LinearIndependent F v ∧ PairOrth A v) ∧ Submodule.span F (Set.range v) = H} ≃
       {w : Fin h → H // LinearIndependent F w} where
-  toFun v := ⟨fun s => ⟨v.1 s, by rw [← v.2.2]; exact Submodule.subset_span (Set.mem_range_self s)⟩,
+  toFun v := ⟨fun s => ⟨v.1 s, by
+      have hs : v.1 s ∈ Submodule.span F (Set.range v.1) :=
+        Submodule.subset_span (Set.mem_range_self s)
+      rw [v.2.2] at hs
+      exact hs⟩,
     LinearIndependent.of_comp H.subtype v.2.1.1⟩
   invFun w := by
     have hli : LinearIndependent F (fun s => ((w.1 s : H) : Fin R → F)) :=
@@ -874,7 +880,8 @@ theorem card_isoOrth_eq_sum (A : Matrix (Fin R) (Fin R) F) (h : ℕ) :
   unfold isoTupCount
   congr 1
   ext v
-  simp only [Finset.mem_filter, Finset.mem_univ, true_and, IsoTup, and_assoc]
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+  exact and_assoc
 
 /-- `|Gr(h, X)| · ∏_{t<h} (q^h - q^t) = ∏_{t<h} (q^R - q^t)`. -/
 theorem grass_mul_card {h : ℕ} (hh : h ≤ R) :
