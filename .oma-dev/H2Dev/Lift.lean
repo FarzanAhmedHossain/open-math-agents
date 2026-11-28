@@ -44,7 +44,12 @@ Part 5, the fibrewise count over the recorded data and the power word array:
 * `realizedCB` : the commutator coefficient arrays over fixed recorded data and power word array;
 * `lf_ncard_classes_le_fiberB` : the number of classes is at most `Σ_{(D, B)} N_c(D, B)`;
 * `lf_ncard_classes_le_fiberB_pw` : with Theorem 3.1, at most `Σ_D p ^ PW(D) M(D)` whenever
-  `N_c(D, B) ≤ M(D)` for every realised `B`. -/
+  `N_c(D, B) ≤ M(D)` for every realised `B`.
+
+Part 6, the leading coefficients and term A (`lf_ncard_lead_le`); Part 7, the bound
+`lf_realizedCB_ncard_le` on `N_c(D, B)` at class 3, i.e. the input `M(D)` of
+`lf_ncard_classes_le_fiberB_pw`: term A (with `|D| = r_2` distinct defining pairs) times the
+deeper count `p ^ ((C(r_1, 2) - r_2) s_3)`. -/
 
 namespace OMA.SimsLite
 
@@ -1444,5 +1449,753 @@ theorem SimsGen.lf_lead2_eq_brCm [Finite G] (hp : p.Prime) (hS : SimsGen p u d X
     omega⟩))
 
 end LfFlat
+
+section LfCBGen
+
+/-! Part 7, the commutator coefficient factor `N_c(D, B)` of a class-3 Sims code.
+
+* `SimsGen.lf_hcore` : the core hypothesis (34) of `exists_sims_gen` holds for every `SimsGen`
+  (the weight-1 generators are commutators of core generators);
+* `SimsGen.lf_lcs_bot` : `γ_{c+1} = 1` for `c` layers;
+* `SimsGen.lf_brCm_ne` : the zero pattern of the flattened commutator coefficient array `brCm`
+  at class 3 (nonzero entries only at `([g_{0,j}, g_{0,k}], layers 1, 2)`, `j < k`, and at
+  `([g_{1,j}, g_{0,k}], layer 2)`, `k ≤ co(j)`);
+* `SimsGen.lf_defpair` : at a defining pair `(f(j), co(j))` the commutator is the generator
+  `g_{1,j}`, so its coefficients are the unit vector at `g_{1,j}` (all deeper ones vanish);
+* `SimsGen.lf_pair_inj` : the defining pairs `j ↦ (f(j), co(j))` are pairwise distinct;
+* `lf_brCo_common` : two Sims generating sets with the same recorded block sizes have the same
+  core indices `co(j)`;
+* `SimsGen.lf_code`, `SimsGen.lf_reindex` : reading the recorded data off a code, and the
+  `SimsGenSet` of a code reindexed by the common index type `SimsIdx c (fibRk D)`;
+* `LfGood`, `SimsGen.lf_good`, `lf_phi_inj` : every commutator array `C` of a realised class-3
+  code is a function of its leading part (in the truncation of a leading coefficient pair of a
+  group) and its deeper part (vanishing off the non-defining pairs);
+* `lf_realizedCB_ncard_le` : `N_c(D, B) ≤ (term A) · p ^ ((C(r_1, 2) - r_2) s_3)`, with the full
+  Remark 4.4 saving `|D| = r_2`;
+* `lf_sum_le_max` : the sum over the breadth is at most `(min(s_2, s_3) + 1)` times a uniform bound
+  on its terms. -/
+
+lemma lf_brCm_rec (d : SimsData) (t k w : Fin d.n) (hrec : d.Rec t k) :
+    brCm d t.val k.val w.val = d.c t k w := by
+  unfold brCm
+  rw [dif_pos ⟨t.isLt, k.isLt, w.isLt⟩]
+  exact if_pos hrec
+
+lemma lf_brCm_lt {p : ℕ} (hp0 : 0 < p) {d : SimsData} (hb : d.Bounded p) (i j k : ℕ) :
+    brCm d i j k < p ^ brA d k := by
+  unfold brCm brA
+  by_cases h : i < d.n ∧ j < d.n ∧ k < d.n
+  · rw [dif_pos h, dif_pos h.2.2]
+    split_ifs
+    · exact hb.2 _ _ _
+    · exact pow_pos hp0 _
+  · rw [dif_neg h]
+    exact pow_pos hp0 _
+
+end LfCBGen
+
+section LfCBGroup
+
+variable {G : Type u} [Group G] {p : ℕ} {u : ℕ → G} {d : SimsData} {X : Fin d.n → G}
+  {r : ℕ → ℕ}
+
+/-- (34) for every `SimsGen`: `γ_2 ≤ [H, H] γ_3` with `H = ⟨u_0, ..., u_{s-1}⟩`, since the
+weight-1 generators are commutators `[u_{f(j)}, u_{co(j)}]` of core generators. -/
+theorem SimsGen.lf_hcore (hS : SimsGen p u d X r) :
+    lcs G 1 ≤ ⁅Subgroup.closure (u '' Set.Iio d.s), Subgroup.closure (u '' Set.Iio d.s)⁆ ⊔
+      lcs G 2 := by
+  refine (hS.layer_gen 1).trans (sup_le_sup_right ?_ _)
+  rw [Subgroup.closure_le]
+  rintro _ ⟨t, ht, rfl⟩
+  have ht' : d.lv t = 1 := ht
+  have hdf := hS.realizes.dfeq t (by omega)
+  have h1 : (d.df t).1 < (d.df t).2 := hS.valid.df_one t ht'
+  have h2 : ((d.df t).2 : ℕ) < d.s := hS.valid.df_core t (by omega)
+  have hf : ((d.df t).1 : ℕ) < d.s := lt_trans (Fin.lt_def.mp h1) h2
+  rw [SetLike.mem_coe, hdf, hS.core _ hf, hS.core _ h2]
+  exact Subgroup.commutator_mem_commutator (Subgroup.subset_closure ⟨_, hf, rfl⟩)
+    (Subgroup.subset_closure ⟨_, h2, rfl⟩)
+
+/-- `γ_{c+1} = 1` (0-indexed `lcs G c = ⊥`) for a Sims generating set with `c` layers. -/
+theorem SimsGen.lf_lcs_bot (hS : SimsGen p u d X r) {c : ℕ} (hn : d.n = fOff r c)
+    (hc : 1 ≤ c) : lcs G c = ⊥ := by
+  rw [eq_bot_iff]
+  refine (hS.deep c hc).trans ?_
+  rw [Subgroup.closure_le]
+  rintro _ ⟨t, ht, rfl⟩
+  exfalso
+  have h1 := hS.lv_lt hn t
+  have h2 : c ≤ d.lv t := ht
+  omega
+
+/-- The zero pattern of `brCm` at class 3: a nonzero entry is either a coefficient of
+`[g_{0,j}, g_{0,k}]`, `j < k`, in layer 1 or 2, or a coefficient of `[g_{1,j}, g_{0,k}]`,
+`k ≤ co(j)`, in layer 2. -/
+theorem SimsGen.lf_brCm_ne (hS : SimsGen p u d X r) (hn : d.n = fOff r 3) {i j k : ℕ}
+    (h : brCm d i j k ≠ 0) :
+    (i < j ∧ j < fOff r 1 ∧ fOff r 1 ≤ k ∧ k < fOff r 3) ∨
+      (fOff r 1 ≤ i ∧ i < fOff r 2 ∧ j < fOff r 1 ∧ j ≤ brCo d r (i - fOff r 1) ∧
+        fOff r 2 ≤ k ∧ k < fOff r 3) := by
+  unfold brCm at h
+  by_cases hr : i < d.n ∧ j < d.n ∧ k < d.n
+  swap
+  · rw [dif_neg hr] at h
+    exact absurd rfl h
+  rw [dif_pos hr] at h
+  by_cases hrec : d.Rec ⟨i, hr.1⟩ ⟨j, hr.2.1⟩
+  swap
+  · rw [if_neg hrec] at h
+    exact absurd rfl h
+  rw [if_pos hrec] at h
+  have hsupp := hS.valid.c_supp _ _ _ h
+  have hk3 := hS.lv_lt hn ⟨k, hr.2.2⟩
+  obtain ⟨ki1, -⟩ := (hS.layer_iff ⟨k, hr.2.2⟩ (d.lv ⟨k, hr.2.2⟩)).mp rfl
+  have ki1' : fOff r (d.lv ⟨k, hr.2.2⟩) ≤ k := ki1
+  have e01 : fOff r 1 = fOff r 0 + r 0 := fOff_succ r 0
+  have e12 : fOff r 2 = fOff r 1 + r 1 := fOff_succ r 1
+  have e0 : fOff r 0 = 0 := rfl
+  have hkn : k < fOff r 3 := by rw [← hn]; exact hr.2.2
+  rcases hrec with ⟨h1, h2, h3⟩ | ⟨h1, h2⟩ | ⟨h1, -⟩
+  · left
+    obtain ⟨-, j2⟩ := (hS.layer_iff ⟨j, hr.2.1⟩ 0).mp h2
+    have j2' : j < fOff r 0 + r 0 := j2
+    have hk1 : fOff r 1 ≤ fOff r (d.lv ⟨k, hr.2.2⟩) := fOff_mono r (by omega)
+    have h3' : i < j := h3
+    exact ⟨h3', by omega, by omega, hkn⟩
+  · right
+    obtain ⟨i1, i2⟩ := (hS.layer_iff ⟨i, hr.1⟩ 1).mp h1
+    have i1' : fOff r 1 ≤ i := i1
+    have i2' : i < fOff r 1 + r 1 := i2
+    have hlk : d.lv ⟨k, hr.2.2⟩ = 2 := by omega
+    rw [hlk] at ki1'
+    have hco := brCo_eq d r ⟨i, hr.1⟩ (i - fOff r 1)
+      (by show fOff r 1 + (i - fOff r 1) = i; omega)
+    have hcs := hS.valid.df_core ⟨i, hr.1⟩ (by omega)
+    have hc0 := hS.valid.core (d.df ⟨i, hr.1⟩).2 hcs
+    obtain ⟨-, c2⟩ := (hS.layer_iff _ 0).mp hc0
+    have c2' : ((d.df ⟨i, hr.1⟩).2 : ℕ) < fOff r 0 + r 0 := c2
+    have h2' : j ≤ ((d.df ⟨i, hr.1⟩).2 : ℕ) := h2
+    refine ⟨i1', by omega, by omega, ?_, ki1', hkn⟩
+    rw [hco]
+    exact h2'
+  · exfalso
+    omega
+
+/-- A weight-1 generator `g_t = [g_{f}, g_{co}]` has commutator coefficients the unit vector at
+`t`: `c(f, co, k) = δ_{k, t}`. -/
+theorem SimsGen.lf_defpair_t (hp : p.Prime) (hS : SimsGen p u d X r) (t : Fin d.n)
+    (hl : d.lv t = 1) (k : ℕ) :
+    brCm d (d.df t).1.val (d.df t).2.val k = if k = t.val then 1 else 0 := by
+  have hlt : (d.df t).1 < (d.df t).2 := hS.valid.df_one t hl
+  have hcs : ((d.df t).2 : ℕ) < d.s := hS.valid.df_core t (by omega)
+  have hl0 : d.lv (d.df t).1 = 0 := by
+    have := hS.valid.df_lv t (by omega)
+    omega
+  have hl0' : d.lv (d.df t).2 = 0 := hS.valid.core _ hcs
+  have hcomm := hS.realizes.comm0 _ _ hl0 hl0' hlt
+  have hdf := hS.realizes.dfeq t (by omega)
+  have hbd : ∀ v, delta t 1 v < p ^ d.a v := by
+    intro v
+    unfold delta
+    split_ifs
+    · exact one_lt_pow' hp.one_lt (by have := hS.a_pos v; omega)
+    · exact pow_pos hp.pos _
+  have heq := hS.nf_unique (d.c (d.df t).1 (d.df t).2) (delta t 1)
+    (fun v => hS.bounded.2 _ _ v) hbd
+    (hcomm.symm.trans (hdf.symm.trans (by rw [nfw_delta, pow_one])))
+  by_cases hk : k < d.n
+  · show brCm d (d.df t).1.val (d.df t).2.val (⟨k, hk⟩ : Fin d.n).val = _
+    rw [lf_brCm_rec d (d.df t).1 (d.df t).2 ⟨k, hk⟩ (Or.inl ⟨hl0, hl0', hlt⟩), heq]
+    show (if (⟨k, hk⟩ : Fin d.n) = t then 1 else 0) = _
+    by_cases hkt : k = t.val
+    · rw [if_pos (Fin.ext hkt : (⟨k, hk⟩ : Fin d.n) = t), if_pos hkt]
+    · rw [if_neg (fun h' => hkt (congrArg Fin.val h')), if_neg hkt]
+  · have h1 : brCm d (d.df t).1.val (d.df t).2.val k = 0 := by
+      unfold brCm
+      rw [dif_neg (fun h' => hk h'.2.2)]
+    rw [h1, if_neg (by have := t.isLt; omega)]
+
+/-- The defining pair `(f(j), co(j))` of the `j`-th weight-1 generator: the coefficients of
+`[g_{0,f(j)}, g_{0,co(j)}]` are the unit vector at `g_{1,j}`. -/
+theorem SimsGen.lf_defpair (hp : p.Prime) (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) {j : ℕ}
+    (hj : j < r 1) (k : ℕ) :
+    brCm d (brPa d r j) (brCo d r j) k = if k = fOff r 1 + j then 1 else 0 := by
+  obtain ⟨h, hl⟩ := hS.pos_one hs2 j hj
+  rw [brPa_eq d r ⟨fOff r 1 + j, h⟩ j rfl, brCo_eq d r ⟨fOff r 1 + j, h⟩ j rfl]
+  exact hS.lf_defpair_t hp ⟨fOff r 1 + j, h⟩ hl k
+
+theorem SimsGen.lf_brPa_lt_brCo (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) {j : ℕ}
+    (hj : j < r 1) : brPa d r j < brCo d r j := by
+  obtain ⟨h, hl⟩ := hS.pos_one hs2 j hj
+  rw [brPa_eq d r ⟨fOff r 1 + j, h⟩ j rfl, brCo_eq d r ⟨fOff r 1 + j, h⟩ j rfl]
+  exact hS.valid.df_one _ hl
+
+/-- The defining pairs `j ↦ (f(j), co(j))` are pairwise distinct (`block_inj`); hence the set
+`D` of defining pairs has `r_2` elements. -/
+theorem SimsGen.lf_pair_inj (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) {j j' : ℕ}
+    (hj : j < r 1) (hj' : j' < r 1) (h1 : brPa d r j = brPa d r j')
+    (h2 : brCo d r j = brCo d r j') : j = j' := by
+  obtain ⟨h, hl⟩ := hS.pos_one hs2 j hj
+  obtain ⟨h', hl'⟩ := hS.pos_one hs2 j' hj'
+  rw [brPa_eq d r ⟨fOff r 1 + j, h⟩ j rfl, brPa_eq d r ⟨fOff r 1 + j', h'⟩ j' rfl] at h1
+  rw [brCo_eq d r ⟨fOff r 1 + j, h⟩ j rfl, brCo_eq d r ⟨fOff r 1 + j', h'⟩ j' rfl] at h2
+  have e := hS.block_inj _ _ hl hl' (Fin.ext h1) (Fin.ext h2)
+  have e' : fOff r 1 + j = fOff r 1 + j' := congrArg Fin.val e
+  omega
+
+/-- The reindexed Sims generating set over a common index type `SimsIdx c r'` (for `r'`, `a'`
+equal to the layer ranks and relative orders of the Sims data): its same-layer power words,
+leading coefficients and core are read off the flattened arrays `brB`, `brCm`. -/
+theorem SimsGen.lf_reindex [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {c : ℕ}
+    (hn : d.n = fOff r c) (h2 : 2 < c) (r' : Fin c → ℕ) (hr : ∀ i : Fin c, r i.val = r' i)
+    (a' : SimsIdx c r' → ℕ) (ha : ∀ k : SimsIdx c r', a' k = brA d (fOff r k.1.val + k.2.val)) :
+    ∃ (g' : SimsIdx c r' → G) (S : SimsGenSet p a' g'),
+      (∀ (i : Fin c) (j v : Fin (r' i)), (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val =
+        brB d (fOff r i.val + j.val) (fOff r i.val + v.val)) ∧
+      (∀ (j k : Fin (r' (lfI0 h2))) (v : Fin (r' (lfI1 h2))), j < k →
+        S.lfLead1 h2 j k v = brCm d (fOff r 0 + j.val) (fOff r 0 + k.val) (fOff r 1 + v.val)) ∧
+      (∀ (j : Fin (r' (lfI1 h2))) (k : Fin (r' (lfI0 h2))) (v : Fin (r' (lfI2 h2))),
+        k.val ≤ brCo d r j.val →
+        S.lfLead2 h2 j k v = brCm d (fOff r 1 + j.val) (fOff r 0 + k.val) (fOff r 2 + v.val)) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g' ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < d.s}),
+        Subgroup.closure ((fun j => g' ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < d.s})⁆ ⊔ lcs G 2 := by
+  have hr' : brR r c = r' := funext hr
+  subst hr'
+  have ha' : a' = fun k => d.a (hS.brEquiv hn k) :=
+    funext fun k => (ha k).trans (hS.brA_brEquiv hn k)
+  subst ha'
+  refine ⟨fun k => X (hS.brEquiv hn k), hS.toSimsGenSet hp hn, fun i j v => ?_,
+    fun j k v hjk => ?_, fun j k v hk => ?_, ?_⟩
+  · exact (hS.brB_eq_powerWords hp hn ⟨i, j⟩ ⟨i, v⟩).symm
+  · exact (hS.lf_lead1_eq_brCm hp hn h2 j k hjk v).symm
+  · have hk' : (k : ℕ) ≤ (d.df (hS.brEquiv hn ⟨lfI1 h2, j⟩)).2.val := by
+      rw [← brCo_eq d r (hS.brEquiv hn ⟨lfI1 h2, j⟩) j.val rfl]
+      exact hk
+    exact (hS.lf_lead2_eq_brCm hp hn h2 j k hk' v).symm
+  · exact (hS.lf_core hn (by omega) hS.lf_hcore).2
+
+end LfCBGroup
+
+section LfCBCount
+
+/-- The commutator coefficient component of full data, flattened on `ℕ` (as `rdCm`). -/
+def lfCn {p m : ℕ} (D : RecData m)
+    (C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) (i j k : ℕ) : ℕ :=
+  if h : i < D.2.2.1.tot ∧ j < D.2.2.1.tot ∧ k < D.2.2.1.tot then
+    (C ⟨i, h.1⟩ ⟨j, h.2.1⟩ ⟨k, h.2.2⟩).val
+  else 0
+
+/-- The power word component of full data, flattened on `ℕ` (as `rdB`). -/
+def lfBn {p m : ℕ} (D : RecData m) (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m))
+    (i j : ℕ) : ℕ :=
+  if h : i < D.2.2.1.tot ∧ j < D.2.2.1.tot then (B ⟨i, h.1⟩ ⟨j, h.2⟩).val else 0
+
+/-- The recorded block sizes `d_{k+2} - d_{k+1}` (as `rdInc`). -/
+def lfInc {m : ℕ} (D : RecData m) (k : ℕ) : ℕ :=
+  if h : k < D.2.1.val - 1 then (D.2.2.2.1.1 ⟨k, h⟩).val else 0
+
+/-- The recorded auxiliary function `f` (as `rdF`). -/
+def lfFa {m : ℕ} (D : RecData m) (j : ℕ) : ℕ :=
+  if h : j < D.2.2.1.r2 then (D.2.2.2.2.1.1 ⟨j, h⟩).val else 0
+
+lemma lfCn_fin {p m : ℕ} (D : RecData m)
+    (C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m))
+    (i j k : Fin D.2.2.1.tot) : lfCn D C i.val j.val k.val = (C i j k).val := by
+  unfold lfCn
+  rw [dif_pos ⟨i.isLt, j.isLt, k.isLt⟩]
+
+/-- Reading the recorded data and the flattened arrays off a code. -/
+theorem SimsGen.lf_code {G : Type u} [Group G] {p : ℕ} {u : ℕ → G} {d : SimsData}
+    {X : Fin d.n → G} {r : ℕ → ℕ} [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) (hsum : ∑ t, d.a t = m) {D : RecData m}
+    {B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    {C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    (e : hS.enc hp m hnm hs2 hsum = ⟨D, (B, C)⟩) :
+    hS.nL = D.1.val ∧ d.s = D.2.1.val ∧ (∀ i < hS.nL, r i = fibR D i) ∧ brA d = fibA D ∧
+      lfCn D C = brCm d ∧ lfBn D B = brB d ∧ (∀ k < d.s - 1, brFib d r k = lfInc D k) ∧
+      (∀ j < r 1, brPa d r j = lfFa D j) := by
+  refine ⟨(hS.rdC_enc hp hnm hs2 hsum).symm.trans (congrArg rdC e),
+    (hS.rdS_enc hp hnm hs2 hsum).symm.trans (congrArg rdS e), fun i hi => ?_, ?_, ?_, ?_,
+    fun k hk => ?_, fun j hj => ?_⟩
+  · have h := congrFun (congrArg rdR e) i
+    rw [hS.rdR_enc hp hnm hs2 hsum, dif_pos hi] at h
+    exact h
+  · funext j
+    exact (hS.rdA_enc hp hnm hs2 hsum j).symm.trans (congrFun (congrArg rdA e) j)
+  · funext i j k
+    exact ((hS.rdCm_enc hp hnm hs2 hsum i j k).symm.trans
+      (congrFun (congrFun (congrFun (congrArg rdCm e) i) j) k)).symm
+  · funext i j
+    exact ((hS.rdB_enc hp hnm hs2 hsum i j).symm.trans
+      (congrFun (congrFun (congrArg rdB e) i) j)).symm
+  · have h := congrFun (congrArg rdInc e) k
+    rw [hS.rdInc_enc hp hnm hs2 hsum, dif_pos hk] at h
+    exact h
+  · have h := congrFun (congrArg rdF e) j
+    rw [hS.rdF_enc hp hnm hs2 hsum, dif_pos (show j < (hS.rankVec hp hnm).r2 by
+      rw [hS.rankVec_r2 hp hnm hs2]; exact hj)] at h
+    exact h
+
+/-- Two Sims generating sets with the same Sims rank, the same `r_2` and the same recorded block
+sizes have the same core indices `co(j)` (the second entries of the defining pairs). -/
+theorem lf_brCo_common {G₁ G₂ : Type u} [Group G₁] [Group G₂] {p : ℕ} {u₁ : ℕ → G₁}
+    {d₁ : SimsData} {X₁ : Fin d₁.n → G₁} {r₁ : ℕ → ℕ} {u₂ : ℕ → G₂} {d₂ : SimsData}
+    {X₂ : Fin d₂.n → G₂} {r₂ : ℕ → ℕ} (hS₁ : SimsGen p u₁ d₁ X₁ r₁)
+    (hS₂ : SimsGen p u₂ d₂ X₂ r₂) (hs₁ : 2 ≤ d₁.s) (hs : d₁.s = d₂.s) (hr1 : r₁ 1 = r₂ 1)
+    (hfib : ∀ k < d₁.s - 1, brFib d₁ r₁ k = brFib d₂ r₂ k) :
+    ∀ j < r₁ 1, brCo d₁ r₁ j = brCo d₂ r₂ j := by
+  have hs₂ : 2 ≤ d₂.s := by omega
+  have hfib' : ∀ k, ((Finset.range (r₁ 1)).filter (fun j => brCo d₁ r₁ j = k)).card =
+      ((Finset.range (r₁ 1)).filter (fun j => brCo d₂ r₂ j = k)).card := by
+    intro k
+    by_cases hk : 1 ≤ k ∧ k < d₁.s
+    · have h := hfib (k - 1) (by omega)
+      unfold brFib at h
+      rw [← hr1, show k - 1 + 1 = k by omega] at h
+      exact h
+    · have e1 : (Finset.range (r₁ 1)).filter (fun j => brCo d₁ r₁ j = k) = ∅ :=
+        Finset.filter_eq_empty_iff.mpr fun j hj => by
+          have := hS₁.brCo_bounds hs₁ j (Finset.mem_range.mp hj)
+          omega
+      have e2 : (Finset.range (r₁ 1)).filter (fun j => brCo d₂ r₂ j = k) = ∅ :=
+        Finset.filter_eq_empty_iff.mpr fun j hj => by
+          have hj' : j < r₂ 1 := by rw [← hr1]; exact Finset.mem_range.mp hj
+          have := hS₂.brCo_bounds hs₂ j hj'
+          omega
+      rw [e1, e2]
+  intro j hj
+  exact eq_of_mono_fiber _ _ _ (fun i j hij hj => hS₁.brCo_mono hs₁ i j hij hj)
+    (fun i j hij hj => hS₂.brCo_mono hs₂ i j hij (by rw [← hr1]; exact hj)) hfib' j hj
+
+/-- The leading coefficient arrays of `lf_ncard_lead_le` for the layer shape of `D`. -/
+abbrev LfLeadT {m : ℕ} (D : RecData m) (h2 : 2 < D.1.val) : Type :=
+  (Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI1 h2)) → ℕ) ×
+    (Fin (fibRk D (lfI1 h2)) → Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI2 h2)) → ℕ)
+
+/-- Coordinate vectors of the third layer (Sims coordinates `0 ≤ e_v < p ^ a(2, v)`), a group of
+order `p ^ s_3`. -/
+abbrev LfDeepG (p : ℕ) {m : ℕ} (D : RecData m) (h2 : 2 < D.1.val) : Type :=
+  (v : Fin (fibRk D (lfI2 h2))) → Fin (p ^ fibAk D ⟨lfI2 h2, v⟩)
+
+/-- The leading part of a commutator array: the entries at `([g_{0,j}, g_{0,k}], layer 1)` and
+`([g_{1,j}, g_{0,k}], layer 2)`. -/
+def lfPhi1 {p m : ℕ} (D : RecData m) (h2 : 2 < D.1.val)
+    (C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) : LfLeadT D h2 :=
+  (fun j k v => lfCn D C (fOff (fibR D) 0 + j.val) (fOff (fibR D) 0 + k.val)
+      (fOff (fibR D) 1 + v.val),
+    fun j k v => lfCn D C (fOff (fibR D) 1 + j.val) (fOff (fibR D) 0 + k.val)
+      (fOff (fibR D) 2 + v.val))
+
+/-- The deeper part of a commutator array: the entries at `([g_{0,j}, g_{0,k}], layer 2)`. -/
+def lfPhi3 {p m : ℕ} (hp0 : 0 < p) (D : RecData m) (h2 : 2 < D.1.val)
+    (C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) :
+    Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)) → LfDeepG p D h2 :=
+  fun q v => ⟨lfCn D C (fOff (fibR D) 0 + q.1.val) (fOff (fibR D) 0 + q.2.val)
+      (fOff (fibR D) 2 + v.val) % p ^ fibAk D ⟨lfI2 h2, v⟩, Nat.mod_lt _ (pow_pos hp0 _)⟩
+
+/-- The truncation of a leading coefficient pair to the recorded index ranges
+(`j < k`, resp. `k ≤ co(j)`). -/
+def lfTrunc {m : ℕ} (D : RecData m) (h2 : 2 < D.1.val) (co : ℕ → ℕ) (x : LfLeadT D h2) :
+    LfLeadT D h2 :=
+  (fun j k v => if j < k then x.1 j k v else 0,
+    fun j k v => if k.val ≤ co j.val then x.2 j k v else 0)
+
+/-- The defining pairs `(f(j), co(j))`. -/
+def lfDp {m : ℕ} (D : RecData m) (h2 : 2 < D.1.val) (f co : ℕ → ℕ) :
+    Finset (Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2))) :=
+  Finset.univ.filter (fun q => ∃ j : Fin (fibRk D (lfI1 h2)), q.1.val = f j.val ∧ q.2.val = co j.val)
+
+/-- The prescribed leading coefficients on the defining pairs (unit vectors). -/
+def lfW {m : ℕ} (D : RecData m) (h2 : 2 < D.1.val) (f co : ℕ → ℕ)
+    (q : Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2))) (v : Fin (fibRk D (lfI1 h2))) : ℕ :=
+  if q.1.val = f v.val ∧ q.2.val = co v.val then 1 else 0
+
+/-- The same-layer power words read off the power word array `B`. -/
+def lfBB {p m : ℕ} (D : RecData m) (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m))
+    (i : Fin D.1.val) (j v : Fin (fibRk D i)) : ℕ :=
+  lfBn D B (fOff (fibR D) i.val + j.val) (fOff (fibR D) i.val + v.val)
+
+/-- The leading coefficient pairs of groups counted by `lf_ncard_lead_le` (with their range). -/
+def lfLam (p : ℕ) {m : ℕ} (D : RecData m) (h2 : 2 < D.1.val)
+    (b0 : Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI0 h2)) → ℕ)
+    (b1 : Fin (fibRk D (lfI1 h2)) → Fin (fibRk D (lfI1 h2)) → ℕ)
+    (b2 : Fin (fibRk D (lfI2 h2)) → Fin (fibRk D (lfI2 h2)) → ℕ)
+    (Dp : Finset (Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2))))
+    (w : Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI1 h2)) → ℕ) :
+    Set (LfLeadT D h2) :=
+  {x | (∃ (G : Type) (_ : Group G) (_ : Finite G) (g : SimsIdx D.1.val (fibRk D) → G)
+      (S : SimsGenSet p (fibAk D) g),
+      (∀ j v, (S.powerWords ⟨lfI0 h2, j⟩ ⟨lfI0 h2, v⟩).val = b0 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI1 h2, j⟩ ⟨lfI1 h2, v⟩).val = b1 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI2 h2, j⟩ ⟨lfI2 h2, v⟩).val = b2 j v) ∧
+      (3 < D.1.val ∨ lcs G 3 = ⊥) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < D.2.1.val}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < D.2.1.val})⁆ ⊔ lcs G 2 ∧
+      (∀ q ∈ Dp, S.lfLead1 h2 q.1 q.2 = w q) ∧
+      x = (S.lfLead1 h2, S.lfLead2 h2)) ∧
+    (∀ j k v, x.1 j k v < p ^ fibAk D ⟨lfI1 h2, v⟩) ∧
+    (∀ j k v, x.2 j k v < p ^ fibAk D ⟨lfI2 h2, v⟩)}
+
+/-- The deeper arrays counted by `br_deeper_count_fin`: zero off the non-defining pairs. -/
+def lfDset (p : ℕ) {m : ℕ} (hp0 : 0 < p) (D : RecData m) (h2 : 2 < D.1.val)
+    (Dp : Finset (Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)))) :
+    Set (Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)) → LfDeepG p D h2) :=
+  {c | ∀ q, q ∉ (Finset.univ.filter
+      (fun q : Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)) => q.1 < q.2)) \ Dp →
+    c q = fun _ => ⟨0, pow_pos hp0 _⟩}
+
+/-- What the count needs of a commutator array `C` with recorded data `D` (class 3): its zero
+pattern and range, its leading part is the truncation of a counted leading pair, and its
+deeper part vanishes off the non-defining pairs. -/
+structure LfGood (p : ℕ) {m : ℕ} (hp0 : 0 < p) (D : RecData m) (h2 : 2 < D.1.val)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) (co : ℕ → ℕ)
+    (C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) : Prop where
+  zero : ∀ i j k, lfCn D C i j k ≠ 0 →
+    (i < j ∧ j < fOff (fibR D) 1 ∧ fOff (fibR D) 1 ≤ k ∧ k < fOff (fibR D) 3) ∨
+      (fOff (fibR D) 1 ≤ i ∧ i < fOff (fibR D) 2 ∧ j < fOff (fibR D) 1 ∧
+        fOff (fibR D) 2 ≤ k ∧ k < fOff (fibR D) 3)
+  bd : ∀ i j k, lfCn D C i j k < p ^ fibA D k
+  lead : ∃ x ∈ lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2))
+      (lfDp D h2 (lfFa D) co) (lfW D h2 (lfFa D) co), lfPhi1 D h2 C = lfTrunc D h2 co x
+  deep : lfPhi3 hp0 D h2 C ∈ lfDset p hp0 D h2 (lfDp D h2 (lfFa D) co)
+
+/-- A commutator array of a class-3 code with recorded data `D` is good (given the common core
+indices `co`). -/
+theorem SimsGen.lf_good {G : Type} [Group G] [Finite G] {p : ℕ} {u : ℕ → G} {d : SimsData}
+    {X : Fin d.n → G} {r : ℕ → ℕ} (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) (hsum : ∑ t, d.a t = m) {D : RecData m}
+    {B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    {C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    (e : hS.enc hp m hnm hs2 hsum = ⟨D, (B, C)⟩) (h2 : 2 < D.1.val) (h3 : D.1.val = 3)
+    (co : ℕ → ℕ) (hco : ∀ j < r 1, brCo d r j = co j) :
+    LfGood p hp.pos D h2 B co C := by
+  obtain ⟨cf1, cf2, cf3, cf4, cf5, cf6, -, cf8⟩ := hS.lf_code hp hnm hs2 hsum e
+  have hn : d.n = fOff r D.1.val := by rw [← cf1]; exact hS.nL_spec.symm
+  have hfo : ∀ w ≤ D.1.val, fOff r w = fOff (fibR D) w :=
+    fOff_congr (fun w hw => cf3 w (by rw [cf1]; exact hw))
+  have hn3 : d.n = fOff r 3 := by rw [hn, h3]
+  have f1 := hfo 1 (by omega)
+  have f2 := hfo 2 (by omega)
+  have f3 := hfo 3 (by omega)
+  have e0 : fOff r 0 = 0 := rfl
+  have e0' : fOff (fibR D) 0 = 0 := rfl
+  have e01 : fOff r 1 = fOff r 0 + r 0 := fOff_succ r 0
+  have e12 : fOff r 2 = fOff r 1 + r 1 := fOff_succ r 1
+  have hr0 : r 0 = fibR D 0 := cf3 0 (by rw [cf1]; omega)
+  have hr1 : r 1 = fibR D 1 := cf3 1 (by rw [cf1]; omega)
+  obtain ⟨g', S, hpw, hl1, hl2, hcore⟩ := hS.lf_reindex hp hn h2 (fibRk D)
+    (fun i => cf3 i.val (by rw [cf1]; exact i.isLt)) (fibAk D) (fun k => by
+      show fibA D (fOff (fibR D) k.1.val + k.2.val) = _
+      rw [cf4, hfo _ k.1.isLt.le])
+  have hpwB : ∀ (i : Fin D.1.val) (j v : Fin (fibRk D i)),
+      (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val = lfBB D B i j v := by
+    intro i j v
+    rw [hpw, ← cf6]
+    unfold lfBB
+    rw [hfo _ i.isLt.le]
+  refine ⟨fun i j k h => ?_, fun i j k => ?_,
+    ⟨(S.lfLead1 h2, S.lfLead2 h2), ⟨⟨G, inferInstance, inferInstance, g', S, hpwB (lfI0 h2),
+      hpwB (lfI1 h2), hpwB (lfI2 h2), ?_, ?_, ?_, rfl⟩, fun j k v => Fin.isLt _,
+      fun j k v => Fin.isLt _⟩, ?_⟩, ?_⟩
+  · -- the zero pattern
+    rw [cf5] at h
+    have hz := hS.lf_brCm_ne hn3 h
+    rw [f1, f2, f3] at hz
+    rcases hz with ⟨a1, a2, a3, a4⟩ | ⟨b1, b2, b3, -, b5, b6⟩
+    · exact Or.inl ⟨a1, a2, a3, a4⟩
+    · exact Or.inr ⟨b1, b2, b3, b5, b6⟩
+  · -- the range
+    rw [cf5, ← cf4]
+    exact lf_brCm_lt hp.pos hS.bounded i j k
+  · -- class 3
+    have hb := hS.lf_lcs_bot hn (by omega)
+    rw [h3] at hb
+    exact Or.inr hb
+  · -- the core
+    rw [← cf2]
+    exact hcore
+  · -- the defining pairs
+    intro q hq
+    obtain ⟨j, hj1, hj2⟩ := (Finset.mem_filter.mp hq).2
+    have hjr : j.val < r 1 := by
+      have : j.val < fibR D 1 := j.isLt
+      omega
+    rw [← cf8 _ hjr] at hj1
+    rw [← hco _ hjr] at hj2
+    have hlt : q.1 < q.2 := by
+      show q.1.val < q.2.val
+      rw [hj1, hj2]
+      exact hS.lf_brPa_lt_brCo hs2 hjr
+    funext v
+    have hv : v.val < r 1 := by
+      have : v.val < fibR D 1 := v.isLt
+      omega
+    rw [hl1 q.1 q.2 v hlt, e0, Nat.zero_add, Nat.zero_add, hj1, hj2,
+      hS.lf_defpair hp hs2 hjr]
+    unfold lfW
+    rw [hj1, hj2, ← cf8 _ hv, ← hco _ hv]
+    by_cases hvj : v.val = j.val
+    · rw [if_pos (by omega), if_pos ⟨by rw [hvj], by rw [hvj]⟩]
+    · rw [if_neg (by omega), if_neg]
+      rintro ⟨h1', h2'⟩
+      exact hvj (hS.lf_pair_inj hs2 hv hjr h1'.symm h2'.symm)
+  · -- the leading part is the truncation of the leading pair
+    refine Prod.ext (funext fun j => funext fun k => funext fun v => ?_)
+      (funext fun j => funext fun k => funext fun v => ?_)
+    · show lfCn D C (fOff (fibR D) 0 + j.val) (fOff (fibR D) 0 + k.val)
+          (fOff (fibR D) 1 + v.val) = if j < k then S.lfLead1 h2 j k v else 0
+      rw [cf5, e0', ← f1]
+      split_ifs with hjk
+      · rw [hl1 j k v hjk, e0]
+      · by_contra hne
+        have hj0 : j.val < fibR D 0 := j.isLt
+        rcases hS.lf_brCm_ne hn3 hne with ⟨a1, -⟩ | ⟨b1, -⟩
+        · exact hjk (by show j.val < k.val; omega)
+        · omega
+    · show lfCn D C (fOff (fibR D) 1 + j.val) (fOff (fibR D) 0 + k.val)
+          (fOff (fibR D) 2 + v.val) = if k.val ≤ co j.val then S.lfLead2 h2 j k v else 0
+      have hj1 : j.val < r 1 := by
+        have : j.val < fibR D 1 := j.isLt
+        omega
+      rw [cf5, e0', ← f1, ← f2, ← hco j.val hj1]
+      split_ifs with hk
+      · rw [hl2 j k v hk, e0]
+      · by_contra hne
+        have hk0 : k.val < fibR D 0 := k.isLt
+        rcases hS.lf_brCm_ne hn3 hne with ⟨a1, a2, -, -⟩ | ⟨-, -, -, b4, -, -⟩
+        · omega
+        · rw [Nat.add_sub_cancel_left] at b4
+          exact hk (by omega)
+  · -- the deeper part vanishes off the non-defining pairs
+    simp only [lfDset, Set.mem_setOf_eq]
+    intro q hq
+    funext v
+    apply Fin.ext
+    have hz : brCm d q.1.val q.2.val (fOff r 2 + v.val) = 0 := by
+      by_cases hlt : q.1 < q.2
+      · have hqD : q ∈ lfDp D h2 (lfFa D) co := by
+          by_contra hc
+          exact hq (Finset.mem_sdiff.mpr ⟨Finset.mem_filter.mpr ⟨Finset.mem_univ _, hlt⟩, hc⟩)
+        obtain ⟨j, hj1, hj2⟩ := (Finset.mem_filter.mp hqD).2
+        have hjr : j.val < r 1 := by
+          have : j.val < fibR D 1 := j.isLt
+          omega
+        rw [hj1, hj2, ← cf8 _ hjr, ← hco _ hjr, hS.lf_defpair hp hs2 hjr, if_neg (by omega)]
+      · by_contra hne
+        have hq0 : q.1.val < fibR D 0 := q.1.isLt
+        rcases hS.lf_brCm_ne hn3 hne with ⟨a1, -⟩ | ⟨b1, -⟩
+        · exact hlt a1
+        · omega
+    show lfCn D C (fOff (fibR D) 0 + q.1.val) (fOff (fibR D) 0 + q.2.val)
+        (fOff (fibR D) 2 + v.val) % p ^ fibAk D ⟨lfI2 h2, v⟩ = 0
+    rw [cf5, e0', Nat.zero_add, Nat.zero_add, ← f2, hz, Nat.zero_mod]
+
+/-- Good commutator arrays are determined by their leading and deeper parts. -/
+theorem lf_phi_inj {p m : ℕ} (hp0 : 0 < p) {D : RecData m} (h2 : 2 < D.1.val)
+    {B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)} {co : ℕ → ℕ}
+    {C C' : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    (hC : LfGood p hp0 D h2 B co C) (hC' : LfGood p hp0 D h2 B co C')
+    (h1 : lfPhi1 D h2 C = lfPhi1 D h2 C') (h3 : lfPhi3 hp0 D h2 C = lfPhi3 hp0 D h2 C') :
+    C = C' := by
+  have e0 : fOff (fibR D) 0 = 0 := rfl
+  have e01 : fOff (fibR D) 1 = fOff (fibR D) 0 + fibR D 0 := fOff_succ _ 0
+  have e12 : fOff (fibR D) 2 = fOff (fibR D) 1 + fibR D 1 := fOff_succ _ 1
+  have e23 : fOff (fibR D) 3 = fOff (fibR D) 2 + fibR D 2 := fOff_succ _ 2
+  have K1 : ∀ j0 k0 v (hj : j0 < fibR D 0) (hk : k0 < fibR D 0) (hv : v < fibR D 1),
+      lfCn D C (fOff (fibR D) 0 + j0) (fOff (fibR D) 0 + k0) (fOff (fibR D) 1 + v) =
+        lfCn D C' (fOff (fibR D) 0 + j0) (fOff (fibR D) 0 + k0) (fOff (fibR D) 1 + v) :=
+    fun j0 k0 v hj hk hv => congrFun (congrFun (congrFun (congrArg Prod.fst h1)
+      (⟨j0, hj⟩ : Fin (fibRk D (lfI0 h2)))) (⟨k0, hk⟩ : Fin (fibRk D (lfI0 h2))))
+      (⟨v, hv⟩ : Fin (fibRk D (lfI1 h2)))
+  have K2 : ∀ j0 k0 v (hj : j0 < fibR D 1) (hk : k0 < fibR D 0) (hv : v < fibR D 2),
+      lfCn D C (fOff (fibR D) 1 + j0) (fOff (fibR D) 0 + k0) (fOff (fibR D) 2 + v) =
+        lfCn D C' (fOff (fibR D) 1 + j0) (fOff (fibR D) 0 + k0) (fOff (fibR D) 2 + v) :=
+    fun j0 k0 v hj hk hv => congrFun (congrFun (congrFun (congrArg Prod.snd h1)
+      (⟨j0, hj⟩ : Fin (fibRk D (lfI1 h2)))) (⟨k0, hk⟩ : Fin (fibRk D (lfI0 h2))))
+      (⟨v, hv⟩ : Fin (fibRk D (lfI2 h2)))
+  have K3 : ∀ j0 k0 v (hj : j0 < fibR D 0) (hk : k0 < fibR D 0) (hv : v < fibR D 2),
+      lfCn D C (fOff (fibR D) 0 + j0) (fOff (fibR D) 0 + k0) (fOff (fibR D) 2 + v) %
+          p ^ fibA D (fOff (fibR D) 2 + v) =
+        lfCn D C' (fOff (fibR D) 0 + j0) (fOff (fibR D) 0 + k0) (fOff (fibR D) 2 + v) %
+          p ^ fibA D (fOff (fibR D) 2 + v) :=
+    fun j0 k0 v hj hk hv => congrArg Fin.val (congrFun (congrFun h3
+      ((⟨j0, hj⟩ : Fin (fibRk D (lfI0 h2))), (⟨k0, hk⟩ : Fin (fibRk D (lfI0 h2)))))
+      (⟨v, hv⟩ : Fin (fibRk D (lfI2 h2))))
+  have key : ∀ i j k, lfCn D C i j k = lfCn D C' i j k := by
+    intro i j k
+    by_cases h0 : lfCn D C i j k = 0 ∧ lfCn D C' i j k = 0
+    · rw [h0.1, h0.2]
+    have hz : (i < j ∧ j < fOff (fibR D) 1 ∧ fOff (fibR D) 1 ≤ k ∧ k < fOff (fibR D) 3) ∨
+        (fOff (fibR D) 1 ≤ i ∧ i < fOff (fibR D) 2 ∧ j < fOff (fibR D) 1 ∧
+          fOff (fibR D) 2 ≤ k ∧ k < fOff (fibR D) 3) := by
+      rcases not_and_or.mp h0 with h | h
+      · exact hC.zero i j k h
+      · exact hC'.zero i j k h
+    rcases hz with ⟨a1, a2, a3, a4⟩ | ⟨b1, b2, b3, b4, b5⟩
+    · by_cases hk : k < fOff (fibR D) 2
+      · have := K1 i j (k - fOff (fibR D) 1) (by omega) (by omega) (by omega)
+        rwa [e0, Nat.zero_add, Nat.zero_add, Nat.add_sub_of_le a3] at this
+      · have := K3 i j (k - fOff (fibR D) 2) (by omega) (by omega) (by omega)
+        rw [e0, Nat.zero_add, Nat.zero_add,
+          Nat.add_sub_of_le (show fOff (fibR D) 2 ≤ k by omega)] at this
+        rwa [Nat.mod_eq_of_lt (hC.bd i j k), Nat.mod_eq_of_lt (hC'.bd i j k)] at this
+    · have := K2 (i - fOff (fibR D) 1) j (k - fOff (fibR D) 2) (by omega) (by omega) (by omega)
+      rwa [e0, Nat.zero_add, Nat.add_sub_of_le b1, Nat.add_sub_of_le b4] at this
+  funext i j k
+  apply Fin.ext
+  rw [← lfCn_fin D C i j k, ← lfCn_fin D C' i j k]
+  exact key _ _ _
+
+/-- The commutator coefficient factor at class 3 (Sec 2.3/2.4 with Lemma 4.1, Propositions
+4.2/4.3, Remark 4.4 and eq. (53)): for recorded data `D` with `c = 3` layers and a power word array
+`B`, the commutator arrays of the realised codes number at most the `br_eq53_sum` bound of term
+A with `|D| = r_2` defining pairs (ranks `r_1 = fibR D 0`, `r_2 = fibR D 1`, Sims rank `s`,
+`s_2 = Σ_v a(1, v)`, `s_3 = Σ_v a(2, v)`, 0-indexed layers) times the deeper count
+`p ^ ((C(r_1, 2) - r_2) s_3)` of the `γ_3`-coefficients of `[g_{1,j}, g_{1,k}]` on the
+non-defining pairs. -/
+theorem lf_realizedCB_ncard_le {p m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0})
+    (D : RecData m) (h2 : 2 < D.1.val) (h3 : D.1.val = 3)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) :
+    (realizedCB hp T D B).ncard ≤
+      (∑ β ∈ (Finset.range (min (∑ v, fibAk D ⟨lfI1 h2, v⟩)
+          (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1)).filter
+          (fun β => (∑ v, fibAk D ⟨lfI2 h2, v⟩) ≤ D.2.1.val * β),
+        p ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+          p ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+              (∑ v, fibAk D ⟨lfI1 h2, v⟩) - (fibRk D (lfI0 h2) - D.2.1.val).choose 2 * β)) *
+        p ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+          ∑ v, fibAk D ⟨lfI2 h2, v⟩) := by
+  rcases (realizedCB hp T D B).eq_empty_or_nonempty with hE | ⟨C0, hC0⟩
+  · rw [hE, Set.ncard_empty]
+    exact Nat.zero_le _
+  obtain ⟨G0, -, u0, d0, X0, r0, hS0, hnm0, hs0, hsum0, e0⟩ := hC0
+  obtain ⟨c1, c2, c3, -, -, -, c7, c8⟩ := hS0.lf_code hp hnm0 hs0 hsum0 e0
+  have hn0 : d0.n = fOff r0 D.1.val := by rw [← c1]; exact hS0.nL_spec.symm
+  have hr00 : r0 0 = fibR D 0 := c3 0 (by rw [c1]; omega)
+  have hr01 : r0 1 = fibR D 1 := c3 1 (by rw [c1]; omega)
+  have hsr0 := (hS0.lf_core hn0 (by omega) hS0.lf_hcore).1
+  -- every realised commutator array is good, with the core indices of `G0`
+  have hgood : ∀ C ∈ realizedCB hp T D B, LfGood p hp.pos D h2 B (brCo d0 r0) C := by
+    rintro C ⟨G, -, u, d, X, r, hS, hnm, hs2, hsum, e⟩
+    obtain ⟨g1, g2, g3, -, -, -, g7, -⟩ := hS.lf_code hp hnm hs2 hsum e
+    refine hS.lf_good hp hnm hs2 hsum e h2 h3 _
+      (lf_brCo_common hS hS0 hs2 (g2.trans c2.symm) ?_ ?_)
+    · rw [g3 1 (by rw [g1]; omega), hr01]
+    · intro k hk
+      rw [g7 k hk, c7 k (by rw [c2, ← g2]; exact hk)]
+  -- the defining pairs of `G0`: distinct, `f(j) < co(j)`, `f(j) < s`
+  have hjr : ∀ j : Fin (fibRk D (lfI1 h2)), j.val < r0 1 := fun j => by
+    have : j.val < fibR D 1 := j.isLt
+    omega
+  have hDp : ∀ q ∈ lfDp D h2 (lfFa D) (brCo d0 r0), q.1 < q.2 ∧ (q.1 : ℕ) < D.2.1.val := by
+    intro q hq
+    obtain ⟨j, hj1, hj2⟩ := (Finset.mem_filter.mp hq).2
+    rw [← c8 _ (hjr j)] at hj1
+    refine ⟨?_, ?_⟩
+    · show q.1.val < q.2.val
+      rw [hj1, hj2]
+      exact hS0.lf_brPa_lt_brCo hs0 (hjr j)
+    · rw [hj1, ← c2]
+      have := hS0.brPa_lt hs0 j.val (hjr j)
+      omega
+  have hb1 : ∀ j : Fin (fibRk D (lfI1 h2)), lfFa D j.val < fibRk D (lfI0 h2) := by
+    intro j
+    show lfFa D j.val < fibR D 0
+    rw [← c8 _ (hjr j), ← hr00]
+    have := hS0.brPa_lt hs0 j.val (hjr j)
+    omega
+  have hb2 : ∀ j : Fin (fibRk D (lfI1 h2)), brCo d0 r0 j.val < fibRk D (lfI0 h2) := by
+    intro j
+    show brCo d0 r0 j.val < fibR D 0
+    rw [← hr00]
+    have := hS0.brCo_bounds hs0 j.val (hjr j)
+    omega
+  obtain ⟨F, hF⟩ : ∃ F : Fin (fibRk D (lfI1 h2)) →
+      Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)),
+      ∀ j, (F j).1.val = lfFa D j.val ∧ (F j).2.val = brCo d0 r0 j.val :=
+    ⟨fun j => (⟨_, hb1 j⟩, ⟨_, hb2 j⟩), fun j => ⟨rfl, rfl⟩⟩
+  have hFinj : Function.Injective F := by
+    intro j j' hjj
+    have e1 : lfFa D j.val = lfFa D j'.val := by rw [← (hF j).1, ← (hF j').1, hjj]
+    have e2 : brCo d0 r0 j.val = brCo d0 r0 j'.val := by rw [← (hF j).2, ← (hF j').2, hjj]
+    rw [← c8 _ (hjr j), ← c8 _ (hjr j')] at e1
+    exact Fin.ext (hS0.lf_pair_inj hs0 (hjr j) (hjr j') e1 e2)
+  have himg : lfDp D h2 (lfFa D) (brCo d0 r0) = Finset.univ.image F := by
+    ext q
+    simp only [lfDp, Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_image]
+    constructor
+    · rintro ⟨j, h1, h2'⟩
+      exact ⟨j, Prod.ext (Fin.ext ((hF j).1.trans h1.symm)) (Fin.ext ((hF j).2.trans h2'.symm))⟩
+    · rintro ⟨j, rfl⟩
+      exact ⟨j, (hF j).1, (hF j).2⟩
+  have hDcard : (lfDp D h2 (lfFa D) (brCo d0 r0)).card = fibRk D (lfI1 h2) := by
+    rw [himg, Finset.card_image_of_injective _ hFinj, Finset.card_univ, Fintype.card_fin]
+  -- term A
+  have hLead := lf_ncard_lead_le (p := p) (c := D.1.val) (r := fibRk D) (a := fibAk D) hp h2
+    (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2)) (s := D.2.1.val)
+    (by show D.2.1.val ≤ fibR D 0; rw [← c2, ← hr00]; exact hsr0)
+    (lfDp D h2 (lfFa D) (brCo d0 r0)) hDp (lfW D h2 (lfFa D) (brCo d0 r0))
+    (lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2))
+      (lfDp D h2 (lfFa D) (brCo d0 r0)) (lfW D h2 (lfFa D) (brCo d0 r0))) (fun x hx => hx.1)
+  rw [hDcard] at hLead
+  -- the deeper count
+  have hDeep := br_deeper_count_fin (Γ := LfDeepG p D h2)
+    (lf_card_box (p := p) (fun v : Fin (fibRk D (lfI2 h2)) => fibAk D ⟨lfI2 h2, v⟩))
+    (lfDp D h2 (lfFa D) (brCo d0 r0)) (fun q hq => (hDp q hq).1)
+    (fun _ _ => ⟨0, pow_pos hp.pos _⟩)
+  rw [hDcard] at hDeep
+  -- finiteness of the counted leading pairs
+  have hΛfin : (lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2))
+      (lfDp D h2 (lfFa D) (brCo d0 r0)) (lfW D h2 (lfFa D) (brCo d0 r0))).Finite := by
+    refine (Set.finite_range (fun y : (Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI0 h2)) →
+        (v : Fin (fibRk D (lfI1 h2))) → Fin (p ^ fibAk D ⟨lfI1 h2, v⟩)) ×
+        (Fin (fibRk D (lfI1 h2)) → Fin (fibRk D (lfI0 h2)) →
+          (v : Fin (fibRk D (lfI2 h2))) → Fin (p ^ fibAk D ⟨lfI2 h2, v⟩)) =>
+        ((fun j k v => (y.1 j k v).val, fun j k v => (y.2 j k v).val) : LfLeadT D h2))).subset ?_
+    rintro x ⟨-, hx1, hx2⟩
+    exact ⟨(fun j k v => ⟨x.1 j k v, hx1 j k v⟩, fun j k v => ⟨x.2 j k v, hx2 j k v⟩), rfl⟩
+  have hinj : Set.InjOn (fun C => (lfPhi1 D h2 C, lfPhi3 hp.pos D h2 C))
+      (realizedCB hp T D B) := by
+    intro C hC C' hC' he
+    exact lf_phi_inj hp.pos h2 (hgood C hC) (hgood C' hC') (congrArg Prod.fst he)
+      (congrArg Prod.snd he)
+  have hmaps : ∀ C ∈ realizedCB hp T D B, (fun C => (lfPhi1 D h2 C, lfPhi3 hp.pos D h2 C)) C ∈
+      (lfTrunc D h2 (brCo d0 r0) '' lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2))
+        (lfBB D B (lfI2 h2)) (lfDp D h2 (lfFa D) (brCo d0 r0))
+        (lfW D h2 (lfFa D) (brCo d0 r0))) ×ˢ
+        lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0)) := by
+    intro C hC
+    obtain ⟨x, hx, hxe⟩ := (hgood C hC).lead
+    show (lfPhi1 D h2 C, lfPhi3 hp.pos D h2 C) ∈ _
+    exact Set.mk_mem_prod ⟨x, hx, hxe.symm⟩ (hgood C hC).deep
+  calc (realizedCB hp T D B).ncard
+      ≤ ((lfTrunc D h2 (brCo d0 r0) '' lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2))
+          (lfBB D B (lfI2 h2)) (lfDp D h2 (lfFa D) (brCo d0 r0))
+          (lfW D h2 (lfFa D) (brCo d0 r0))) ×ˢ
+          lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0))).ncard :=
+        Set.ncard_le_ncard_of_injOn _ hmaps hinj
+          ((hΛfin.image (lfTrunc D h2 (brCo d0 r0))).prod (Set.toFinite _))
+    _ = (lfTrunc D h2 (brCo d0 r0) '' lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2))
+          (lfBB D B (lfI2 h2)) (lfDp D h2 (lfFa D) (brCo d0 r0))
+          (lfW D h2 (lfFa D) (brCo d0 r0))).ncard *
+          (lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0))).ncard := Set.ncard_prod
+    _ ≤ (lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2))
+          (lfBB D B (lfI2 h2)) (lfDp D h2 (lfFa D) (brCo d0 r0))
+          (lfW D h2 (lfFa D) (brCo d0 r0))).ncard *
+          (lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0))).ncard :=
+        Nat.mul_le_mul_right _ (Set.ncard_image_le hΛfin)
+    _ ≤ _ := Nat.mul_le_mul hLead hDeep
+
+/-- The sum over the breadth `b_2` in `lf_ncard_lead_le` / `lf_realizedCB_ncard_le` is at most
+`min(s_2, s_3) + 1` times a uniform bound on its terms (the maximum form of CNT3). -/
+theorem lf_sum_le_max {s s2 s3 : ℕ} (f : ℕ → ℕ) (M : ℕ)
+    (hM : ∀ β ∈ (Finset.range (min s2 s3 + 1)).filter (fun β => s3 ≤ s * β), f β ≤ M) :
+    ∑ β ∈ (Finset.range (min s2 s3 + 1)).filter (fun β => s3 ≤ s * β), f β ≤
+      (min s2 s3 + 1) * M := by
+  refine (Finset.sum_le_card_nsmul _ _ _ hM).trans ?_
+  rw [smul_eq_mul]
+  exact Nat.mul_le_mul_right _ ((Finset.card_filter_le _ _).trans (Finset.card_range _).le)
+
+end LfCBCount
 
 end OMA.SimsLite
