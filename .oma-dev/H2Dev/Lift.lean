@@ -1083,7 +1083,7 @@ theorem lf_closure_single {n : ℕ} (p : ℕ) (a : Fin n → ℕ) (b : Fin n →
       rw [Finset.sum_insert hj, QuotientAddGroup.mk_add, ofAdd_add]
       refine Subgroup.mul_mem _ ?_ ih
       rw [lf_single_smul x j, QuotientAddGroup.mk_zsmul, ofAdd_zsmul]
-      exact Subgroup.zpow_mem _ (Subgroup.subset_closure ⟨j, rfl⟩) _
+      exact Subgroup.zpow_mem _ (Subgroup.subset_closure (Set.mem_range_self j)) _
   have h := key Finset.univ
   rwa [Finset.univ_sum_single] at h
 
@@ -1259,14 +1259,14 @@ theorem lf_ncard_lead_le (hp : p.Prime) (h2 : 2 < c)
           (r (lfI0 h2) - s).choose 2 * β) := by
   classical
   have hp0 := hp.pos
-  haveI : Finite (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) := (lf_card_quot_le hp0 _ b0).1
-  haveI : Finite (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) := (lf_card_quot_le hp0 _ b1).1
-  haveI : Finite (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2) := (lf_card_quot_le hp0 _ b2).1
-  haveI : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0)) :=
+  have : Finite (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) := (lf_card_quot_le hp0 _ b0).1
+  have : Finite (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) := (lf_card_quot_le hp0 _ b1).1
+  have : Finite (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2) := (lf_card_quot_le hp0 _ b2).1
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0)) :=
     Finite.of_equiv _ Multiplicative.ofAdd
-  haveI : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) :=
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) :=
     Finite.of_equiv _ Multiplicative.ofAdd
-  haveI : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) :=
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) :=
     Finite.of_equiv _ Multiplicative.ofAdd
   rcases Λ.eq_empty_or_nonempty with hE | ⟨x0, hx0⟩
   · rw [hE, Set.ncard_empty]
@@ -1420,5 +1420,11 @@ theorem SimsGen.lf_core (hS : SimsGen p u d X r) {c : ℕ} (hn : d.n = fOff r c)
   exact ⟨hsr, hcore⟩
 
 end LfFlat
+
+#print axioms OMA.SimsLite.lf_ncard_lead_le
+#print axioms OMA.SimsLite.SimsGen.lf_brCm_eq_coord
+#print axioms OMA.SimsLite.SimsGen.lf_core
+#print axioms OMA.SimsLite.lf_ncard_classes_le_fiberB_pw
+#print axioms OMA.SimsLite.lf_recover_eq
 
 end OMA.SimsLite
