@@ -1315,7 +1315,7 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
       have hn : (bPair s (t.val - bOff s r 1)).1 < bOff s r (L + 1) := by
         have := (bData_s_le : s ≤ bOff s r (L + 1))
         omega
-      show bLv s r L (bFin _ (bPair s (t.val - bOff s r 1)).1 t).val + 1 = 1
+      show bLv s r L (bFin (bOff s r (L + 1)) (bPair s (t.val - bOff s r 1)).1 t).val + 1 = 1
       rw [bFin_val (n := bOff s r (L + 1)) t hn, bLv_small (by omega)]
     · rw [bDf_two t hw]
       rw [hw] at hsp
@@ -1332,10 +1332,11 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
       have hle := bOff_mono (s := s) (r := r) (show w + 2 ≤ L + 1 by omega)
       have hn : bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s < bOff s r (L + 1) := by
         omega
-      show bLv s r L (bFin _ (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val + 1 =
-        w + 2
+      show bLv s r L (bFin (bOff s r (L + 1))
+        (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val + 1 = w + 2
       rw [bFin_val (n := bOff s r (L + 1)) t hn,
-        bLv_eq (w := w + 1) (by omega) (by omega) (by omega)]
+        bLv_eq (w := w + 1) (by omega) (Nat.le_add_right _ _)
+          (by rw [hoff']; exact Nat.add_lt_add_left hdiv _)]
   · intro t ht
     show ((bDf s r L t).2).val < s
     have hsl : s ≤ bOff s r (L + 1) := bData_s_le
@@ -1349,12 +1350,12 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
         split_ifs with h
         · exact Nat.mod_lt _ hspos
         · omega
-      show (bFin _ (bPair s (t.val - bOff s r 1)).2 t).val < s
+      show (bFin (bOff s r (L + 1)) (bPair s (t.val - bOff s r 1)).2 t).val < s
       rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
       exact hp2
     · rw [bDf_two t hw]
       have hp2 : (t.val - bOff s r (w + 2)) % s < s := Nat.mod_lt _ hspos
-      show (bFin _ ((t.val - bOff s r (w + 2)) % s) t).val < s
+      show (bFin (bOff s r (L + 1)) ((t.val - bOff s r (w + 2)) % s) t).val < s
       rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
       exact hp2
   · intro t ht
@@ -1452,7 +1453,8 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
       have hlv1 : bLv s r L (bFin (bOff s r (L + 1))
           (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val = w + 1 := by
         rw [bFin_val (n := bOff s r (L + 1)) t hn]
-        exact bLv_eq (by omega) (by omega) (by omega)
+        exact bLv_eq (by omega) (Nat.le_add_right _ _)
+          (by rw [hoff']; exact Nat.add_lt_add_left hdiv _)
       rw [bX_eq u v _ hlv1, bFin_val (n := bOff s r (L + 1)) t hn, Nat.add_sub_cancel_left,
         bX_core u v _ hm (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hm hsl))]
       rfl
@@ -1465,11 +1467,13 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
     have h2 : bOff s r 2 = bOff s r 1 + s * s := rfl
     have h2' : bOff s r (1 + 1) = bOff s r 1 + s * s := rfl
     have hle := bOff_mono (s := s) (r := r) (show 2 ≤ L + 1 by omega)
-    have hn : bOff s r 1 + (a.val * s + b.val) < (bData s r L).n := by
-      show _ < bOff s r (L + 1)
-      omega
+    have hlt2 : bOff s r 1 + (a.val * s + b.val) < bOff s r (1 + 1) := by
+      rw [h2']
+      exact Nat.add_lt_add_left hi _
+    have hn : bOff s r 1 + (a.val * s + b.val) < (bData s r L).n :=
+      lt_of_lt_of_le hlt2 hle
     have hlv1 : bLv s r L (bOff s r 1 + (a.val * s + b.val)) = 1 :=
-      bLv_eq hL1 (by omega) (by omega)
+      bLv_eq hL1 (Nat.le_add_right _ _) hlt2
     refine ⟨⟨_, hn⟩, hlv1, ?_⟩
     rw [bX_eq u v ⟨_, hn⟩ hlv1]
     show bVal u v 1 (bOff s r 1 + (a.val * s + b.val) - bOff s r 1) = ⁅u a, u b⁆
@@ -1523,12 +1527,14 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
         slot_lt hi hk
       have hoff : bOff s r (w + 2 + 1) = bOff s r (w + 2) + bLen s r (w + 1) * s := rfl
       have hle := bOff_mono (s := s) (r := r) (show w + 2 + 1 ≤ L + 1 by omega)
+      have hlt3 : bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) <
+          bOff s r (w + 2 + 1) := by
+        rw [hoff]
+        exact Nat.add_lt_add_left hslot _
       have hn : bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) <
-          (bData s r L).n := by
-        show _ < bOff s r (L + 1)
-        omega
+          (bData s r L).n := lt_of_lt_of_le hlt3 hle
       have hlv2 : bLv s r L (bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val)) =
-          w + 2 := bLv_eq hwL (by omega) (by omega)
+          w + 2 := bLv_eq hwL (Nat.le_add_right _ _) hlt3
       refine Subgroup.mem_sup_left (Subgroup.subset_closure ⟨⟨_, hn⟩, hlv2, ?_⟩)
       rw [bX_eq u v ⟨_, hn⟩ hlv2, bX_eq u v t hw, bX_core u v k hk rfl]
       show bVal u v (w + 2) (bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) -
