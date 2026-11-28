@@ -271,7 +271,8 @@ theorem card_quot_frattini (hG : IsPGroup p G) :
   letI : Module (ZMod p) (Additive (FratQ G)) := AddCommGroup.zmodModule hpow
   have : Finite (FratQ G) := Finite.of_surjective (fratPi G) fratPi_surjective
   have : Finite (Additive (FratQ G)) := inferInstance
-  have : Module.Free (ZMod p) (Additive (FratQ G)) := inferInstance
+  have : Module.Free (ZMod p) (Additive (FratQ G)) :=
+    Module.Free.of_divisionRing (ZMod p) (Additive (FratQ G))
   have : Module.Finite (ZMod p) (Additive (FratQ G)) := inferInstance
   have hcardQ : Nat.card (G ⧸ frattini G) = Nat.card (Additive (FratQ G)) := by
     have e := Nat.card_congr
