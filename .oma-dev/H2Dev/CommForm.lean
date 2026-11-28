@@ -152,7 +152,7 @@ theorem commForm_span (p : ℕ) :
   show ⁅lcs G 0, ⊤⁆ ≤ _
   rw [Subgroup.commutator_le]
   intro a _ b _
-  exact (le_sup_left : _ ≤ _ ⊔ _) (Subgroup.subset_closure ⟨(a, b), rfl⟩)
+  exact Subgroup.mem_sup_left (Subgroup.subset_closure ⟨(a, b), rfl⟩)
 
 end CommForm
 
