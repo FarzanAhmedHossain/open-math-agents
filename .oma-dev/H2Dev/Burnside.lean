@@ -268,7 +268,8 @@ theorem card_quot_frattini (hG : IsPGroup p G) :
       exact pow_mem_pPhi p g
     show Additive.ofMul (Additive.toMul x ^ p) = Additive.ofMul 1
     rw [h1]
-  letI : Module (ZMod p) (Additive (FratQ G)) := AddCommGroup.zmodModule hpow
+  -- `have`, not `letI`: the module structure is used only abstractly
+  have : Module (ZMod p) (Additive (FratQ G)) := AddCommGroup.zmodModule hpow
   have : Finite (FratQ G) := Finite.of_surjective (fratPi G) fratPi_surjective
   have : Finite (Additive (FratQ G)) := inferInstance
   have : Module.Free (ZMod p) (Additive (FratQ G)) :=
