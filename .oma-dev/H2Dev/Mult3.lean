@@ -538,9 +538,13 @@ theorem group_finrank_coreCent_le [Finite G] (hG : IsPGroup p G) {k : ℕ} (u : 
 /-- The core centraliser as a subgroup of `V` (multiplicative form). -/
 def coreCentSub {k : ℕ} (u : Fin k → G) : Subgroup (VQ p G) where
   carrier := {x | Additive.ofMul x ∈ coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)}
-  mul_mem' := fun ha hb => Submodule.add_mem _ ha hb
-  one_mem' := Submodule.zero_mem _
-  inv_mem' := fun ha => Submodule.neg_mem _ ha
+  mul_mem' := by
+    intro a b ha hb
+    exact (coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)).add_mem ha hb
+  one_mem' := (coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)).zero_mem
+  inv_mem' := by
+    intro a ha
+    exact (coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)).neg_mem ha
 
 /-- The inline order condition of `mult3Set`:
 `|{g : [g, H] ⊆ γ_3 γ_2^p}| · p^r1 = p^(dim K) |G|`. -/
@@ -556,7 +560,7 @@ theorem card_coreCent_pre [Finite G] (hG : IsPGroup p G) {k : ℕ} (u : Fin k �
   have e1 : Nat.card {g : G // ∀ h ∈ Subgroup.closure (Set.range u), ⁅g, h⁆ ∈ pN p G} =
       Nat.card (KS.comap (piV p G)) :=
     Nat.card_congr (Equiv.subtypeEquivRight (q := fun g => g ∈ KS.comap (piV p G))
-      (fun g => mem_coreCent_lamLin_iff u g))
+      (fun g => (mem_coreCent_lamLin_iff (p := p) u g).trans Iff.rfl))
   have e2 := Subgroup.card_mul_index (KS.comap (piV p G))
   have e3 : (KS.comap (piV p G)).index = KS.index :=
     Subgroup.index_comap_of_surjective (H := KS) piV_surjective
