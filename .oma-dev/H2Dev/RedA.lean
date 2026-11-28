@@ -174,7 +174,7 @@ def H3 : Prop :=
       2 ^ ((r2 + 1 - s) * r1.choose 2 + C3 * (r1 ^ 2 + r2 ^ 2))
 
 
-/-! ## Lemmas for `main` (stated, `sorry` in this draft)
+/-! ## Lemmas for `main` (all proved)
 
 `PW`, `A b2`, `B b2` are the three exponents of `H1`; `e = m2 - m3 - r2`, `λ = δ = s1 - r1`,
 `h = s - 1`, `Ψ(r1, m2) = r1^2 m2 / 2 + r1 m2 / 2 - m2^2 - r1^2 / 2`.
