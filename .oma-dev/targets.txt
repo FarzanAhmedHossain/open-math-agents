@@ -1,1 +1,6 @@
+H2Dev.Burnside
+H2Dev.CoreFlag
 H2Dev.Frame
+H2Dev.SimsGen
+H2Dev.DataCount
+H2Dev.PowerWords
