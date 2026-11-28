@@ -77,8 +77,8 @@ theorem lf_recover_core {r n s : ℕ} (β1 : L1 →* L1 →* L2) {β2 β2' : L2 
       rw [MonoidHom.flip_apply, MonoidHom.flip_apply]
       by_cases hle : k ≤ kk j
       · exact hrec j k hks hle
-      · have hlt : (kk j : ℕ) < k := Fin.lt_iff_val_lt_val.mp (lt_of_not_le hle)
-        have hf : (f j : ℕ) < kk j := Fin.lt_iff_val_lt_val.mp (hfk j)
+      · have hlt : (kk j : ℕ) < k := Fin.lt_def.mp (not_le.mp hle)
+        have hf : (f j : ℕ) < kk j := Fin.lt_def.mp (hfk j)
         have i1 : ∀ z, β2 z (g (f j)) = β2' z (g (f j)) := fun z =>
           ih (f j : ℕ) (by omega) (f j) rfl (by omega) z
         have i2 : ∀ z, β2 z (g (kk j)) = β2' z (g (kk j)) := fun z =>
@@ -364,20 +364,20 @@ theorem lf_reduce {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fi
           · rw [hjj]
             have e : (w - q • lfRel p a b jk) jk = w jk % (p : ℤ) ^ a jk := by
               rw [Pi.sub_apply, Pi.smul_apply, lfRel_self, smul_eq_mul, hq]
-              have h := Int.emod_add_ediv (w jk) ((p : ℤ) ^ a jk)
+              have h := Int.ediv_add_emod (w jk) ((p : ℤ) ^ a jk)
               linear_combination -h
             rw [e]
             exact ⟨Int.emod_nonneg _ hPpos.ne', Int.emod_lt_of_pos _ hPpos⟩
           · have hne : (j : ℕ) ≠ n - 1 - k := fun h => hjj (Fin.ext (h.trans hjkv.symm))
-            have hlt : jk < j := Fin.lt_iff_val_lt_val.mpr (by omega)
+            have hlt : jk < j := Fin.lt_def.mpr (by omega)
             have h0 : (w - q • lfRel p a b jk) j = w j := by
               rw [Pi.sub_apply, Pi.smul_apply, lfRel_of_gt a b hlt, smul_zero, sub_zero]
             rw [h0]
             exact hw j (by omega)
         · have e : x - (w - q • lfRel p a b jk) = (x - w) + q • lfRel p a b jk := by abel
           rw [e]
-          exact (lfSpan p a b).add_mem hx
-            (AddSubgroup.zsmul_mem _ (AddSubgroup.subset_closure ⟨jk, rfl⟩) q)
+          have hmem : lfRel p a b jk ∈ lfSpan p a b := AddSubgroup.subset_closure ⟨jk, rfl⟩
+          exact (lfSpan p a b).add_mem hx (zsmul_mem hmem q)
       · exact ⟨w, fun j hj => hw j (by omega), hx⟩
   obtain ⟨w, hw, hx⟩ := key n
   exact ⟨w, fun j => hw j (by omega), hx⟩
@@ -430,7 +430,7 @@ lemma lfPsi_single {n : ℕ} (y : Fin n → L) (j : Fin n) :
   rw [lfPsi_apply, Finset.sum_eq_single j]
   · simp
   · intro i _ hi
-    simp [Pi.single_apply, hi]
+    simp [hi]
   · intro h
     exact absurd (Finset.mem_univ j) h
 
@@ -536,10 +536,12 @@ theorem SimsGenSet.lf_mem_relSub (S : SimsGenSet p a g) (i : Fin c) {x : G}
     (hx : x ∈ lcs G i) : x ∈ relSub g i (r i) := by
   have h := le_closure_sup_of_layerQ_gen (fun v : Fin (r i) => g ⟨i, v⟩)
     (fun v => S.mem ⟨i, v⟩) (S.gen i) hx
-  refine (sup_le_sup_right ?_ _) h
-  apply Subgroup.closure_mono
-  rintro _ ⟨v, rfl⟩
-  exact ⟨v, v.isLt, rfl⟩
+  have hmono : Subgroup.closure (Set.range fun v : Fin (r i) => g ⟨i, v⟩) ≤
+      Subgroup.closure {x | ∃ v : Fin (r i), v.val < r i ∧ g ⟨i, v⟩ = x} := by
+    apply Subgroup.closure_mono
+    rintro _ ⟨v, rfl⟩
+    exact ⟨v, v.isLt, rfl⟩
+  exact sup_le_sup_right hmono (lcs G ((i : ℕ) + 1)) h
 
 /-- The Sims lift (36): an element `x ∈ γ_{i+1}` is the product of its weight-`i` block
 `Π_v g_{i,v} ^ e(i,v)` (the Sims lift of its class, with Sims coordinates `0 ≤ e(i,v) < p ^ a(i,v)`)
@@ -557,6 +559,7 @@ theorem SimsGenSet.lf_sims_lift (S : SimsGenSet p a g) (i : Fin c) {x : G}
   rw [List.mem_ofFn'] at hz
   obtain ⟨v, rfl⟩ := hz
   have h0 : (S.nf.coord x ⟨u, v⟩).val = 0 := hsupp ⟨u, v⟩ (Or.inl hu)
+  show g ⟨u, v⟩ ^ (S.nf.coord x ⟨u, v⟩).val = 1
   rw [h0, pow_zero]
 
 /-- (35): the class of `x ∈ γ_{i+1}` in the layer is `Σ_v e(i,v) ḡ_{i,v}` for its Sims
