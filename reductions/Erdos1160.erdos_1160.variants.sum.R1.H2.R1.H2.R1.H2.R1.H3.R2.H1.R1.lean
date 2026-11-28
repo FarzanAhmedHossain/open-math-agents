@@ -65,42 +65,32 @@ For the class-three groups `G` of order `2^m` with the parameters `(r1, r2, s, s
   `B b2` is (55) with the leading-layer exponent replaced by the second alternative of (54),
   `N_2(r1, r2, s) + (C(r1,2) - r2)(s2 - r2)`.
 The term `C m (log_2 m + 1)` absorbs the `2^{O(m log m)}` recorded data and breadth choices. -/
-def H1 : Prop :=
-  ∃ C : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 : ℕ, ∀ S : Set FiniteGrp.{0},
-    S = {G : FiniteGrp.{0} | Nat.card G = 2 ^ m ∧
-        (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧
-        (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧
-        Group.rank G = r1 ∧
-        Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
-          ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
-            ((⊤ : Subgroup G).lowerCentralSeries 1)) = r2 ∧
-        sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
-          ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} = s ∧
-        ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1 ∧
-        Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2 ∧
-        Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3 ∧
-        Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3} →
-    S.Nonempty →
-    (r1 ≤ s1 ∧ 2 ≤ s ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧
-      m2 - m3 - r2 ≤ (s1 - r1).choose 2 ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) ∧
-    ∃ b2 : ℕ, m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3 ∧
-      Real.logb 2 ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' S).ncard : ℝ) ≤
-        C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1) +
-        ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2)) +
-          (r3 - 1) * (m3 - r3) : ℕ) : ℝ) +
-        min (((r1.choose 2 : ℝ) - r2) * m2 +
-            (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ)))
-          (Real.logb 2 ({β : Fin r2 → Matrix (Fin r1) (Fin r1) (ZMod 2) |
-              (∀ k, (∀ i, β k i i = 0) ∧ ∀ i j, β k j i = -β k i j) ∧
-              Submodule.span (ZMod 2) {w : Fin r2 → ZMod 2 |
-                ∃ x ∈ (⊤ : Submodule (ZMod 2) (Fin r1 → ZMod 2)),
-                  ∃ y ∈ (⊤ : Submodule (ZMod 2) (Fin r1 → ZMod 2)), w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤ ∧
-              sInf {d | ∃ U : Submodule (ZMod 2) (Fin r1 → ZMod 2), Module.finrank (ZMod 2) U = d ∧
-                Submodule.span (ZMod 2) {w : Fin r2 → ZMod 2 |
-                  ∃ x ∈ U, ∃ y ∈ U, w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤} = s}.ncard : ℝ) +
-            ((r1.choose 2 : ℝ) - r2) * ((m2 : ℝ) - m3 - r2) + ((r1.choose 2 : ℝ) - r2) * m3 +
-            (s : ℝ) * b2 * ((r2 : ℝ) + m3 - b2 + 1))
-
+def H1 : Prop := ∃ C : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 : ℕ, ∀ S : Set FiniteGrp.{0}, S = {G :
+  FiniteGrp.{0} | Nat.card G = 2 ^ m ∧ (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥
+  ∧ (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧ Group.rank G = r1
+  ∧ Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸ ((⊤ : Subgroup G).lowerCentralSeries
+  2).subgroupOf ((⊤ : Subgroup G).lowerCentralSeries 1)) = r2 ∧ sInf {k |
+  ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 = ⁅H, H⁆ ⊔ (⊤ : Subgroup
+  G).lowerCentralSeries 2 ∧ Group.rank H = k} = s
+  ∧ ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ s1
+  ∧ Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ m2
+  ∧ Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3
+  ∧ Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3} → S.Nonempty → (r1 ≤ s1 ∧ 2 ≤ s
+  ∧ s ≤ r1 ∧ s - 1 ≤ r2 ∧ r2 ≤ s.choose 2 ∧ r2 ≤ m2 - m3 ∧ m2 - m3 - r2 ≤ (s1 - r1).choose 2
+  ∧ m2 - m3 ≤ r2 * (s1 - r1 + 1)) ∧ ∃ b2 : ℕ, m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3 ∧
+  Real.logb 2 ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' S).ncard : ℝ) ≤ C * (m : ℝ) *
+  ((Nat.log 2 m : ℝ) + 1) + ((r1 * m2 + (r1 - 1) * (s1 - r1) + (r2 * m3 + (r2 - 1) * (m2 - m3 - r2))
+  + (r3 - 1) * (m3 - r3) : ℕ) : ℝ) + min (((r1.choose 2 : ℝ) - r2) * m2
+  + (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2
+  + 1) - ((r1 - s).choose 2 : ℝ))) (Real.logb 2 ({β : Fin r2
+  → Matrix (Fin r1) (Fin r1) (ZMod 2) | (∀ k, (∀ i, β k i i = 0) ∧ ∀ i j, β k j i = -β k i j)
+  ∧ Submodule.span (ZMod 2) {w : Fin r2 → ZMod 2 | ∃ x ∈ (⊤ : Submodule (ZMod 2) (Fin r1 → ZMod 2)),
+  ∃ y ∈ (⊤ : Submodule (ZMod 2) (Fin r1 → ZMod 2)), w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤ ∧ sInf {d |
+  ∃ U : Submodule (ZMod 2) (Fin r1 → ZMod 2), Module.finrank (ZMod 2) U = d
+  ∧ Submodule.span (ZMod 2) {w : Fin r2 → ZMod 2 | ∃ x ∈ U,
+  ∃ y ∈ U, w = fun k => x ⬝ᵥ (β k *ᵥ y)} = ⊤} = s}.ncard : ℝ)
+  + ((r1.choose 2 : ℝ) - r2) * ((m2 : ℝ) - m3 - r2) + ((r1.choose 2 : ℝ) - r2) * m3
+  + (s : ℝ) * b2 * ((r2 : ℝ) + m3 - b2 + 1))
 
 /-- MULT3, the class-three multiplicity count at defect `δ = s1 - r1 = 0`, for
 `C(s-1, 2) ≤ r2` (the saturated range `C(s-1, 2) < r2` of (134) together with the binary
