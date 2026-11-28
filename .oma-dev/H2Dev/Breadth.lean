@@ -584,7 +584,7 @@ theorem br_card_pairs_nat (s : ℕ) : ∀ r : ℕ,
     rw [Finset.disjoint_iff_inter_eq_empty.1 hdisj, Finset.card_empty, add_zero] at hu
     rw [hsplit, hu, br_card_pairs_nat s r, Finset.card_image_of_injective _ hinj, Nat.card_Ico]
     rcases Nat.lt_or_ge r s with h | h
-    · rw [show r - s = 0 by omega, show r + 1 - s = 0 by omega]
+    · rw [show r - s = 0 by omega, show r + 1 - s = 0 by omega, Nat.add_zero]
     · rw [show r + 1 - s = (r - s) + 1 by omega, Nat.choose_succ_succ', Nat.choose_one_right,
         Nat.add_comm]
 
