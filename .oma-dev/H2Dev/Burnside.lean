@@ -8,7 +8,11 @@ For a finite p-group `G`:
 * `card_quot_frattini` : `Nat.card (G ⧸ frattini G) = p ^ Group.rank G`;
 * `rank_eq_log_index_frattini` : `Group.rank G = Nat.log p (frattini G).index`;
 * `closure_eq_top_of_sup_frattini`, `closure_image_frattini_eq_top_iff` : a subset generates `G`
-  iff its image generates `G ⧸ frattini G`. -/
+  iff its image generates `G ⧸ frattini G`.
+The `F_p`-vector space used in the proof of `card_quot_frattini` is `Additive (FratQ G)`, where
+`FratQ G = G^ab ⧸ Φ(G)^ab` and `fratPi : G →* FratQ G` has kernel `frattini G` (`ker_fratPi`).
+Item (d) of the plan (log_p |A| as a sum of exponents over a basis of a finite abelian p-group)
+is not formalised here. -/
 
 namespace OMA.SimsLite
 
@@ -92,7 +96,7 @@ variable {p : ℕ} [hp : Fact p.Prime] {G : Type u} [Group G] [Finite G]
 /-- Maximal subgroups of a finite p-group are normal. -/
 lemma coatom_normal (hG : IsPGroup p G) {M : Subgroup G} (hM : IsCoatom M) : M.Normal := by
   have := hG.isNilpotent
-  exact Subgroup.NormalizerCondition.normal_of_coatom M normalizerCondition_of_isNilpotent hM
+  exact Subgroup.NormalizerCondition.normal_of_coatom M Group.normalizerCondition_of_isNilpotent hM
 
 /-- Every maximal subgroup of a finite p-group contains `G^p γ_2`. -/
 lemma pPhi_le_coatom (hG : IsPGroup p G) {M : Subgroup G} (hM : IsCoatom M) :
@@ -137,7 +141,7 @@ lemma pPhi_le_coatom (hG : IsPGroup p G) {M : Subgroup G} (hM : IsCoatom M) :
     exact hcomm _ _
 
 /-- Elements outside `G^p γ_2` are avoided by some maximal subgroup. -/
-lemma exists_coatom_not_mem (hG : IsPGroup p G) {g : G} (hg : g ∉ pPhi p G) :
+lemma exists_coatom_not_mem {g : G} (hg : g ∉ pPhi p G) :
     ∃ H : Subgroup G, IsCoatom H ∧ g ∉ H := by
   have : Finite (Subgroup G) :=
     Finite.of_injective (fun H : Subgroup G => (H : Set G)) SetLike.coe_injective
@@ -193,7 +197,7 @@ theorem frattini_eq_pPhi (hG : IsPGroup p G) : frattini G = pPhi p G := by
   apply le_antisymm
   · intro g hg
     by_contra hgn
-    obtain ⟨H, hH, hgH⟩ := exists_coatom_not_mem hG hgn
+    obtain ⟨H, hH, hgH⟩ := exists_coatom_not_mem hgn
     exact hgH (frattini_le_coatom hH hg)
   · show pPhi p G ≤ ⨅ a ∈ {H : Subgroup G | IsCoatom H}, a
     exact le_iInf₂ fun M hM => pPhi_le_coatom hG hM
