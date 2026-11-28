@@ -287,3 +287,12 @@ theorem simsRank_bounds [Finite G] (hG : IsPGroup p G) :
 end Bridge
 
 end OMA.SimsLite.Alt2
+
+#print axioms OMA.SimsLite.Alt2.simsRank_bounds
+#print axioms OMA.SimsLite.Alt2.N2_pos_of_group
+#print axioms OMA.SimsLite.Alt2.N2_support_sims
+#print axioms OMA.SimsLite.Alt2.N2_eq_ncard
+#print axioms OMA.SimsLite.Alt2.pow_le_ncard_grass
+#print axioms OMA.SimsLite.Alt2.ncard_subgroups_le
+#print axioms OMA.SimsLite.Alt2.exists_le_card_pow
+#print axioms OMA.SimsLite.Alt2.simsRk_lamLin_tuple
