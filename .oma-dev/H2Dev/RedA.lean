@@ -186,13 +186,77 @@ def H3 : Prop :=
 lemma class_three {G : Type} [Group G] (h1 : ¬commutator G ≤ Subgroup.center G)
     (h2 : (⊤ : Subgroup G).lowerCentralSeries 2 ≤ Subgroup.center G) :
     (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧ (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ := by
-  sorry
+  refine ⟨fun hb => h1 ?_, Subgroup.lowerCentralSeries_succ_eq_bot _ h2⟩
+  intro x hx
+  rw [Subgroup.mem_center_iff]
+  intro g
+  have h2eq : (⊤ : Subgroup G).lowerCentralSeries 2 =
+      ⁅(⊤ : Subgroup G).lowerCentralSeries 1, ⊤⁆ := Subgroup.lowerCentralSeries_succ _ 1
+  have hx1 : x ∈ (⊤ : Subgroup G).lowerCentralSeries 1 := hx
+  have hc : ⁅x, g⁆ ∈ ⁅(⊤ : Subgroup G).lowerCentralSeries 1, ⊤⁆ :=
+    Subgroup.commutator_mem_commutator hx1 (Subgroup.mem_top g)
+  rw [← h2eq, hb, Subgroup.mem_bot, commutatorElement_eq_one_iff_mul_comm] at hc
+  exact hc.symm
 
 /-- A member of a parameter set has `m3 ≥ 1` (`γ_3 ≠ 1`). -/
 lemma param_m3_pos {m s1 m2 m3 : ℕ} (G : FiniteGrp.{0})
     (h3 : (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥)
     (hm3 : Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ m3) : 1 ≤ m3 := by
-  sorry
+  by_contra hc
+  have h0 : m3 = 0 := by omega
+  apply h3
+  rw [← Subgroup.card_eq_one, hm3, h0, pow_zero]
+
+/-- A finite group has rank at most its order (`Group.rank_le` on `Finset.univ`). -/
+lemma lqmg_rank_le_card (H : Type*) [Group H] [Finite H] : Group.rank H ≤ Nat.card H := by
+  classical
+  letI := Fintype.ofFinite H
+  calc Group.rank H ≤ (Finset.univ : Finset H).card := Group.rank_le (by simp)
+    _ = Nat.card H := by rw [Finset.card_univ, Nat.card_eq_fintype_card]
+
+/-- The rank of a subgroup is at most the order of the ambient finite group. -/
+lemma lqmg_rank_sub_le {G : Type*} [Group G] [Finite G] (H : Subgroup G) :
+    Group.rank H ≤ Nat.card G :=
+  (lqmg_rank_le_card H).trans (Subgroup.card_le_card_group H)
+
+/-- The rank of a quotient of a subgroup is at most the order of the ambient finite group. -/
+lemma lqmg_rank_quot_le {G : Type*} [Group G] [Finite G] (H : Subgroup G) (N : Subgroup H)
+    [N.Normal] : Group.rank (H ⧸ N) ≤ Nat.card G := by
+  calc Group.rank (H ⧸ N) ≤ Nat.card (H ⧸ N) := lqmg_rank_le_card _
+    _ ≤ Nat.card H := Nat.card_le_card_of_surjective _ QuotientGroup.mk_surjective
+    _ ≤ Nat.card G := Subgroup.card_le_card_group H
+
+/-- The isomorphism classes of a set of finite groups of a fixed order `n` form a finite set
+(a group of order `n` is determined up to isomorphism by a multiplication table on `Fin n`). -/
+lemma lqmg_classes_finite (n : ℕ) (S : Set FiniteGrp.{0}) (hS : ∀ G ∈ S, Nat.card G = n) :
+    (Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' S).Finite := by
+  have hsub : ∀ t : Fin n → Fin n → Fin n, Set.Subsingleton {q | ∃ G ∈ S,
+      Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) G = q ∧
+        ∃ e : G ≃ Fin n, ∀ a b, e.symm (t a b) = e.symm a * e.symm b} := by
+    intro t
+    rintro q₁ ⟨G₁, -, rfl, e₁, h₁⟩ q₂ ⟨G₂, -, rfl, e₂, h₂⟩
+    let f : G₁ ≃* G₂ := MulEquiv.mk (e₁.trans e₂.symm) (by
+      intro x y
+      show e₂.symm (e₁ (x * y)) = e₂.symm (e₁ x) * e₂.symm (e₁ y)
+      rw [← h₂]
+      congr 1
+      apply e₁.symm.injective
+      rw [h₁]
+      simp)
+    exact Quotient.sound ⟨CategoryTheory.InducedCategory.isoMk (MulEquiv.toGrpIso f)⟩
+  refine Set.Finite.subset (Set.finite_iUnion fun t : Fin n → Fin n → Fin n => (hsub t).finite) ?_
+  rintro q ⟨G, hG, rfl⟩
+  let e : G ≃ Fin n := (Finite.equivFin G).trans (finCongr (hS G hG))
+  exact Set.mem_iUnion.mpr ⟨fun a b => e (e.symm a * e.symm b), G, hG, rfl, e, fun a b => by simp⟩
+
+/-- `ncard` of a finite union is at most the sum of the `ncard`s. -/
+lemma lqmg_ncard_biUnion_le {ι α : Type*} [DecidableEq ι] (I : Finset ι) (T : ι → Set α) :
+    (⋃ i ∈ I, T i).ncard ≤ ∑ i ∈ I, (T i).ncard := by
+  refine Finset.induction_on I ?_ ?_
+  · simp
+  · intro a J ha ih
+    rw [Finset.set_biUnion_insert, Finset.sum_insert ha]
+    exact (Set.ncard_union_le _ _).trans (Nat.add_le_add_left ih _)
 
 /-- L0 + L1: the target classes are covered by the parameter sets with `m/7 < r1 ≤ 2^m`,
 `r2, s, r3 ≤ 2^m` (`Group.rank_le` on `Finset.univ`) and `s1, m2, m3 ≤ m` (`Nat.dvd_prime_pow`
@@ -220,7 +284,96 @@ lemma target_le_box (m : ℕ) (X : ℝ) (hX : 0 ≤ X)
         2 < Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) ∧
         m / 7 < Group.rank G ∧ (⊤ : Subgroup G).lowerCentralSeries 2 ≤ Subgroup.center G}).ncard : ℝ) ≤
       ((2 ^ m + 1) ^ 4 * (m + 1) ^ 3 : ℝ) * X := by
-  sorry
+  classical
+  let Sp : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ → Set FiniteGrp.{0} := fun p =>
+    {G : FiniteGrp.{0} | Nat.card G = 2 ^ m ∧
+      (⊤ : Subgroup G).lowerCentralSeries 2 ≠ ⊥ ∧
+      (⊤ : Subgroup G).lowerCentralSeries 3 = ⊥ ∧
+      Group.rank G = p.1 ∧
+      Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
+        ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
+          ((⊤ : Subgroup G).lowerCentralSeries 1)) = p.2.1 ∧
+      sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
+        ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} = p.2.2.1 ∧
+      ((⊤ : Subgroup G).lowerCentralSeries 1).index = 2 ^ p.2.2.2.1 ∧
+      Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) = 2 ^ p.2.2.2.2.1 ∧
+      Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) = 2 ^ p.2.2.2.2.2.1 ∧
+      Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = p.2.2.2.2.2.2}
+  let R1 : Finset ℕ := Finset.range (2 ^ m + 1)
+  let R2 : Finset ℕ := Finset.range (m + 1)
+  let B0 : Finset (ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ) := R1 ×ˢ R1 ×ˢ R1 ×ˢ R2 ×ˢ R2 ×ˢ R2 ×ˢ R1
+  let B : Finset (ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ) := B0.filter (fun p => m / 7 < p.1)
+  have hsub : Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) ''
+      {G : FiniteGrp.{0} | Nat.card G = 2^m ∧ ¬commutator G ≤ Subgroup.center G ∧
+        2 < Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) ∧
+        m / 7 < Group.rank G ∧ (⊤ : Subgroup G).lowerCentralSeries 2 ≤ Subgroup.center G} ⊆
+      ⋃ p ∈ B, Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' Sp p := by
+    rintro q ⟨G, ⟨hcard, hnc, -, hr, hcen⟩, rfl⟩
+    obtain ⟨hne, hbot⟩ := class_three hnc hcen
+    have hd1 : ((⊤ : Subgroup G).lowerCentralSeries 1).index ∣ 2 ^ m := by
+      rw [← hcard]; exact Subgroup.index_dvd_card _
+    have hd2 : Nat.card ((⊤ : Subgroup G).lowerCentralSeries 1) ∣ 2 ^ m := by
+      rw [← hcard]; exact Subgroup.card_subgroup_dvd_card _
+    have hd3 : Nat.card ((⊤ : Subgroup G).lowerCentralSeries 2) ∣ 2 ^ m := by
+      rw [← hcard]; exact Subgroup.card_subgroup_dvd_card _
+    obtain ⟨s1, hs1m, hs1⟩ := (Nat.dvd_prime_pow Nat.prime_two).1 hd1
+    obtain ⟨m2, hm2m, hm2⟩ := (Nat.dvd_prime_pow Nat.prime_two).1 hd2
+    obtain ⟨m3, hm3m, hm3⟩ := (Nat.dvd_prime_pow Nat.prime_two).1 hd3
+    have hcG : Nat.card G ≤ 2 ^ m := hcard.le
+    have b1 : Group.rank G ≤ 2 ^ m := (lqmg_rank_le_card G).trans hcG
+    have b2 : Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
+        ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
+          ((⊤ : Subgroup G).lowerCentralSeries 1)) ≤ 2 ^ m :=
+      (lqmg_rank_quot_le _ _).trans hcG
+    have hle : (⊤ : Subgroup G).lowerCentralSeries 2 ≤ (⊤ : Subgroup G).lowerCentralSeries 1 :=
+      Subgroup.lowerCentralSeries_antitone _ (by norm_num : 1 ≤ 2)
+    have hle' : (⊤ : Subgroup G).lowerCentralSeries 2 ≤ ⁅(⊤ : Subgroup G), ⊤⁆ := hle
+    have hsI : sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
+        ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} ≤
+        Group.rank (⊤ : Subgroup G) :=
+      Nat.sInf_le (Set.mem_setOf.mpr ⟨⊤, (sup_eq_left.mpr hle').symm, rfl⟩)
+    have b3 : sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
+        ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k} ≤ 2 ^ m :=
+      hsI.trans ((lqmg_rank_sub_le _).trans hcG)
+    have b7 : Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) ≤ 2 ^ m :=
+      (lqmg_rank_sub_le _).trans hcG
+    refine Set.mem_iUnion₂.mpr ⟨(Group.rank G, Group.rank ((⊤ : Subgroup G).lowerCentralSeries 1 ⧸
+        ((⊤ : Subgroup G).lowerCentralSeries 2).subgroupOf
+          ((⊤ : Subgroup G).lowerCentralSeries 1)),
+        sInf {k | ∃ H : Subgroup G, (⊤ : Subgroup G).lowerCentralSeries 1 =
+          ⁅H, H⁆ ⊔ (⊤ : Subgroup G).lowerCentralSeries 2 ∧ Group.rank H = k},
+        s1, m2, m3, Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2)), ?_,
+        G, ⟨hcard, hne, hbot, rfl, rfl, rfl, hs1, hm2, hm3, rfl⟩, rfl⟩
+    exact Finset.mem_filter.mpr ⟨Finset.mem_product.mpr ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le b1),
+      Finset.mem_product.mpr ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le b2),
+      Finset.mem_product.mpr ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le b3),
+      Finset.mem_product.mpr ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le hs1m),
+      Finset.mem_product.mpr ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le hm2m),
+      Finset.mem_product.mpr ⟨Finset.mem_range.mpr (Nat.lt_succ_of_le hm3m),
+        Finset.mem_range.mpr (Nat.lt_succ_of_le b7)⟩⟩⟩⟩⟩⟩, hr⟩
+  have hfin : (⋃ p ∈ B, Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' Sp p).Finite :=
+    Set.Finite.subset ((Finset.finite_toSet B).biUnion fun p _ =>
+      lqmg_classes_finite (2 ^ m) (Sp p) fun G hG => hG.1) (fun x hx => by
+        simp only [Set.mem_iUnion, Finset.mem_coe] at hx ⊢
+        exact hx)
+  have h1 := Set.ncard_le_ncard hsub hfin
+  have h2 := lqmg_ncard_biUnion_le B (fun p => Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' Sp p)
+  have h3 : ∑ p ∈ B, (((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' Sp p).ncard : ℕ) : ℝ) ≤
+      ∑ p ∈ B, X := Finset.sum_le_sum fun p hp =>
+    h p.1 p.2.1 p.2.2.1 p.2.2.2.1 p.2.2.2.2.1 p.2.2.2.2.2.1 p.2.2.2.2.2.2 (Finset.mem_filter.mp hp).2
+  have hB0 : B0.card = (2 ^ m + 1) ^ 4 * (m + 1) ^ 3 := by
+    simp only [B0, R1, R2, Finset.card_product, Finset.card_range]
+    ring
+  have h4 : (B.card : ℝ) ≤ ((2 ^ m + 1) ^ 4 * (m + 1) ^ 3 : ℝ) := by
+    have : B.card ≤ (2 ^ m + 1) ^ 4 * (m + 1) ^ 3 := hB0 ▸ Finset.card_filter_le _ _
+    exact_mod_cast this
+  calc _ ≤ (((⋃ p ∈ B, Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' Sp p).ncard : ℕ) : ℝ) := by
+        exact_mod_cast h1
+    _ ≤ ∑ p ∈ B, (((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' Sp p).ncard : ℕ) : ℝ) := by
+        exact_mod_cast h2
+    _ ≤ ∑ p ∈ B, X := h3
+    _ = (B.card : ℝ) * X := by rw [Finset.sum_const, nsmul_eq_mul]
+    _ ≤ _ := mul_le_mul_of_nonneg_right h4 hX
 
 /-! ### L1 real-arithmetic glue -/
 
@@ -246,7 +399,69 @@ lemma le_rpow_of_logb_le {n : ℕ} {E : ℝ} (h : Real.logb 2 (n : ℝ) ≤ E) :
 
 /-- The number of parameter tuples in `target_le_box`. -/
 lemma box_card (m : ℕ) : ((2 ^ m + 1) ^ 4 * (m + 1) ^ 3 : ℝ) ≤ 2 ^ (8 * (m : ℝ) + 8) := by
-  sorry
+  have hn : (2 ^ m + 1) ^ 4 * (m + 1) ^ 3 ≤ 2 ^ (8 * m + 8) := by
+    have h2 : m + 1 ≤ 2 ^ m := by
+      induction m with
+      | zero => norm_num
+      | succ k ih =>
+        rw [pow_succ]; linarith
+    have hp : 1 ≤ 2 ^ m := Nat.one_le_two_pow
+    have h1 : 2 ^ m + 1 ≤ 2 ^ (m + 1) := by rw [pow_succ]; linarith
+    calc (2 ^ m + 1) ^ 4 * (m + 1) ^ 3 ≤ (2 ^ (m + 1)) ^ 4 * (2 ^ m) ^ 3 :=
+          Nat.mul_le_mul (Nat.pow_le_pow_left h1 4) (Nat.pow_le_pow_left h2 3)
+      _ = 2 ^ (7 * m + 4) := by ring
+      _ ≤ 2 ^ (8 * m + 8) := Nat.pow_le_pow_right (by norm_num) (by omega)
+  have e : ((8 * m + 8 : ℕ) : ℝ) = 8 * (m : ℝ) + 8 := by push_cast; ring
+  rw [← e, Real.rpow_natCast]
+  exact_mod_cast hn
+
+/-- `k^2 ≤ 2^k + 16` for all `k` (`k^2 ≤ 2^k` from `k = 4` on). -/
+lemma lqmg_sq_le_two_pow (k : ℕ) : k ^ 2 ≤ 2 ^ k + 16 := by
+  rcases Nat.lt_or_ge k 4 with hk | hk
+  · interval_cases k <;> norm_num
+  · have h : k ^ 2 ≤ 2 ^ k := by
+      induction k, hk using Nat.le_induction with
+      | base => norm_num
+      | succ n hn ih =>
+        have h4 : 4 * n ≤ n * n := Nat.mul_le_mul_right n hn
+        rw [pow_succ 2 n]
+        nlinarith [ih, h4]
+    linarith
+
+/-- `(log_2 m)^2 ≤ m + 16`. -/
+lemma lqmg_log_sq_le (m : ℕ) : (Nat.log 2 m) ^ 2 ≤ m + 16 := by
+  rcases Nat.eq_zero_or_pos m with rfl | hm
+  · simp
+  · have h1 := Nat.pow_log_le_self 2 hm.ne'
+    have h2 := lqmg_sq_le_two_pow (Nat.log 2 m)
+    linarith
+
+/-- The exponent comparison behind `final_ineq`, with `x = m`, `L = log_2 m`, `L^2 ≤ x + 16`
+and the threshold `x ≥ ⌈2 (27 |C|)^2⌉ + 500` (so `27 |C| (L + 1) ≤ x` and `x ≥ 500`). -/
+lemma lqmg_final_exp (C x L : ℝ) (hx : ((Nat.ceil (2 * (27 * |C|) ^ 2) : ℕ) : ℝ) + 500 ≤ x)
+    (hL0 : 0 ≤ L) (hL : L ^ 2 ≤ x + 16) :
+    135 + 27 * (8 * x + 8 + (2 / 27 * x ^ 3 - 7 / 18 * x ^ 2 + C * x * (L + 1))) + 9 * x ^ 2 ≤
+      2 * x ^ 3 := by
+  have hceil : 2 * (27 * |C|) ^ 2 ≤ ((Nat.ceil (2 * (27 * |C|) ^ 2) : ℕ) : ℝ) := Nat.le_ceil _
+  have hc0 : (0 : ℝ) ≤ ((Nat.ceil (2 * (27 * |C|) ^ 2) : ℕ) : ℝ) := Nat.cast_nonneg _
+  have ha0 : 0 ≤ 27 * |C| := by positivity
+  have hx500 : 500 ≤ x := by linarith
+  have h2a : 2 * (27 * |C|) ^ 2 ≤ x - 500 := by linarith
+  have hL1 : (L + 1) ^ 2 ≤ 2 * x + 34 := by nlinarith [sq_nonneg (L - 1)]
+  have e1 := mul_le_mul_of_nonneg_left hL1 (sq_nonneg (27 * |C|))
+  have e2 := mul_le_mul_of_nonneg_right h2a (by linarith : (0 : ℝ) ≤ x + 17)
+  have hsq : (27 * |C| * (L + 1)) ^ 2 ≤ x ^ 2 := by nlinarith [e1, e2]
+  have haL : 27 * |C| * (L + 1) ≤ x := by
+    by_contra hcon
+    push_neg at hcon
+    nlinarith [mul_self_lt_mul_self (by linarith : (0 : ℝ) ≤ x) hcon]
+  have hCa : 27 * C ≤ 27 * |C| := by linarith [le_abs_self C]
+  have hxL : 0 ≤ x * (L + 1) := mul_nonneg (by linarith) (by linarith)
+  have h3 : 27 * C * (x * (L + 1)) ≤ 27 * |C| * (x * (L + 1)) :=
+    mul_le_mul_of_nonneg_right hCa hxL
+  have h4 : 27 * |C| * (L + 1) * x ≤ x * x := mul_le_mul_of_nonneg_right haL (by linarith)
+  have h5 : 500 * x ≤ x * x := mul_le_mul_of_nonneg_right hx500 (by linarith)
+  nlinarith [h3, h4, h5]
 
 /-- The final inequality: `2^(8m+8)` parameter tuples, each contributing at most
 `2^((2/27) m^3 - (7/18) m^2 + C m (log_2 m + 1))` classes, fit the target
@@ -255,7 +470,37 @@ lemma final_ineq (C : ℝ) : ∀ᶠ m : ℕ in atTop, ∀ N : ℕ,
     (N : ℝ) ≤ 2 ^ (8 * (m : ℝ) + 8) *
       2 ^ (2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 + C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1)) →
     (24 * N) ^ 27 * 2 ^ (9 * m ^ 2) ≤ 2 ^ (2 * m ^ 3) := by
-  sorry
+  filter_upwards [eventually_ge_atTop (Nat.ceil (2 * (27 * |C|) ^ 2) + 500)] with m hm N hN
+  have hexp := lqmg_final_exp C (m : ℝ) (Nat.log 2 m : ℝ) (by exact_mod_cast hm)
+    (Nat.cast_nonneg _) (by exact_mod_cast lqmg_log_sq_le m)
+  rw [← Real.rpow_add (by norm_num : (0 : ℝ) < 2)] at hN
+  set F : ℝ := 8 * (m : ℝ) + 8 + (2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 +
+    C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1)) with hF
+  have hu0 : (0 : ℝ) ≤ (2 : ℝ) ^ F := Real.rpow_nonneg (by norm_num) _
+  have hN0 : (0 : ℝ) ≤ (N : ℝ) := Nat.cast_nonneg _
+  have e1 : ((32 : ℝ) * (2 : ℝ) ^ F) ^ 27 = (2 : ℝ) ^ ((135 : ℝ) + 27 * F) := by
+    rw [mul_pow, Real.rpow_add (by norm_num : (0 : ℝ) < 2), ← Real.rpow_natCast ((2 : ℝ) ^ F) 27,
+      ← Real.rpow_mul (by norm_num : (0 : ℝ) ≤ 2)]
+    have h135 : (2 : ℝ) ^ (135 : ℝ) = (32 : ℝ) ^ 27 := by
+      rw [show (135 : ℝ) = ((135 : ℕ) : ℝ) by norm_num, Real.rpow_natCast]; norm_num
+    rw [h135]
+    congr 2
+    push_cast
+    ring
+  have e2 : (2 : ℝ) ^ (9 * m ^ 2) = (2 : ℝ) ^ (((9 * m ^ 2 : ℕ)) : ℝ) :=
+    (Real.rpow_natCast _ _).symm
+  have key : (((24 * N) ^ 27 * 2 ^ (9 * m ^ 2) : ℕ) : ℝ) ≤ ((2 ^ (2 * m ^ 3) : ℕ) : ℝ) := by
+    push_cast
+    calc (24 * (N : ℝ)) ^ 27 * (2 : ℝ) ^ (9 * m ^ 2) ≤
+          ((32 : ℝ) * (2 : ℝ) ^ F) ^ 27 * (2 : ℝ) ^ (9 * m ^ 2) :=
+          mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (by positivity) (by linarith) 27)
+            (by positivity)
+      _ = (2 : ℝ) ^ ((135 : ℝ) + 27 * F + ((9 * m ^ 2 : ℕ) : ℝ)) := by
+          rw [e1, e2, ← Real.rpow_add (by norm_num : (0 : ℝ) < 2)]
+      _ ≤ (2 : ℝ) ^ (((2 * m ^ 3 : ℕ)) : ℝ) :=
+          Real.rpow_le_rpow_of_exponent_le (by norm_num) (by push_cast; linarith)
+      _ = (2 : ℝ) ^ (2 * m ^ 3) := Real.rpow_natCast _ _
+  exact_mod_cast key
 
 /-! ### L2-L10 Part III arithmetic at class three
 
