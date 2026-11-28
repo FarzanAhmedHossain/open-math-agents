@@ -1590,3 +1590,6 @@ theorem cbt_realizedCB_params {p m : ℕ} [Fact p.Prime] (hp : p.Prime) (T : Set
 end CbtCount
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.cbt_realizedCB_ncard_le_min_two
+#print axioms OMA.SimsLite.cbt_realizedCB_params
