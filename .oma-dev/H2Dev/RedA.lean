@@ -383,6 +383,32 @@ lemma core_small_of_le (H m s r1 r2 : ℕ) (hs : s ≤ H) (hr : r2 ≤ s.choose 
 
 /-! ### Regime bounds -/
 
+/-- `s^2 ≤ 8 m` and `m ≥ 10^8` give `s ≤ m / 1000`. -/
+lemma lqmc_s_small {m s : ℝ} (hmR : (10:ℝ) ^ 8 ≤ m) (hsqR : s ^ 2 ≤ 8 * m) : s ≤ m / 1000 := by
+  have hmm : (10:ℝ) ^ 8 * m ≤ m * m := mul_le_mul_of_nonneg_right hmR (by linarith)
+  by_contra hcon
+  push_neg at hcon
+  have h0 : (0:ℝ) ≤ m / 1000 := by linarith
+  have := mul_self_lt_mul_self h0 hcon
+  linarith
+
+/-- The `P`-condition of `sat_A_bound` for large `m` (`m < 7 r1`, `s ≤ m/1000`, `m2 ≤ m`). -/
+lemma lqmc_P_cond {m r1 s m2 : ℕ} (hc3 : s ≤ r1) (hmR : (10:ℝ) ^ 8 ≤ m)
+    (hm7R : (m:ℝ) < 7 * r1) (hsm : (s:ℝ) ≤ m / 1000) (hm2R : (m2:ℝ) ≤ m) :
+    3 * s * m2 + s * (m2 + 1) ≤ (r1 - s).choose 2 := by
+  have hmm : (10:ℝ) ^ 8 * m ≤ m * m := mul_le_mul_of_nonneg_right hmR (Nat.cast_nonneg m)
+  have hR : ((3 * s * m2 + s * (m2 + 1) : ℕ) : ℝ) ≤ (((r1 - s).choose 2 : ℕ) : ℝ) := by
+    rw [Nat.cast_choose_two ℝ, Nat.cast_sub hc3]
+    push_cast
+    have hu : (m:ℝ) / 8 ≤ (r1:ℝ) - s := by linarith
+    have hu1 : (m:ℝ) / 9 ≤ (r1:ℝ) - s - 1 := by linarith
+    have hprod : (m:ℝ) / 8 * ((m:ℝ) / 9) ≤ ((r1:ℝ) - s) * ((r1:ℝ) - s - 1) :=
+      mul_le_mul hu hu1 (by positivity) (by linarith)
+    have hsm2 : (s:ℝ) * m2 ≤ (m / 1000) * m :=
+      mul_le_mul hsm hm2R (Nat.cast_nonneg _) (by positivity)
+    linarith
+  exact_mod_cast hR
+
 /-- Defect `δ ≥ 1` (CNT3 alone; class-three form of the first step of the proof of Thm 14.3):
 `sat_A_bound` (its `P`-condition holds for large `m` from `m < 7 r1`, `s^2 ≤ 8 m`), `psi_bound`
 with `n = m - δ`, `lam_close`, and `40 m + 5 s m ≤ m^2 / 18`. -/
@@ -396,7 +422,39 @@ lemma lam_pos_case : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, m0 ≤ m 
     (((r1.choose 2 : ℝ) - r2) * m2 +
       (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) ≤
       2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 := by
-  sorry
+  refine ⟨10 ^ 8, ?_⟩
+  intro m r1 r2 s s1 m2 m3 r3 b2 hm hc hsum hm3m2 hm3 hb hd hm7 hsq
+  have hc' := hc
+  obtain ⟨hc1, hc2, hc3, hc4, hc5, hc6, hc7, hc8⟩ := hc'
+  have hmR : (10:ℝ) ^ 8 ≤ m := by exact_mod_cast hm
+  have hsqR : (s:ℝ) ^ 2 ≤ 8 * m := by exact_mod_cast hsq
+  have hmm : (10:ℝ) ^ 8 * m ≤ m * m := mul_le_mul_of_nonneg_right hmR (Nat.cast_nonneg m)
+  have hsm : (s:ℝ) ≤ m / 1000 := lqmc_s_small hmR hsqR
+  have hm7R : (m:ℝ) < 7 * r1 := by exact_mod_cast hm7
+  have hsumR : (s1:ℝ) + m2 = m := by exact_mod_cast hsum
+  have hr1s1 : (r1:ℝ) + 1 ≤ s1 := by exact_mod_cast hd
+  have hm2R : (m2:ℝ) ≤ m := by
+    have : m2 ≤ m := by omega
+    exact_mod_cast this
+  have hP : 3 * s * m2 + s * (m2 + 1) ≤ (r1 - s).choose 2 :=
+    lqmc_P_cond hc3 hmR hm7R hsm hm2R
+  have hA := sat_A_bound m r1 r2 s s1 m2 m3 r3 b2 hc hsum hm3m2 hm3 hb hP
+  have hδ : ((s1 - r1 : ℕ) : ℝ) = (s1:ℝ) - r1 := Nat.cast_sub hc1
+  have hpsi := (psi_bound (r1:ℝ) (m2:ℝ) (Nat.cast_nonneg _) (Nat.cast_nonneg _)).1
+  have hn : (r1:ℝ) + m2 = m - ((s1 - r1 : ℕ) : ℝ) := by rw [hδ]; linarith
+  rw [hn] at hpsi
+  have he : ((m2 - m3 - r2 : ℕ) : ℝ) ≤
+      ((s1 - r1 : ℕ) : ℝ) * (((s1 - r1 : ℕ) : ℝ) - 1) / 2 := by
+    have := (Nat.cast_le (α := ℝ)).mpr hc7
+    rwa [Nat.cast_choose_two ℝ] at this
+  have hem : ((m2 - m3 - r2 : ℕ) : ℝ) ≤ m2 := by
+    have : m2 - m3 - r2 ≤ m2 := by omega
+    exact_mod_cast this
+  have hl1 : (1:ℝ) ≤ ((s1 - r1 : ℕ) : ℝ) := by rw [hδ]; linarith
+  have hlc := lam_close (m:ℝ) ((s1 - r1 : ℕ) : ℝ) r1 m2 ((m2 - m3 - r2 : ℕ) : ℝ) hl1 hn
+    (Nat.cast_nonneg _) (Nat.cast_nonneg _) (Nat.cast_nonneg _) he hem
+  have hsm' : (s:ℝ) * m ≤ m / 1000 * m := mul_le_mul_of_nonneg_right hsm (Nat.cast_nonneg m)
+  linarith
 
 /-- Defect `δ = 0` with multiplicities (`H2`; class-three form of (152)-(158) and Prop 12.1 (ii)
 at `η = -5/6`): `sat_A_bound`, `mult_close`, the second bound of `psi_bound` with `n = m`, and
@@ -412,7 +470,50 @@ lemma mult_case : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 k : ℕ, m0 ≤ m �
       (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) -
       ((r1 - s : ℕ) : ℝ) ^ 2 + (k : ℝ) * (2 * (r1 : ℝ) - s - k - (s : ℝ) * r2) ≤
       2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 := by
-  sorry
+  refine ⟨10 ^ 8, ?_⟩
+  intro m r1 r2 s s1 m2 m3 r3 b2 k hm hc hsum hm3m2 hm3 hb hs1 hm7 hsq hsr hk
+  have hc' := hc
+  obtain ⟨hc1, hc2, hc3, hc4, hc5, hc6, hc7, hc8⟩ := hc'
+  have hmR : (10:ℝ) ^ 8 ≤ m := by exact_mod_cast hm
+  have hsqR : (s:ℝ) ^ 2 ≤ 8 * m := by exact_mod_cast hsq
+  have hmm : (10:ℝ) ^ 8 * m ≤ m * m := mul_le_mul_of_nonneg_right hmR (Nat.cast_nonneg m)
+  have hsm : (s:ℝ) ≤ m / 1000 := lqmc_s_small hmR hsqR
+  have hm7R : (m:ℝ) < 7 * r1 := by exact_mod_cast hm7
+  have hm2R : (m2:ℝ) ≤ m := by
+    have : m2 ≤ m := by omega
+    exact_mod_cast this
+  have hr1R : (r1:ℝ) ≤ m := by
+    have : r1 ≤ m := by omega
+    exact_mod_cast this
+  have hP : 3 * s * m2 + s * (m2 + 1) ≤ (r1 - s).choose 2 :=
+    lqmc_P_cond hc3 hmR hm7R hsm hm2R
+  have hA := sat_A_bound m r1 r2 s s1 m2 m3 r3 b2 hc hsum hm3m2 hm3 hb hP
+  have h00 : (s1 - r1).choose 2 = 0 := by rw [hs1, Nat.sub_self]; rfl
+  have he0 : m2 - m3 - r2 = 0 := by omega
+  have hz1 : (m2:ℝ) * ((m2 - m3 - r2 : ℕ) : ℝ) = 0 := by rw [he0]; simp
+  have hz2 : (r1:ℝ) * ((s1 - r1 : ℕ) : ℝ) = 0 := by rw [hs1, Nat.sub_self]; simp
+  have hpsi := (psi_bound (r1:ℝ) (m2:ℝ) (Nat.cast_nonneg _) (Nat.cast_nonneg _)).2
+  have hn : (r1:ℝ) + m2 = m := by
+    have : r1 + m2 = m := by omega
+    exact_mod_cast this
+  rw [hn] at hpsi
+  have hkR : (k:ℝ) ≤ (r1:ℝ) - s := by
+    have h' : ((r1 - s : ℕ) : ℝ) = (r1:ℝ) - s := Nat.cast_sub hc3
+    rw [← h']
+    exact_mod_cast hk
+  have hsrR : 2 * (r1:ℝ) ≤ s * r2 := by exact_mod_cast hsr
+  have hmc := mult_close (r1:ℝ) (s:ℝ) (r2:ℝ) (k:ℝ) (Nat.cast_nonneg _) (Nat.cast_nonneg _) hkR hsrR
+  rw [Nat.cast_sub hc3]
+  have hsm' : (s:ℝ) * m ≤ m / 1000 * m := mul_le_mul_of_nonneg_right hsm (Nat.cast_nonneg m)
+  have hr1s : (r1:ℝ) * s ≤ m * (m / 1000) :=
+    mul_le_mul hr1R hsm (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+  linarith
+
+lemma lqmc_min_left {x y a b : ℝ} (h : x ≤ y + min a b) : x ≤ y + a :=
+  h.trans (by linarith [min_le_left a b])
+
+lemma lqmc_min_right {x y a b : ℝ} (h : x ≤ y + min a b) : x ≤ y + b :=
+  h.trans (by linarith [min_le_right a b])
 
 /-- L11, the per-parameter bound (the case split of the proof of Thm 14.3 at class three).
 Take `C`, `C'` from `H1`, `H2`, `Cn` from `H3`, `K` from `ns_assembly Cn`, and
@@ -441,7 +542,108 @@ lemma per_param (h1 : H1) (h2 : H2) (h3 : H3) :
       Group.rank ((⊤ : Subgroup G).lowerCentralSeries 2) = r3} →
     Real.logb 2 ((Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) '' S).ncard : ℝ) ≤
       2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 + C * (m : ℝ) * ((Nat.log 2 m : ℝ) + 1) := by
-  sorry
+  obtain ⟨C1, hC1⟩ := h1
+  obtain ⟨C2, hC2⟩ := h2
+  obtain ⟨Cn, hCn⟩ := h3
+  obtain ⟨K, hK⟩ := ns_assembly Cn
+  obtain ⟨H, hH⟩ := exists_nat_ge (20 * (K + 1))
+  obtain ⟨M1, hM1⟩ := lam_pos_case
+  obtain ⟨M2, hM2⟩ := small_core_size
+  obtain ⟨M3, hM3⟩ := small_core
+  obtain ⟨M4, hM4⟩ := mult_case
+  refine ⟨max (max C1 C2) 0, M1 + M2 + M3 + M4 + 12 * H ^ 2 + 7 * H ^ 3 + 7, ?_⟩
+  intro m r1 r2 s s1 m2 m3 r3 hm hr1 S hS
+  have hm7 : m < 7 * r1 := by omega
+  have hm6 : 6 ≤ m := by omega
+  have hmR : (6:ℝ) ≤ m := by exact_mod_cast hm6
+  have hL : (0:ℝ) ≤ (Nat.log 2 m : ℝ) + 1 := by positivity
+  have hcub : (0:ℝ) ≤ 2 / 27 * (m : ℝ) ^ 3 - 7 / 18 * (m : ℝ) ^ 2 := by
+    have h0 : (0:ℝ) ≤ (m:ℝ) ^ 2 * (2 / 27 * m - 7 / 18) :=
+      mul_nonneg (sq_nonneg _) (by linarith)
+    linarith
+  have hm2sq : (0:ℝ) ≤ (m:ℝ) ^ 2 := sq_nonneg _
+  have hCm : ∀ Ci : ℝ, Ci ≤ max (max C1 C2) 0 →
+      Ci * (m:ℝ) * ((Nat.log 2 m : ℝ) + 1) ≤
+        max (max C1 C2) 0 * (m:ℝ) * ((Nat.log 2 m : ℝ) + 1) :=
+    fun Ci hCi => mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_right hCi (Nat.cast_nonneg m)) hL
+  have hC1le : C1 ≤ max (max C1 C2) 0 := (le_max_left C1 C2).trans (le_max_left _ _)
+  have hC2le : C2 ≤ max (max C1 C2) 0 := (le_max_right C1 C2).trans (le_max_left _ _)
+  have hC0 : 0 ≤ max (max C1 C2) 0 * (m:ℝ) * ((Nat.log 2 m : ℝ) + 1) :=
+    mul_nonneg (mul_nonneg (le_max_right _ _) (Nat.cast_nonneg m)) hL
+  by_cases hne : S.Nonempty
+  swap
+  · rw [Set.not_nonempty_iff_eq_empty] at hne
+    rw [hne, Set.image_empty, Set.ncard_empty, Nat.cast_zero, Real.logb_zero]
+    linarith
+  obtain ⟨hc, b2, hb1, hb2, hb3, hlog1⟩ := hC1 m r1 r2 s s1 m2 m3 r3 S hS hne
+  have hc' := hc
+  obtain ⟨hc1, hc2, hc3, hc4, hc5, hc6, hc7, hc8⟩ := hc'
+  obtain ⟨G, hG⟩ := id hne
+  rw [hS, Set.mem_setOf_eq] at hG
+  obtain ⟨hcard, h3G, -, -, -, -, hidx, hm2G, hm3G, -⟩ := hG
+  have hm3 : 1 ≤ m3 := param_m3_pos (m := m) (s1 := s1) (m2 := m2) G h3G hm3G
+  have hsum : s1 + m2 = m := by
+    have key : 2 ^ m2 * 2 ^ s1 = 2 ^ m := by
+      rw [← hm2G, ← hidx, ← hcard]
+      exact Subgroup.card_mul_index _
+    rw [← pow_add] at key
+    have := Nat.pow_right_injective (le_refl 2) key
+    omega
+  have hb2pos : 0 < b2 := by
+    rcases Nat.eq_zero_or_pos b2 with h0 | h0
+    · rw [h0, mul_zero] at hb1
+      omega
+    · exact h0
+  have hm3m2 : m3 ≤ m2 := by omega
+  have hb : m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3 := ⟨hb1, hb2, hb3⟩
+  have hr2m : r2 ≤ m := by omega
+  have hr1m : r1 ≤ m := by omega
+  by_cases hA : r2 < (s - 1).choose 2 ∧ H < s
+  · obtain ⟨hlt, hHs⟩ := hA
+    have hN := logb_le_of_le_pow (hCn r1 r2 s hc2 hc3 hc4 hlt)
+    have hB := hK m r1 r2 s s1 m2 m3 r3 b2 _ hc hsum hm3m2 hm3 hb hlt hN
+    have hlogB := lqmc_min_right hlog1
+    have hsH : (H:ℝ) + 1 ≤ s := by exact_mod_cast hHs
+    have h20 : 20 * (K + 1) ≤ (s:ℝ) - 1 := by linarith
+    have hprod := mul_le_mul_of_nonneg_right h20 hm2sq
+    linarith [hCm C1 hC1le]
+  have hsq : s ^ 2 ≤ 8 * m := by
+    by_cases hsat : (s - 1).choose 2 ≤ r2
+    · exact sq_le_of_sat m s r2 (by omega) hsat hr2m
+    · have hsH : s ≤ H := by
+        by_contra hcon
+        exact hA ⟨by omega, by omega⟩
+      calc s ^ 2 ≤ H ^ 2 := Nat.pow_le_pow_left hsH 2
+        _ ≤ 8 * m := by omega
+  by_cases hd : r1 + 1 ≤ s1
+  · have hlam := hM1 m r1 r2 s s1 m2 m3 r3 b2 (by omega) hc hsum hm3m2 hm3 hb hd hm7 hsq
+    have hlogA := lqmc_min_left hlog1
+    linarith [hCm C1 hC1le]
+  have hs1 : s1 = r1 := by omega
+  by_cases hsr : s * r2 < 2 * r1
+  · have h12 : 12 * s ^ 2 ≤ m := by
+      by_cases hsat : (s - 1).choose 2 ≤ r2
+      · exact hM2 m s r1 r2 (by omega) hsat hsr hr1m
+      · have hsH : s ≤ H := by
+          by_contra hcon
+          exact hA ⟨by omega, by omega⟩
+        have : s ^ 2 ≤ H ^ 2 := Nat.pow_le_pow_left hsH 2
+        omega
+    have hsc := hM3 m r1 r2 s s1 m2 m3 r3 b2 (by omega) hc hsum hm3m2 hm3 hb hs1 hm7 h12
+    have hlogA := lqmc_min_left hlog1
+    linarith [hCm C1 hC1le]
+  have hsr' : 2 * r1 ≤ s * r2 := by omega
+  have hHs : H < s := by
+    by_contra hcon
+    have := core_small_of_le H m s r1 r2 (by omega) hc5 hm7 (by omega)
+    omega
+  have hsat : (s - 1).choose 2 ≤ r2 := by
+    by_contra hcon
+    exact hA ⟨by omega, hHs⟩
+  obtain ⟨b2', k, hb1', hb2', hb3', hk, hlog2⟩ := hC2 m r1 r2 s s1 m2 m3 r3 S hS hs1 hsat hne
+  have hmc := hM4 m r1 r2 s s1 m2 m3 r3 b2' k (by omega) hc hsum hm3m2 hm3 ⟨hb1', hb2', hb3'⟩
+    hs1 hm7 hsq hsr' hk
+  linarith [hCm C2 hC2le]
 
 /-- Reduction A: CNT3, MULT3 and N2A give the class-three, rank `> m/7` estimate.
 (Dev draft: the target body of `...R1.H3.R2.H1` is restated.) -/
