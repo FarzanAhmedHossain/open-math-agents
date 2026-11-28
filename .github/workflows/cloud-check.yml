@@ -1,0 +1,256 @@
+# Runs the Left to Solve checker (tools/check.sh, exactly what check-proof.yml runs) on a GitHub-hosted runner
+# (16 GB RAM) instead of the local machine, and, once the proof is accepted, opens the pull request upstream.
+#
+# Trigger: push to a cloud/** branch of this fork that contains .oma-cloud/request.json, for example
+#   {"problem": "<problem or step id>", "open_pr": false, "agent": "claude-code", "model": "claude-opus-5-5"}
+# The proof checked is proofs/<problem>.lean from the pushed commit, or reductions/<problem>.lean when <problem>
+# ends in .R<n> and that reduction file exists (check only: open_pr must then be false).
+# The lease is NEVER committed (a public branch would leak it): it is read from the repository secret
+# OMA_LEASE, holding "<problem id> <lease>". The job beats it while it works, so it cannot expire mid-run.
+# With "open_pr": true and an accepted verdict, the job cuts a branch oma/<problem> holding ONLY that proof file
+# (the one-file rule) from the cloud branch's merge-base with upstream main, pushes it to this fork, and opens the
+# pull request with the PR_PAT secret (a token of the fork owner allowed to open pull requests upstream).
+# Pushes to cloud/** never match the triggers of the inherited workflows (main / feat/** / pull requests).
+# Reuse one cloud/** branch where possible: Actions caches are scoped to the branch that saved them.
+name: cloud-check
+on:
+  push:
+    branches: ["cloud/**"]
+permissions:
+  contents: write
+concurrency:
+  group: cloud-check-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  UPSTREAM_REPO: GuillaumeBAUD-coder/open-math-agents
+  OMA_SITE: https://lefttosolve.com
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # No write token in .git/config while Lake and Lean run; the one push below passes it explicitly.
+          persist-credentials: false
+
+      - name: Read the request
+        id: req
+        run: |
+          set -euo pipefail
+          python3 -I - <<'PY'
+          import json, os, re
+          r = json.load(open(".oma-cloud/request.json", encoding="utf-8"))
+          if "lease" in r:
+              raise SystemExit("never commit the lease: it is read from the OMA_LEASE secret")
+          pid = str(r["problem"])
+          if not re.fullmatch(r"[A-Za-z0-9_.-]+", pid):
+              raise SystemExit("bad problem id")
+          agent = str(r.get("agent", "claude-code"))
+          model = str(r.get("model", "unknown"))
+          for v in (agent, model):
+              if not re.fullmatch(r"[A-Za-z0-9_.:/-]+", v):
+                  raise SystemExit("bad agent/model")
+          f = "proofs/" + pid + ".lean"
+          # A reduction you wrote (<id>.R<n>) is checked from reductions/; it is check-only here (no PR from the cloud).
+          if re.fullmatch(r".+\.R[0-9]+", pid) and os.path.isfile("reductions/" + pid + ".lean"):
+              f = "reductions/" + pid + ".lean"
+              if r.get("open_pr") is True:
+                  raise SystemExit("open_pr is not supported for reductions: open that pull request with tools/oma.sh submit")
+          if not os.path.isfile(f):
+              raise SystemExit("missing " + f)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("problem=" + pid + "\n")
+              out.write("file=" + f + "\n")
+              out.write("open_pr=" + ("true" if r.get("open_pr") is True else "false") + "\n")
+              out.write("agent=" + agent + "\n")
+              out.write("model=" + model + "\n")
+          PY
+
+      - name: Keep the lease alive while the runner works
+        env:
+          ID: ${{ steps.req.outputs.problem }}
+          OPEN_PR: ${{ steps.req.outputs.open_pr }}
+          OMA_LEASE: ${{ secrets.OMA_LEASE }}
+        run: |
+          set -uo pipefail
+          read -r LID L <<<"$(printf '%s' "${OMA_LEASE:-}" | tr -d '\r')" || true
+          L="$(printf '%s' "${L:-}" | tr -d '\r\n ')"
+          [ -n "$L" ] && echo "::add-mask::$L"
+          if [ -z "$L" ] || [ "${LID:-}" != "$ID" ]; then
+            [ "$OPEN_PR" = true ] && { echo "::error::OMA_LEASE missing or not for $ID"; exit 1; }
+            echo "::warning::OMA_LEASE missing or not for $ID: not beating (check only)"; exit 0
+          fi
+          c="$(curl -sS -m 30 -o /dev/null -w '%{http_code}' -X POST "$OMA_SITE/api/desk/beat?lease=$L" || echo 000)"
+          case "$c" in 410|404) [ "$OPEN_PR" = true ] && { echo "::error::lease is no longer live (HTTP $c)"; exit 1; }; touch "$RUNNER_TEMP/lease_dead";; esac
+          export L
+          nohup bash -c 'while sleep 300; do c=$(curl -sS -m 30 -o /dev/null -w "%{http_code}" -X POST "$OMA_SITE/api/desk/beat?lease=$L" || echo 000); case "$c" in 410|404) touch "$RUNNER_TEMP/lease_dead"; break;; esac; done' >/dev/null 2>&1 &
+
+      - name: Lint (before anything compiles)
+        env:
+          FILE: ${{ steps.req.outputs.file }}
+        run: python3 -I tools/lint.py "$FILE" data/catalog.json
+
+      - name: Pinned formal-conjectures
+        id: fc
+        run: |
+          set -euo pipefail
+          C=$(python3 -I -c 'import json;print(json.load(open("data/catalog.json"))["meta"]["upstreamCommit"])')
+          echo "commit=$C" >> "$GITHUB_OUTPUT"
+          git init -q "$RUNNER_TEMP/fc" && cd "$RUNNER_TEMP/fc"
+          git remote add origin https://github.com/google-deepmind/formal-conjectures
+          git fetch -q --depth 1 origin "$C" && git checkout -q FETCH_HEAD
+
+      # The toolchain, the Mathlib cache AND the compiled formal-conjectures libraries: the first run builds
+      # FormalConjecturesForMathlib once (the slow part); later runs only compile the proof itself.
+      - name: Restore Lean cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.elan
+            ${{ runner.temp }}/fc/.lake
+          key: cloud-fc-${{ steps.fc.outputs.commit }}-${{ hashFiles('reductions/**') }}
+          restore-keys: |
+            cloud-fc-${{ steps.fc.outputs.commit }}-
+            fc-${{ steps.fc.outputs.commit }}
+
+      - name: Lean toolchain and Mathlib cache
+        run: |
+          retry() { for i in 1 2 3 4; do "$@" && return 0; echo "attempt $i failed: $*"; sleep $((i * 20)); done; return 1; }
+          if [ ! -x ~/.elan/bin/lake ]; then
+            retry curl -sSfL --retry 3 https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+            retry sh /tmp/elan-init.sh -y --default-toolchain none
+          fi
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          cd "$RUNNER_TEMP/fc" && retry ~/.elan/bin/lake exe cache get
+
+      - name: Compile and audit axioms (tools/check.sh)
+        id: compile
+        env:
+          FILE: ${{ steps.req.outputs.file }}
+          OPEN_PR: ${{ steps.req.outputs.open_pr }}
+        run: |
+          if [ "$OPEN_PR" = true ] && [ -f "$RUNNER_TEMP/lease_dead" ]; then
+            echo '{"verdict":"fault","reason":"lease expired during the run","log":""}' > verdict.json; exit 1
+          fi
+          OMA_FC="$RUNNER_TEMP/fc" tools/check.sh "$FILE" verdict.json || true
+          [ -f verdict.json ] || echo '{"verdict":"fault","reason":"checker produced no verdict","log":""}' > verdict.json
+          python3 -I -c 'import json;print("built="+("0" if json.load(open("verdict.json"))["verdict"]=="fault" else "1"))' >> "$GITHUB_OUTPUT"
+          python3 -I - <<'PY'
+          import json
+          d = json.load(open("verdict.json", encoding="utf-8"))
+          print("VERDICT:", d["verdict"].upper(), "-", d["reason"])
+          print(d.get("log", "")[-6000:])
+          PY
+
+      - name: Save Lean cache
+        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' && steps.compile.outputs.built == '1' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.elan
+            ${{ runner.temp }}/fc/.lake
+          key: cloud-fc-${{ steps.fc.outputs.commit }}-${{ hashFiles('reductions/**') }}
+
+      # check.sh keeps only the last 6000 characters of the compiler output; on a compile rejection, recompile the
+      # file directly (imports are already built) so EVERY error is visible.
+      - name: Full error log (only on a compile rejection)
+        if: ${{ !cancelled() }}
+        env:
+          FILE: ${{ steps.req.outputs.file }}
+        run: |
+          R=$(python3 -I -c 'import json;print(json.load(open("verdict.json"))["reason"])' 2>/dev/null || echo none)
+          case "$R" in "does not compile"|"compiler reported errors") ;; *) exit 0;; esac
+          cd "$RUNNER_TEMP/fc"
+          timeout 1800 lake env lean "$GITHUB_WORKSPACE/$FILE" > "$GITHUB_WORKSPACE/full.log" 2>&1 || true
+          echo "errors: $(grep -c ': error' "$GITHUB_WORKSPACE/full.log" || true)"
+          grep -n -A 14 ': error' "$GITHUB_WORKSPACE/full.log" | head -600 || true
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: verdict
+          path: |
+            verdict.json
+            full.log
+          if-no-files-found: warn
+
+      - name: Accepted?
+        id: verdict
+        run: |
+          V=$(python3 -I -c 'import json;print(json.load(open("verdict.json"))["verdict"])')
+          echo "verdict=$V" >> "$GITHUB_OUTPUT"
+          echo "### $V" >> "$GITHUB_STEP_SUMMARY"
+          [ "$V" = "accepted" ]
+
+      - name: Open the pull request upstream
+        if: ${{ steps.verdict.outputs.verdict == 'accepted' && steps.req.outputs.open_pr == 'true' }}
+        env:
+          ID: ${{ steps.req.outputs.problem }}
+          FILE: ${{ steps.req.outputs.file }}
+          AGENT: ${{ steps.req.outputs.agent }}
+          MODEL: ${{ steps.req.outputs.model }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_PAT: ${{ secrets.PR_PAT }}
+          OMA_LEASE: ${{ secrets.OMA_LEASE }}
+          FORK_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$PR_PAT" ] || { echo "::error::the PR_PAT secret is not set"; exit 1; }
+          [ "$(GH_TOKEN="$PR_PAT" gh api user --jq .login | tr 'A-Z' 'a-z')" = "$(printf '%s' "$OWNER" | tr 'A-Z' 'a-z')" ] \
+            || { echo "::error::PR_PAT does not belong to $OWNER"; exit 1; }
+          read -r LID L <<<"$(printf '%s' "${OMA_LEASE:-}" | tr -d '\r')" || true
+          L="$(printf '%s' "${L:-}" | tr -d '\r\n ')"
+          [ -n "$L" ] || { echo "::error::the OMA_LEASE secret is not set"; exit 1; }
+          echo "::add-mask::$L"
+          [ "$LID" = "$ID" ] || { echo "::error::OMA_LEASE is for $LID, not $ID: do not send"; exit 1; }
+          [[ "$L" =~ ^[0-9a-fA-F-]{36}$ ]] || { echo "::error::malformed lease in OMA_LEASE"; exit 1; }
+          CODE="$(curl -sS -m 30 -o /dev/null -w '%{http_code}' -X POST "$OMA_SITE/api/desk/beat?lease=$L")"
+          [ "$CODE" = "200" ] || { echo "::error::lease is no longer live (HTTP $CODE): do not send"; exit 1; }
+          BR="oma/$(printf '%s' "$ID" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)"
+          git fetch -q "https://github.com/$UPSTREAM_REPO" main
+          UP=$(git rev-parse FETCH_HEAD)
+          if git cat-file -e "$UP:$FILE" 2>/dev/null; then echo "::error::$FILE is already on upstream main"; exit 1; fi
+          # Branch from the merge-base, not upstream's tip: a GITHUB_TOKEN push may not carry upstream workflow
+          # changes the fork lacks. Upstream's checker diffs only the pull request's own change.
+          BASE=$(git merge-base "$GITHUB_SHA" "$UP") || { echo "::error::no common history with upstream main"; exit 1; }
+          if [ -n "$(git diff --name-only --diff-filter=MD "$BASE" "$GITHUB_SHA" -- .github/workflows)" ]; then
+            echo "::error::the cloud branch alters upstream workflows"; exit 1
+          fi
+          git checkout -q -B "$BR" "$BASE"
+          git checkout -q "$GITHUB_SHA" -- "$FILE"
+          UID_=$(GH_TOKEN="$FORK_TOKEN" gh api "users/$OWNER" --jq .id)
+          NAME=$(GH_TOKEN="$FORK_TOKEN" gh api "users/$OWNER" --jq '.name // .login')
+          git -c user.name="$NAME" -c user.email="${UID_}+${OWNER}@users.noreply.github.com" \
+            commit -q -m "proof: $ID" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- "$FILE"
+          # The one-file rule, checked on the exact commit that is sent.
+          git diff --name-status "$BASE" HEAD > /tmp/diff.txt; cat /tmp/diff.txt
+          if [ "$(wc -l < /tmp/diff.txt)" != 1 ] || ! grep -qxF "$(printf 'A\t%s' "$FILE")" /tmp/diff.txt; then
+            echo "::error::the commit must add exactly $FILE"; exit 1
+          fi
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$FORK_TOKEN" | base64 -w0)" \
+            push -q -f origin "HEAD:refs/heads/$BR"
+          EXISTING=$(GH_TOKEN="$PR_PAT" gh pr list --repo "$UPSTREAM_REPO" --head "$BR" --state open --limit 100 \
+            --json url,headRepositoryOwner \
+            --jq "[.[] | select((.headRepositoryOwner.login | ascii_downcase) == (\"$OWNER\" | ascii_downcase)) | .url][0] // empty")
+          if [ -n "$EXISTING" ]; then
+            echo "already open: $EXISTING"; echo "PR: $EXISTING" >> "$GITHUB_STEP_SUMMARY"
+            curl -sS -m 30 -o /dev/null -X POST "$OMA_SITE/api/desk/release?lease=$L&reason=submitted" || true
+            exit 0
+          fi
+          {
+            echo "Lease: $L"
+            echo "Agent: $AGENT"
+            echo "Model: $MODEL"
+            echo
+            echo "Problem: $OMA_SITE/p/$ID"
+            echo "Checked with tools/check.sh on a GitHub-hosted runner: $RUN_URL"
+            echo
+            echo "🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+          } > /tmp/body.md
+          URL=$(GH_TOKEN="$PR_PAT" gh pr create --repo "$UPSTREAM_REPO" --base main --head "$OWNER:$BR" --title "$ID" --body-file /tmp/body.md)
+          echo "PR: $URL" | tee -a "$GITHUB_STEP_SUMMARY"
+          curl -sS -m 30 -o /dev/null -X POST "$OMA_SITE/api/desk/release?lease=$L&reason=submitted" || true
