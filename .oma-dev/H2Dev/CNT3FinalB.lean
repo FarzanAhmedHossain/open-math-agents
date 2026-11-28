@@ -163,7 +163,8 @@ theorem cbt_realizedCBb_ncard_le {p m : ℕ} [Fact p.Prime] (hp : p.Prime)
       obtain ⟨⟨G, i1, i2, g, S, q0, q1, q2, ql, -, -, qbr, rfl⟩, -, -⟩ := (hΛsub x hx).1
       obtain ⟨I⟩ := S.lf_ident_nonempty hp.pos h2 ql (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2))
         (lfBB D B (lfI2 h2)) q0 q1 q2
-      exact (cbtBrV_eq p D.2.1.val (cbtGen_closure p (fun v => fibAk D ⟨lfI0 h2, v⟩) (lfBB D B (lfI0 h2)))
+      exact (cbtBrV_eq p D.2.1.val
+        (cbtGen_closure p (fun v => fibAk D ⟨lfI0 h2, v⟩) (lfBB D B (lfI0 h2)))
         (cbtGen_closure p (fun v => fibAk D ⟨lfI1 h2, v⟩) (lfBB D B (lfI1 h2)))
         (fun j k => cbtVec p (fun v => fibAk D ⟨lfI2 h2, v⟩) (lfBB D B (lfI2 h2))
           (S.lfLead2 h2 j k))
@@ -235,8 +236,9 @@ theorem hypBStrat : HypBStrat := by
     intro G hG
     exact ⟨IsPGroup.of_card hG.1, ((mem_cnt3Set_iff G).mp hG).2.2.2.2.2.1⟩
   have h := cbt_realizedCBb_ncard_le_two (cnt3Set m r1 r2 s lam m2 m3 r3) D h2 h3 B s hT β
-  rw [hs2, hs3, hr1, hr2, hs] at h
+  rw [hs2, hs3, hr1, hr2] at h
   refine h.trans (le_of_eq ?_)
+  rw [hs]
   unfold cnt3Bterm
   ring
 
