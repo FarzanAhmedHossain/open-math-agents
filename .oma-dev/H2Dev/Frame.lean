@@ -10,13 +10,18 @@ For a group `G` and a natural number `p`:
   `pN p G ∩ γ_2 = γ_3 γ_2^p` (`ker_piW`); this is `W = G_2 ⧸ G_3 Φ(G_2)`.
 Both are commutative of exponent `p`, hence `ZMod p`-modules (as `Additive _`).
 * `finrank_V` : `dim V = Group.rank G = r_1`;  `card_W` : `|W| = p ^ r2 p G`, `r2 = dim W`;
+* `rank_lcs_quot_eq_r2` : `rank (γ_2 ⧸ γ_3) = r2 p G` (eq. (18)), so `r2` is the paper's `d(G_2/G_3)`;
 * `lamV` : the commutator form `β_G : V × V → W` (`lamV_mk` : `β_G(xΦ, yΦ) = [x, y] G_3 Φ(G_2)`),
   biadditive, alternating, with values generating `W` (`lamV_closure`); `lamLin` is the same map
   as a `ZMod p`-bilinear map, with `lamLin_span`;
 * `frame_hN3` ... `frame_hMN` : the hypotheses of `core_flag` for `N = pN p G`, `M = frattini G`;
   `frame_core_flag` and `frame_core_bounds` (`s - 1 ≤ r_2`, `s ≤ r_1`);
+* `core_iff_lcs` : `γ_2 ≤ [H, H] γ_3 γ_2^p ↔ [H, H] γ_3 = γ_2` (Frattini argument in `γ_2`), and
+  `sims_core_bounds`, `sims_core_bounds_rank` : the same bounds for the Sims rank
+  `s = sInf {rank H | γ_2 = [H, H] γ_3}` of Def 2.1 / (17);
 * `s1 p G = log_p |G : γ_2|` and `lambdaPar p G = s1 - r1` with `|G : γ_2| = p ^ (r1 + λ)`
-  (`index_lcs_one_eq`) and `0 ≤ λ` as an integer (`lambdaPar_nonneg`). -/
+  (`index_lcs_one_eq`; the content of `0 ≤ λ` is `rank_le_s1`, and `lambdaPar_nonneg` is only its
+  integer restatement). -/
 
 namespace OMA.SimsLite
 
@@ -83,7 +88,9 @@ lemma elemQ_nsmul (K : Subgroup H) (x : Additive (ElemQ p H K)) : p • x = 0 :=
   show Additive.ofMul (Additive.toMul x ^ p) = Additive.ofMul 1
   rw [elemQ_pow]
 
-/-- `ElemQ p H K` is an `F_p`-vector space. -/
+/-- `ElemQ p H K` is an `F_p`-vector space. This is a global instance on `Additive (ElemQ p H K)`
+(for every `K`), built from `AddCommGroup.zmodModule`; downstream code should not introduce a
+second `ZMod p`-module structure on these types. -/
 instance elemQ_module (K : Subgroup H) : Module (ZMod p) (Additive (ElemQ p H K)) :=
   letI : NeZero p := ⟨hp.out.ne_zero⟩
   AddCommGroup.zmodModule (elemQ_nsmul K)
@@ -182,7 +189,7 @@ theorem W_mul_comm (w w' : WQ p G) : w * w' = w' * w := mul_comm w w'
 theorem card_V_eq_index : Nat.card (VQ p G) = (pPhi p G).index :=
   card_elemQ commutator_le_pPhi (pow_mem_pPhi p)
 
-theorem card_W_eq_relindex : Nat.card (WQ p G) = ((pN p G).subgroupOf (lcs G 1)).index :=
+theorem card_W_eq_index : Nat.card (WQ p G) = ((pN p G).subgroupOf (lcs G 1)).index :=
   card_elemQ commutator_lcs_one_le pow_mem_pN_subgroupOf
 
 /-! The commutator form `β_G : V × V → W`. -/
@@ -407,9 +414,73 @@ theorem card_lcs_one_eq : Nat.card (lcs G 1) = Nat.card (pN p G) * p ^ r2 p G :=
   have h2 := Nat.card_congr (Subgroup.subgroupOfEquivOfLe (pN_le_lcs_one (G := G) p)).toEquiv
   have h3 : ((pN p G).subgroupOf (lcs G 1)).index = p ^ r2 p G := by
     rw [← card_W (p := p) (G := G)]
-    exact card_W_eq_relindex.symm
+    exact card_W_eq_index.symm
   rw [h3, h2] at h1
   exact h1.symm
+
+/-- In `γ_2 ⧸ γ_3`, the preimage of `(γ_2 ⧸ γ_3)^p [γ_2 ⧸ γ_3, γ_2 ⧸ γ_3]` is `γ_3 γ_2^p`. -/
+theorem comap_pPhi_lcs_quot :
+    (pPhi p (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1))).comap
+      (QuotientGroup.mk' ((lcs G 2).subgroupOf (lcs G 1))) = (pN p G).subgroupOf (lcs G 1) := by
+  have hKN : (lcs G 2).subgroupOf (lcs G 1) ≤ (pN p G).subgroupOf (lcs G 1) := by
+    intro a ha
+    rw [Subgroup.mem_subgroupOf] at ha ⊢
+    exact lcs_two_le_pN p ha
+  apply le_antisymm
+  · have h1 : pPhi p (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1)) ≤
+        ((pN p G).subgroupOf (lcs G 1)).map
+          (QuotientGroup.mk' ((lcs G 2).subgroupOf (lcs G 1))) := by
+      refine sup_le ?_ ?_
+      · rw [Subgroup.closure_le]
+        rintro _ ⟨q, rfl⟩
+        obtain ⟨a, rfl⟩ := QuotientGroup.mk'_surjective ((lcs G 2).subgroupOf (lcs G 1)) q
+        exact Subgroup.mem_map.mpr ⟨a ^ p, pow_mem_pN_subgroupOf a, map_pow _ a p⟩
+      · rw [commutator_def, Subgroup.commutator_le]
+        intro q1 _ q2 _
+        obtain ⟨a, rfl⟩ := QuotientGroup.mk'_surjective ((lcs G 2).subgroupOf (lcs G 1)) q1
+        obtain ⟨b, rfl⟩ := QuotientGroup.mk'_surjective ((lcs G 2).subgroupOf (lcs G 1)) q2
+        refine Subgroup.mem_map.mpr ⟨⁅a, b⁆, ?_, map_commutatorElement _ a b⟩
+        exact commutator_lcs_one_le
+          (Subgroup.commutator_mem_commutator (Subgroup.mem_top a) (Subgroup.mem_top b))
+    refine (Subgroup.comap_mono h1).trans ?_
+    rw [Subgroup.comap_map_eq, QuotientGroup.ker_mk']
+    exact sup_le le_rfl hKN
+  · intro a ha
+    rw [Subgroup.mem_subgroupOf] at ha
+    have h2 : pN p G ≤ ((pPhi p (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1))).comap
+        (QuotientGroup.mk' ((lcs G 2).subgroupOf (lcs G 1)))).map (lcs G 1).subtype := by
+      refine sup_le ?_ ?_
+      · intro n hn
+        have hn1 : n ∈ lcs G 1 := lcs_antitone (by norm_num) hn
+        refine Subgroup.mem_map.mpr ⟨⟨n, hn1⟩, ?_, rfl⟩
+        rw [Subgroup.mem_comap]
+        have e : QuotientGroup.mk' ((lcs G 2).subgroupOf (lcs G 1)) ⟨n, hn1⟩ = 1 := by
+          rw [QuotientGroup.mk'_apply, QuotientGroup.eq_one_iff, Subgroup.mem_subgroupOf]
+          exact hn
+        rw [e]
+        exact Subgroup.one_mem _
+      · rw [Subgroup.closure_le]
+        rintro _ ⟨g, rfl⟩
+        refine Subgroup.mem_map.mpr ⟨g ^ p, ?_, map_pow (lcs G 1).subtype g p⟩
+        rw [Subgroup.mem_comap, map_pow]
+        exact pow_mem_pPhi p _
+    obtain ⟨b, hb, hba⟩ := Subgroup.mem_map.mp (h2 ha)
+    have e : b = a := Subtype.ext hba
+    rw [← e]
+    exact hb
+
+/-- Eq. (18): `r_2 = dim W = rank (γ_2 ⧸ γ_3) = d(G_2 / G_3)`. -/
+theorem rank_lcs_quot_eq_r2 (hG : IsPGroup p G) :
+    Group.rank (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1)) = r2 p G := by
+  have hQ : IsPGroup p (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1)) :=
+    (hG.to_subgroup (lcs G 1)).to_quotient _
+  have h1 : (pPhi p (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1))).index =
+      p ^ Group.rank (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1)) := card_quot_pPhi hQ
+  have h2 : ((pN p G).subgroupOf (lcs G 1)).index = p ^ r2 p G := by
+    rw [← card_W_eq_index, card_W]
+  rw [← comap_pPhi_lcs_quot, Subgroup.index_comap_of_surjective _
+    (QuotientGroup.mk'_surjective _), h1] at h2
+  exact Nat.pow_right_injective hp.out.two_le h2
 
 /-! The hypotheses of `core_flag` for `N = γ_3 γ_2^p` and `M = Φ(G)`. -/
 
@@ -472,6 +543,142 @@ theorem frame_core_bounds {n : ℕ} (hG : Nat.card G = p ^ n) (s : ℕ) (x : ℕ
     have hpos : 0 < Nat.card (frattini G) := Nat.card_pos
     exact pow_le_pow_cancel hp2 (le_of_mul_le_mul_pos hpos h2)
 
+/-! The bridge from the `W`-level core condition to the Sims rank of Def 2.1 / (17). -/
+
+/-- The `W`-level core condition (20) is the group-level one: for a finite p-group,
+`γ_2 ≤ [H, H] γ_3 γ_2^p` iff `[H, H] γ_3 = γ_2` (Frattini argument in `γ_2`). -/
+theorem core_iff_lcs (hG : IsPGroup p G) (H : Subgroup G) :
+    lcs G 1 ≤ ⁅H, H⁆ ⊔ pN p G ↔ ⁅H, H⁆ ⊔ lcs G 2 = lcs G 1 := by
+  have hHH : ⁅H, H⁆ ≤ lcs G 1 := Subgroup.commutator_mono le_top le_top
+  have h21 : lcs G 2 ≤ lcs G 1 := lcs_antitone (by norm_num)
+  constructor
+  · intro h
+    refine le_antisymm (sup_le hHH h21) ?_
+    have hP : IsPGroup p (lcs G 1) := hG.to_subgroup (lcs G 1)
+    have hS : lcs G 1 ≤ ((⁅H, H⁆ ⊔ lcs G 2).subgroupOf (lcs G 1) ⊔
+        frattini (lcs G 1)).map (lcs G 1).subtype := by
+      rw [frattini_eq_pPhi hP]
+      refine h.trans (sup_le ?_ (sup_le ?_ ?_))
+      · intro x hx
+        refine Subgroup.mem_map.mpr ⟨⟨x, hHH hx⟩, Subgroup.mem_sup_left ?_, rfl⟩
+        rw [Subgroup.mem_subgroupOf]
+        exact Subgroup.mem_sup_left hx
+      · intro x hx
+        refine Subgroup.mem_map.mpr ⟨⟨x, h21 hx⟩, Subgroup.mem_sup_left ?_, rfl⟩
+        rw [Subgroup.mem_subgroupOf]
+        exact Subgroup.mem_sup_right hx
+      · rw [Subgroup.closure_le]
+        rintro _ ⟨g, rfl⟩
+        exact Subgroup.mem_map.mpr ⟨g ^ p, Subgroup.mem_sup_right (pow_mem_pPhi p g),
+          map_pow (lcs G 1).subtype g p⟩
+    have hL : (⁅H, H⁆ ⊔ lcs G 2).subgroupOf (lcs G 1) ⊔ frattini (lcs G 1) = ⊤ := by
+      rw [eq_top_iff]
+      intro a _
+      obtain ⟨b, hb, hba⟩ := Subgroup.mem_map.mp (hS a.2)
+      have e : b = a := Subtype.ext hba
+      rw [← e]
+      exact hb
+    have hLt : (⁅H, H⁆ ⊔ lcs G 2).subgroupOf (lcs G 1) = ⊤ := by
+      have h3 := closure_eq_top_of_sup_frattini
+        (s := (((⁅H, H⁆ ⊔ lcs G 2).subgroupOf (lcs G 1) : Subgroup (lcs G 1)) :
+          Set (lcs G 1))) (by rw [Subgroup.closure_eq]; exact hL)
+      rwa [Subgroup.closure_eq] at h3
+    intro x hx
+    have hmem : (⟨x, hx⟩ : lcs G 1) ∈ (⁅H, H⁆ ⊔ lcs G 2).subgroupOf (lcs G 1) := by
+      rw [hLt]
+      exact Subgroup.mem_top _
+    exact Subgroup.mem_subgroupOf.mp hmem
+  · intro h
+    calc lcs G 1 = ⁅H, H⁆ ⊔ lcs G 2 := h.symm
+      _ ≤ ⁅H, H⁆ ⊔ pN p G := sup_le_sup_left (lcs_two_le_pN p) _
+
+/-- A finite set `T` is `x '' Iio |T|` for some `x : ℕ → G`. -/
+lemma exists_enum_finset (T : Finset G) : ∃ x : ℕ → G, x '' Set.Iio T.card = (T : Set G) := by
+  refine ⟨fun i => if h : i < T.card then ((T.equivFin.symm ⟨i, h⟩ : T) : G) else 1, ?_⟩
+  ext y
+  constructor
+  · rintro ⟨i, hi, rfl⟩
+    have hi' : i < T.card := hi
+    dsimp only
+    rw [dif_pos hi']
+    exact (T.equivFin.symm ⟨i, hi'⟩).2
+  · intro hy
+    have hj := (T.equivFin ⟨y, hy⟩).2
+    refine ⟨(T.equivFin ⟨y, hy⟩ : ℕ), hj, ?_⟩
+    dsimp only
+    rw [dif_pos hj, Fin.eta, Equiv.symm_apply_apply]
+
+/-- A subgroup `H` is the closure of `x '' Iio (rank H)` for some `x : ℕ → G`. -/
+lemma exists_enum_closure (H : Subgroup G) :
+    ∃ x : ℕ → G, Subgroup.closure (x '' Set.Iio (Group.rank H)) = H := by
+  classical
+  obtain ⟨T, hTc, hTg⟩ := Group.rank_spec H
+  have hcard : (T.image Subtype.val).card = Group.rank H := by
+    rw [Finset.card_image_of_injective T Subtype.val_injective, hTc]
+  obtain ⟨x, hx⟩ := exists_enum_finset (T.image Subtype.val)
+  refine ⟨x, ?_⟩
+  rw [← hcard, hx]
+  apply le_antisymm
+  · rw [Subgroup.closure_le]
+    intro y hy
+    obtain ⟨z, -, rfl⟩ := Finset.mem_image.mp hy
+    exact z.2
+  · intro h hh
+    have h1 : Subgroup.closure (T : Set H) ≤
+        (Subgroup.closure ((T.image Subtype.val : Finset G) : Set G)).comap H.subtype := by
+      rw [Subgroup.closure_le]
+      intro z hz
+      exact Subgroup.subset_closure (Finset.mem_coe.mpr (Finset.mem_image_of_mem Subtype.val hz))
+    have h2 : (⟨h, hh⟩ : H) ∈ Subgroup.closure (T : Set H) := by
+      rw [hTg]
+      exact Subgroup.mem_top _
+    exact h1 h2
+
+/-- `rank (closure (v '' Iio t)) ≤ t`. -/
+lemma rank_closure_image_Iio_le (v : ℕ → G) (t : ℕ) :
+    Group.rank (Subgroup.closure (v '' Set.Iio t)) ≤ t := by
+  classical
+  have e : v '' Set.Iio t = (((Finset.range t).image v : Finset G) : Set G) := by
+    rw [Finset.coe_image, Finset.coe_range]
+  rw [e]
+  exact (Subgroup.rank_closure_finset_le_card _).trans
+    (Finset.card_image_le.trans (Finset.card_range t).le)
+
+/-- Lemma 2.3 (lower half) and `s ≤ r_1` for the Sims rank `s` of Def 2.1 / (17):
+`s = sInf {rank H | γ_2 = [H, H] γ_3}` gives `s - 1 ≤ r_2` and `s ≤ r_1`. -/
+theorem sims_core_bounds (hG : IsPGroup p G) (s : ℕ)
+    (hs : s = sInf {k | ∃ H : Subgroup G, lcs G 1 = ⁅H, H⁆ ⊔ lcs G 2 ∧ Group.rank H = k}) :
+    s - 1 ≤ r2 p G ∧ s ≤ Group.rank G := by
+  by_cases h0 : s = 0
+  · subst h0
+    exact ⟨by omega, by omega⟩
+  have hne : {k | ∃ H : Subgroup G, lcs G 1 = ⁅H, H⁆ ⊔ lcs G 2 ∧ Group.rank H = k}.Nonempty :=
+    ⟨_, ⊤, (sup_eq_left.mpr (lcs_antitone (by norm_num) : lcs G 2 ≤ lcs G 1)).symm, rfl⟩
+  obtain ⟨H, hH, hrk⟩ := Nat.sInf_mem hne
+  rw [← hs] at hrk
+  obtain ⟨x, hx⟩ := exists_enum_closure H
+  rw [hrk] at hx
+  obtain ⟨n, hn⟩ := IsPGroup.iff_card.mp hG
+  refine frame_core_bounds hn s x ?_ ?_ (by omega)
+  · rw [hx]
+    exact (core_iff_lcs hG H).mpr hH.symm
+  · intro t ht v _ hle
+    have hc := (core_iff_lcs hG _).mp hle
+    have hmem : Group.rank (Subgroup.closure (v '' Set.Iio t)) ∈
+        {k | ∃ H : Subgroup G, lcs G 1 = ⁅H, H⁆ ⊔ lcs G 2 ∧ Group.rank H = k} :=
+      ⟨_, hc.symm, rfl⟩
+    have h1 := Nat.sInf_le hmem
+    rw [← hs] at h1
+    have h2 := rank_closure_image_Iio_le v t
+    omega
+
+/-- `sims_core_bounds` with `r_2` written as `rank (γ_2 ⧸ γ_3)`, as in CNT3. -/
+theorem sims_core_bounds_rank (hG : IsPGroup p G) (s : ℕ)
+    (hs : s = sInf {k | ∃ H : Subgroup G, lcs G 1 = ⁅H, H⁆ ⊔ lcs G 2 ∧ Group.rank H = k}) :
+    s - 1 ≤ Group.rank (lcs G 1 ⧸ (lcs G 2).subgroupOf (lcs G 1)) ∧ s ≤ Group.rank G := by
+  rw [rank_lcs_quot_eq_r2 hG]
+  exact sims_core_bounds hG s hs
+
 /-! The parameter `λ` with `|G : γ_2| = p ^ (r_1 + λ)`. -/
 
 /-- `s_1 = log_p |G : γ_2| = log_p |L_1|`. -/
@@ -513,3 +720,11 @@ theorem lambdaPar_nonneg (hG : IsPGroup p G) :
 end Frame
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.frame_core_flag
+#print axioms OMA.SimsLite.frame_core_bounds
+#print axioms OMA.SimsLite.finrank_V
+#print axioms OMA.SimsLite.lamLin_span
+#print axioms OMA.SimsLite.rank_lcs_quot_eq_r2
+#print axioms OMA.SimsLite.core_iff_lcs
+#print axioms OMA.SimsLite.sims_core_bounds_rank
