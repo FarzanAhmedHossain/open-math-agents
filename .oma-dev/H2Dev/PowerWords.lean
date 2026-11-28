@@ -28,6 +28,14 @@ For a finite p-group this forces the same-layer coordinates to be multiples of `
 [Sim65, p.160]; the argument of Li-Qiao in the proof of Theorem 3.1, via the Burnside basis
 theorem in each layer), so the power word arrays realised by finite p-groups form a set of
 cardinality at most `p ^ pwBound1 a ≤ p ^ pwBound2 a`.
+
+Bridge (`SimsGenSet`, `SimsGenSet.powerData`, `liqiao_thm_3_1_simsGenSet`). `SimsGenSet p a g`
+is a Sims generating set in the sense of Section 2.1: minimum generating sets of the layers,
+the relative order relation (25), and the Sims normal form (26) (unique coordinates, and normal
+forms of elements of each Sims series term `⟨g_{i,1}, ..., g_{i,j-1}, G_{i+1}⟩` supported on its
+generators). The normal form coordinates of `g_{ij} ^ p ^ a(i,j)` then form `SimsPowerData`, so
+the support zeros and the shape of (27) are derived rather than assumed, and a minimum
+generating set is shown irredundant (`irredundant_of_minimum`).
 This is valid for every nilpotency class, not only class 3. The hypotheses are weaker than the
 paper's: the `a(i,j)` need not be the true relative orders, and the layer generators need only be
 irredundant (a minimum generating set is irredundant). -/
@@ -524,7 +532,8 @@ theorem SimsGenSet.powerData {p : ℕ} {a : SimsIdx c r → ℕ} {g : SimsIdx c 
     rintro ⟨i, j⟩ ⟨u, v⟩ h1 h2
     have hs := (S.nf.coord_spec i j.val _ (S.rel i j)).1
     refine hs ⟨u, v⟩ ?_
-    rcases lt_or_eq_of_le (not_lt.mp h1) with hu | hu
+    have h1' : u ≤ i := not_lt.mp h1
+    rcases lt_or_eq_of_le h1' with hu | hu
     · exact Or.inl hu
     · subst hu
       exact Or.inr ⟨rfl, not_lt.mp fun hv => h2 ⟨rfl, hv⟩⟩
@@ -540,11 +549,14 @@ theorem SimsGenSet.powerData {p : ℕ} {a : SimsIdx c r → ℕ} {g : SimsIdx c 
     have hf : ∀ u, u < i →
         blockProd g (fun h => (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) h).val) u = 1 := by
       intro u hu
+      unfold blockProd
       refine List.prod_eq_one fun x hx => ?_
       rw [List.mem_ofFn'] at hx
       obtain ⟨v, rfl⟩ := hx
-      dsimp only
-      rw [hs ⟨u, v⟩ (Or.inl hu), pow_zero]
+      have h0 : (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) ⟨u, v⟩).val = 0 :=
+        hs ⟨u, v⟩ (Or.inl hu)
+      show g ⟨u, v⟩ ^ (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) ⟨u, v⟩).val = 1
+      rw [h0, pow_zero]
     have hsplit := list_prod_ofFn_split _
       (fun u => blockProd g (fun h => (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) h).val) u) i hf
     conv_lhs => rw [← hprod]
