@@ -336,7 +336,7 @@ lemma mem_sup_zpowers_decomp {K : Subgroup G} [K.Normal] {x : G} {p : ℕ} (hp :
   refine ⟨r, hrp, (x ^ p) ^ (e / (p : ℤ)) * k, K.mul_mem (zpow_mem hx _) hk, ?_⟩
   have he : e = (r : ℤ) + (p : ℤ) * (e / (p : ℤ)) := by
     rw [← hr]
-    have := Int.ediv_add_emod e (p : ℤ)
+    have := Int.emod_add_mul_ediv e (p : ℤ)
     linarith
   calc x ^ e * k = x ^ ((r : ℤ) + (p : ℤ) * (e / (p : ℤ))) * k := by rw [← he]
     _ = x ^ r * ((x ^ p) ^ (e / (p : ℤ)) * k) := by
@@ -498,6 +498,7 @@ lemma WkN_card_growth (hp : p.Prime) (hG : Nat.card G = p ^ n) (N : Subgroup G) 
       rw [mul_assoc]
       exact h3.trans h2
 
+omit [Finite G] in
 lemma exists_comm_not_mem {N H W : Subgroup G} (hcore : lcs G 1 ≤ ⁅H, H⁆ ⊔ N) (hNW : N ≤ W)
     (hW : ¬ lcs G 1 ≤ W) : ∃ x ∈ H, ∃ y ∈ H, ⁅x, y⁆ ∉ W := by
   by_contra hc
