@@ -263,7 +263,7 @@ theorem hypData : HypData := by
     _ = (2 : ℝ) ^ ((7 : ℝ) * m * ((Nat.log 2 m : ℝ) + 1)) := by
         rw [cnt3_two_pow_cast]
         congr 1
-        first | norm_num | (push_cast; ring)
+        norm_num
 
 end CNT3MainArith
 
@@ -297,19 +297,20 @@ theorem cnt3_setup (hPW : HypPW) (hne : (cnt3Set m r1 r2 s lam m2 m3 r3).Nonempt
       Subgroup.card_le_of_le (lcs_antitone (by norm_num))
     rw [hm2, hm3] at hle
     exact pow_le_pow_cancel (p := 2) (le_refl 2) hle
-  obtain ⟨⟨D, B, C⟩, hcode, hL, -⟩ := hPW m r1 r2 s lam m2 m3 r3 G hG
+  obtain ⟨Df, hcode, hL, -⟩ := hPW m r1 r2 s lam m2 m3 r3 G hG
   have hr2s2 : r2 ≤ m2 - m3 := by
     obtain ⟨h2, -, -, -, hr2, hs2, -⟩ := hL
-    have hsum : ∑ _v : Fin (fibRk D (lfI1 h2)), 1 ≤ ∑ v, fibAk D ⟨lfI1 h2, v⟩ :=
-      Finset.sum_le_sum fun v _ => fibAk_pos D _
-    have hcard : ∑ _v : Fin (fibRk D (lfI1 h2)), (1 : ℕ) = fibRk D (lfI1 h2) := by
+    have hsum : ∑ _v : Fin (fibRk Df.1 (lfI1 h2)), 1 ≤ ∑ v, fibAk Df.1 ⟨lfI1 h2, v⟩ :=
+      Finset.sum_le_sum fun v _ => fibAk_pos Df.1 _
+    have hcard : ∑ _v : Fin (fibRk Df.1 (lfI1 h2)), (1 : ℕ) = fibRk Df.1 (lfI1 h2) := by
       rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, smul_eq_mul, mul_one]
     omega
-  have hC : C ∈ realizedCB Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D B :=
+  have hC : Df.2.2 ∈ realizedCB Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) Df.1 Df.2.1 :=
     ⟨G, hG, hcode⟩
-  have hA := cnt3_cfactor_A (lam := lam) (r3 := r3) D hL B
-  have hpos : 0 < (realizedCB Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D B).ncard :=
-    (Set.ncard_pos (Set.toFinite _)).mpr ⟨C, hC⟩
+  have hA := cnt3_cfactor_A (lam := lam) (r3 := r3) Df.1 hL Df.2.1
+  have hpos : 0 <
+      (realizedCB Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) Df.1 Df.2.1).ncard :=
+    (Set.ncard_pos (Set.toFinite _)).mpr ⟨Df.2.2, hC⟩
   have hadm : (cnt3Adm s m2 m3).Nonempty := by
     rcases Finset.eq_empty_or_nonempty (cnt3Adm s m2 m3) with h | h
     · rw [h, Finset.sum_empty] at hA
