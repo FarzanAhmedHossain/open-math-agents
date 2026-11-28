@@ -11,11 +11,14 @@ The two terms of CNT3 (b) that do not involve the commutator coefficients: the p
 
 The index set of recorded data:
 
-* `cnt3Codes m r1 r2 s lam m2 m3 r3 : Finset (RecData m)`, the recorded data `D` for which some
-  group of `cnt3Set m r1 r2 s lam m2 m3 r3` has a Sims code `⟨D, x⟩`; `mem_cnt3Codes`.
+* `cnt3Codes m r1 r2 s lam m2 m3 r3 : Finset (RecData m)`, the recorded data `D` with core size
+  `D.2.1.val = s` for which some group of `cnt3Set m r1 r2 s lam m2 m3 r3` has a Sims code
+  `⟨D, x⟩`; `mem_cnt3Codes`. The core size is pinned to the true `s = simsRank G`, since the
+  bound of `lf_realizedCB_ncard_le` is stated with `D.2.1.val` and grows with it.
 * `cnt3_hI : ∀ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3, ∃ D : FullData 2 m,
     SimsCode Nat.prime_two m G D ∧ D.1 ∈ cnt3Codes m r1 r2 s lam m2 m3 r3`
-  (the hypothesis `hI` of `Bridge.ncard_classes_le_fiber_pw` / `Lift.lf_ncard_classes_le_fiberB_pw`).
+  (the hypothesis `hI` of `Bridge.ncard_classes_le_fiber_pw` / `Lift.lf_ncard_classes_le_fiberB_pw`),
+  proved from `exists_sims_gen`, whose Sims data have `d.s = simsRank G`.
 
 (1) The power word term:
 
@@ -26,7 +29,9 @@ The index set of recorded data:
     (∀ h : 1 < D.1.val, sL (fibAk D) ⟨1, h⟩ = m2 - m3) ∧
     (∀ h : 2 < D.1.val, sL (fibAk D) ⟨2, h⟩ = m3)`
   (`sL a i = Σ_v a ⟨i, v⟩`; `s ≤ D.2.1.val` is `simsRank G ≤ d.s` for the code's Sims data);
-* `cnt3_codes_lf` : the same in the `lfI0 / lfI1 / lfI2` form used by `lf_realizedCB_ncard_le`;
+  in `cnt3_codes_facts` the conjunct `s ≤ D.2.1.val` is strengthened to `D.2.1.val = s`;
+* `cnt3_codes_lf` : the same (with `D.2.1.val = s`) in the `lfI0 / lfI1 / lfI2` form used by
+  `lf_realizedCB_ncard_le`;
 * `cnt3_pw_eq : D ∈ cnt3Codes m r1 r2 s lam m2 m3 r3 →
     pwBound2 (fibAk D) = cnt3PW r1 r2 r3 lam m2 m3` and `cnt3_pw_le` (the `≤` form);
 * `cnt3_ncard_le_pw` : for `M : RecData m → ℕ` with
@@ -37,7 +42,8 @@ The index set of recorded data:
 (2) The data count, with the explicit constant `C0 = 7`:
 
 * `card_recData_le_log m : Fintype.card (RecData m) ≤ 2 ^ (7 * m * (Nat.log 2 m + 1))`;
-* `cnt3_data_le (I : Finset (RecData m)) : I.card ≤ 2 ^ (7 * m * (Nat.log 2 m + 1))`;
+* `cnt3_data_le (I : Finset (RecData m)) : I.card ≤ 2 ^ (7 * m * (Nat.log 2 m + 1))` (the
+  uniform data count with `C0 = 7`, valid for any index set, in particular `cnt3Codes`);
 * `cnt3_ncard_le_uniform` : for a uniform bound `M0` on the fibres,
   `(cnt3Classes ..).ncard ≤ 2 ^ (7 * m * (Nat.log 2 m + 1)) * (2 ^ cnt3PW .. * M0)`;
 * `cnt3_logb_le : n ≤ 2 ^ k → Real.logb 2 n ≤ k` (for the final real assembly).
@@ -252,32 +258,43 @@ section CNT3Codes
 
 variable {m r1 r2 s lam m2 m3 r3 : ℕ}
 
-/-- The recorded data of the Sims codes of the groups of `cnt3Set`. -/
+/-- The recorded data, with core size `s`, of the Sims codes of the groups of `cnt3Set`. -/
 noncomputable def cnt3Codes (m r1 r2 s lam m2 m3 r3 : ℕ) : Finset (RecData m) := by
   classical
-  exact Finset.univ.filter (fun D => ∃ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3,
+  exact Finset.univ.filter (fun D => D.2.1.val = s ∧ ∃ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3,
     ∃ x : (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)) ×
       (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)),
       SimsCode Nat.prime_two m G (⟨D, x⟩ : FullData 2 m))
 
 theorem mem_cnt3Codes {D : RecData m} :
-    D ∈ cnt3Codes m r1 r2 s lam m2 m3 r3 ↔ ∃ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3,
+    D ∈ cnt3Codes m r1 r2 s lam m2 m3 r3 ↔ D.2.1.val = s ∧ ∃ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3,
       ∃ x : (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)) ×
         (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)),
         SimsCode Nat.prime_two m G (⟨D, x⟩ : FullData 2 m) := by
   simp only [cnt3Codes, Finset.mem_filter, Finset.mem_univ, true_and]
 
-/-- Every group of `cnt3Set` has a Sims code whose recorded data lie in `cnt3Codes`. -/
+/-- Every group of `cnt3Set` has a Sims code whose recorded data lie in `cnt3Codes` (the code of
+the Sims generating set of `exists_sims_gen`, whose core size is `simsRank G = s`). -/
 theorem cnt3_hI : ∀ G ∈ cnt3Set m r1 r2 s lam m2 m3 r3, ∃ D : FullData 2 m,
     SimsCode Nat.prime_two m G D ∧ D.1 ∈ cnt3Codes m r1 r2 s lam m2 m3 r3 := by
   intro G hG
+  have : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
+  have hsG : simsRank G = s := ((mem_cnt3Set_iff G).mp hG).2.2.2.2.2.1
   have hna : lcs G 1 ≠ ⊥ := by
     intro h
     apply hG.2.1
     rw [eq_bot_iff, ← h]
     exact lcs_antitone (by norm_num)
-  obtain ⟨D, hD⟩ := exists_simsCode Nat.prime_two hG.1 hna
-  exact ⟨D, hD, mem_cnt3Codes.mpr ⟨G, hG, D.2, hD⟩⟩
+  obtain ⟨u, d, X, r, hs2, hds, -, -, -, -, hnm, -, hS⟩ := exists_sims_gen Nat.prime_two hG.1 hna
+  have hsum : ∑ t, d.a t = m := by
+    have h1 := hS.realizes.card
+    rw [hG.1] at h1
+    exact (Nat.pow_right_injective (le_refl 2) h1).symm
+  have hs2' : 2 ≤ d.s := by rw [hds]; exact hs2
+  have hc : SimsCode Nat.prime_two m G (hS.enc Nat.prime_two m hnm hs2' hsum) :=
+    ⟨u, d, X, r, hS, hnm, hs2', hsum, rfl⟩
+  have hDs : (hS.enc Nat.prime_two m hnm hs2' hsum).1.2.1.val = s := hds.trans hsG
+  exact ⟨_, hc, mem_cnt3Codes.mpr ⟨hDs, G, hG, (hS.enc Nat.prime_two m hnm hs2' hsum).2, hc⟩⟩
 
 /-- The recorded data of a Sims code of a group of `cnt3Set`: three layers of ranks
 `r1, r2, r3`, core size at least `s`, and layer sums `r1 + lam`, `m2 - m3`, `m3`. -/
@@ -334,20 +351,21 @@ theorem cnt3_code_facts {G : FiniteGrp.{0}} (hG : G ∈ cnt3Set m r1 r2 s lam m2
     rw [a1, h4, Subgroup.card_bot, mul_one, hm3] at a2
     exact Nat.pow_right_injective (le_refl 2) a2
 
-/-- `cnt3_code_facts` for the recorded data in `cnt3Codes`. -/
+/-- `cnt3_code_facts` for the recorded data in `cnt3Codes`, with the core size `D.2.1.val = s`. -/
 theorem cnt3_codes_facts {D : RecData m} (hD : D ∈ cnt3Codes m r1 r2 s lam m2 m3 r3) :
-    D.1.val = 3 ∧ fibR D 0 = r1 ∧ fibR D 1 = r2 ∧ fibR D 2 = r3 ∧ s ≤ D.2.1.val ∧ m3 ≤ m2 ∧
+    D.1.val = 3 ∧ fibR D 0 = r1 ∧ fibR D 1 = r2 ∧ fibR D 2 = r3 ∧ D.2.1.val = s ∧ m3 ≤ m2 ∧
       (∀ h : 0 < D.1.val, sL (fibAk D) ⟨0, h⟩ = r1 + lam) ∧
       (∀ h : 1 < D.1.val, sL (fibAk D) ⟨1, h⟩ = m2 - m3) ∧
       (∀ h : 2 < D.1.val, sL (fibAk D) ⟨2, h⟩ = m3) := by
-  obtain ⟨G, hG, ⟨B, C⟩, hc⟩ := mem_cnt3Codes.mp hD
-  exact cnt3_code_facts hG hc
+  obtain ⟨hDs, G, hG, ⟨B, C⟩, hc⟩ := mem_cnt3Codes.mp hD
+  obtain ⟨a1, a2, a3, a4, -, a6⟩ := cnt3_code_facts hG hc
+  exact ⟨a1, a2, a3, a4, hDs, a6⟩
 
 /-- The facts of `cnt3_codes_facts` in the form used by `lf_realizedCB_ncard_le`. -/
 theorem cnt3_codes_lf {D : RecData m} (hD : D ∈ cnt3Codes m r1 r2 s lam m2 m3 r3)
     (h2 : 2 < D.1.val) :
     fibRk D (lfI0 h2) = r1 ∧ fibRk D (lfI1 h2) = r2 ∧ fibRk D (lfI2 h2) = r3 ∧
-      s ≤ D.2.1.val ∧ m3 ≤ m2 ∧
+      D.2.1.val = s ∧ m3 ≤ m2 ∧
       ∑ v, fibAk D ⟨lfI0 h2, v⟩ = r1 + lam ∧ ∑ v, fibAk D ⟨lfI1 h2, v⟩ = m2 - m3 ∧
       ∑ v, fibAk D ⟨lfI2 h2, v⟩ = m3 := by
   obtain ⟨-, hR0, hR1, hR2, hs, hm, hS0, hS1, hS2⟩ := cnt3_codes_facts hD
@@ -423,7 +441,8 @@ theorem card_recData_le_log (m : ℕ) :
           ring
 
 /-- (2) Any set of recorded data (e.g. the index set `cnt3Codes` of the fibrewise count) has at
-most `2 ^ (7 m (log_2 m + 1))` elements. -/
+most `2 ^ (7 m (log_2 m + 1))` elements. This is the uniform data count (constant `C0 = 7`),
+`Finset.card_le_univ` composed with `card_recData_le_log`; nothing in it is specific to CNT3. -/
 theorem cnt3_data_le {m : ℕ} (I : Finset (RecData m)) :
     I.card ≤ 2 ^ (7 * m * (Nat.log 2 m + 1)) :=
   (Finset.card_le_univ I).trans (card_recData_le_log m)
