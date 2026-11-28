@@ -364,7 +364,7 @@ theorem lf_reduce {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fi
           · rw [hjj]
             have e : (w - q • lfRel p a b jk) jk = w jk % (p : ℤ) ^ a jk := by
               rw [Pi.sub_apply, Pi.smul_apply, lfRel_self, smul_eq_mul, hq]
-              have h := Int.ediv_add_emod (w jk) ((p : ℤ) ^ a jk)
+              have h := Int.mul_ediv_add_emod (w jk) ((p : ℤ) ^ a jk)
               linear_combination -h
             rw [e]
             exact ⟨Int.emod_nonneg _ hPpos.ne', Int.emod_lt_of_pos _ hPpos⟩
@@ -571,6 +571,178 @@ theorem SimsGenSet.lf_grOf_coord (S : SimsGenSet p a g) (i : Fin c) {x : G}
   refine (congrArg (grOf (lcs G) (i : ℕ)) (S.lf_sims_lift i hx)).trans ?_
   exact grOf_block nseries_lcs (fun v => g ⟨i, v⟩) (fun v => (S.nf.coord x ⟨i, v⟩).val)
     (fun v => S.mem ⟨i, v⟩) (deeper_mem g S.mem (fun h => (S.nf.coord x h).val) i)
+
+/-- Coordinates `e` on layer `i`, `dc` on the layers above `i`, zero below. -/
+def lfComb (hp : 0 < p) (i : Fin c) (e : Fin (r i) → ℕ) (he : ∀ v, e v < p ^ a ⟨i, v⟩)
+    (dc : (h : SimsIdx c r) → Fin (p ^ a h)) : (h : SimsIdx c r) → Fin (p ^ a h)
+  | ⟨i', v⟩ => if hh : i' = i then ⟨e (hh ▸ v), by subst hh; exact he v⟩
+      else if i < i' then dc ⟨i', v⟩ else ⟨0, pow_pos hp _⟩
+
+lemma lfComb_self (hp : 0 < p) (i : Fin c) (e : Fin (r i) → ℕ) (he : ∀ v, e v < p ^ a ⟨i, v⟩)
+    (dc : (h : SimsIdx c r) → Fin (p ^ a h)) (v : Fin (r i)) :
+    (lfComb hp i e he dc ⟨i, v⟩).val = e v := by
+  rw [lfComb, dif_pos rfl]
+  try rfl
+
+lemma lfComb_lt (hp : 0 < p) (i : Fin c) (e : Fin (r i) → ℕ) (he : ∀ v, e v < p ^ a ⟨i, v⟩)
+    (dc : (h : SimsIdx c r) → Fin (p ^ a h)) {u : Fin c} (hu : u < i) (v : Fin (r u)) :
+    (lfComb hp i e he dc ⟨u, v⟩).val = 0 := by
+  rw [lfComb, dif_neg hu.ne, if_neg (not_lt.mpr hu.le)]
+
+lemma lfComb_gt (hp : 0 < p) (i : Fin c) (e : Fin (r i) → ℕ) (he : ∀ v, e v < p ^ a ⟨i, v⟩)
+    (dc : (h : SimsIdx c r) → Fin (p ^ a h)) {u : Fin c} (hu : i < u) (v : Fin (r u)) :
+    lfComb hp i e he dc ⟨u, v⟩ = dc ⟨u, v⟩ := by
+  rw [lfComb, dif_neg hu.ne', if_pos hu]
+
+/-- (35), uniqueness of the weight-`i` coordinates: for Sims coordinates `0 ≤ e(v) < p ^ a(i,v)`
+and any `d ∈ γ_{i+2}`, the weight-`i` normal form coordinates of `(Π_v g_{i,v} ^ e(v)) d` are
+`e`. (For the last layer one needs `γ_{i+2} = 1`.) -/
+theorem SimsGenSet.lf_coord_layer (S : SimsGenSet p a g) (hp : 0 < p) (i : Fin c)
+    (e : Fin (r i) → ℕ) (he : ∀ v, e v < p ^ a ⟨i, v⟩) {d : G} (hd : d ∈ lcs G ((i : ℕ) + 1))
+    (hlast : (i : ℕ) + 1 < c ∨ lcs G ((i : ℕ) + 1) = ⊥) (v : Fin (r i)) :
+    (S.nf.coord ((List.ofFn fun w => g ⟨i, w⟩ ^ e w).prod * d) ⟨i, v⟩).val = e v := by
+  have hdi : d ∈ lcs G i := lcs_antitone (Nat.le_succ _) hd
+  have hdprod : fullProd g (fun h => (S.nf.coord d h).val) = d :=
+    (S.nf.coord_spec i (r i) d (S.lf_mem_relSub i hdi)).2
+  have hdc : ∀ h : SimsIdx c r, h.1 ≤ i → (S.nf.coord d h).val = 0 := by
+    rcases hlast with h1 | hbot
+    · intro h hh
+      have hsup := (S.nf.coord_spec ⟨(i : ℕ) + 1, h1⟩ (r ⟨(i : ℕ) + 1, h1⟩) d
+        (S.lf_mem_relSub ⟨(i : ℕ) + 1, h1⟩ hd)).1
+      exact hsup h (Or.inl (Fin.lt_def.mpr (Nat.lt_succ_of_le (Fin.le_def.mp hh))))
+    · have hd1 : d = 1 := by
+        rw [hbot] at hd
+        exact Subgroup.mem_bot.mp hd
+      intro h _
+      have hZ : fullProd g (fun h => ((⟨0, pow_pos hp _⟩ : Fin (p ^ a h)) : ℕ)) = 1 := by
+        unfold fullProd
+        refine List.prod_eq_one fun z hz => ?_
+        rw [List.mem_ofFn'] at hz
+        obtain ⟨u, rfl⟩ := hz
+        unfold blockProd
+        refine List.prod_eq_one fun z hz => ?_
+        rw [List.mem_ofFn'] at hz
+        obtain ⟨w, rfl⟩ := hz
+        exact pow_zero _
+      have hu : S.nf.coord (fullProd g (fun h => ((⟨0, pow_pos hp _⟩ : Fin (p ^ a h)) : ℕ))) =
+          fun h => ⟨0, pow_pos hp _⟩ := S.nf.uniq _
+      rw [hZ, ← hd1] at hu
+      rw [hu]
+  obtain ⟨E, hE⟩ : ∃ E, E = lfComb hp i e he (S.nf.coord d) := ⟨_, rfl⟩
+  have hEi : ∀ w, (E ⟨i, w⟩).val = e w := by
+    intro w
+    rw [hE]
+    exact lfComb_self hp i e he _ w
+  have hElt : ∀ u, u < i → ∀ w, (E ⟨u, w⟩).val = 0 := by
+    intro u hu w
+    rw [hE]
+    exact lfComb_lt hp i e he _ hu w
+  have hEgt : ∀ u, i < u → ∀ w, E ⟨u, w⟩ = S.nf.coord d ⟨u, w⟩ := by
+    intro u hu w
+    rw [hE]
+    exact lfComb_gt hp i e he _ hu w
+  have hs := list_prod_ofFn_split c (blockProd g fun h => (E h).val) i fun u hu => by
+    unfold blockProd
+    refine List.prod_eq_one fun z hz => ?_
+    rw [List.mem_ofFn'] at hz
+    obtain ⟨w, rfl⟩ := hz
+    show g ⟨u, w⟩ ^ (E ⟨u, w⟩).val = 1
+    rw [hElt u hu w, pow_zero]
+  have hd' := list_prod_ofFn_split c (blockProd g fun h => (S.nf.coord d h).val) i fun u hu => by
+    unfold blockProd
+    refine List.prod_eq_one fun z hz => ?_
+    rw [List.mem_ofFn'] at hz
+    obtain ⟨w, rfl⟩ := hz
+    show g ⟨u, w⟩ ^ (S.nf.coord d ⟨u, w⟩).val = 1
+    rw [hdc ⟨u, w⟩ hu.le, pow_zero]
+  have hb1 : blockProd g (fun h => (S.nf.coord d h).val) i = 1 := by
+    unfold blockProd
+    refine List.prod_eq_one fun z hz => ?_
+    rw [List.mem_ofFn'] at hz
+    obtain ⟨w, rfl⟩ := hz
+    show g ⟨i, w⟩ ^ (S.nf.coord d ⟨i, w⟩).val = 1
+    rw [hdc ⟨i, w⟩ le_rfl, pow_zero]
+  have hbi : blockProd g (fun h => (E h).val) i = (List.ofFn fun w => g ⟨i, w⟩ ^ e w).prod := by
+    simp only [blockProd, hEi]
+  have hdeep : (List.ofFn fun u : Fin c =>
+        if i < u then blockProd g (fun h => (E h).val) u else 1).prod =
+      (List.ofFn fun u : Fin c =>
+        if i < u then blockProd g (fun h => (S.nf.coord d h).val) u else 1).prod := by
+    congr 2
+    funext u
+    by_cases hu : i < u
+    · rw [if_pos hu, if_pos hu]
+      simp only [blockProd, hEgt u hu]
+    · rw [if_neg hu, if_neg hu]
+  have hdd : d = (List.ofFn fun u : Fin c =>
+        if i < u then blockProd g (fun h => (S.nf.coord d h).val) u else 1).prod := by
+    have h2 := hdprod.symm.trans hd'
+    rwa [hb1, one_mul] at h2
+  have hfull : fullProd g (fun h => (E h).val) = (List.ofFn fun w => g ⟨i, w⟩ ^ e w).prod * d := by
+    calc fullProd g (fun h => (E h).val)
+        = blockProd g (fun h => (E h).val) i * (List.ofFn fun u : Fin c =>
+          if i < u then blockProd g (fun h => (E h).val) u else 1).prod := hs
+      _ = _ := by rw [hbi, hdeep, ← hdd]
+  have hu := S.nf.uniq E
+  rw [hfull] at hu
+  rw [hu]
+  exact hEi v
+
+/-- The order of a layer: `|γ_{i+1} / γ_{i+2}| = p ^ Σ_v a(i,v)`, from the Sims normal form
+(the Sims lift (36) and the uniqueness (35)); the classes of the blocks `Π_v g_{i,v} ^ e(v)`,
+`0 ≤ e(v) < p ^ a(i,v)`, are exactly the elements of the layer. -/
+theorem SimsGenSet.lf_card_layer (S : SimsGenSet p a g) (hp : 0 < p) (i : Fin c)
+    (hlast : (i : ℕ) + 1 < c ∨ lcs G ((i : ℕ) + 1) = ⊥) :
+    Nat.card (LayerQ G i) = p ^ ∑ v : Fin (r i), a ⟨i, v⟩ := by
+  have hB : ∀ e : (v : Fin (r i)) → Fin (p ^ a ⟨i, v⟩),
+      (List.ofFn fun w => g ⟨i, w⟩ ^ (e w).val).prod ∈ lcs G i := fun e =>
+    Subgroup.list_prod_mem _ fun z hz => by
+      rw [List.mem_ofFn'] at hz
+      obtain ⟨w, rfl⟩ := hz
+      exact Subgroup.pow_mem _ (S.mem ⟨i, w⟩) _
+  let β : ((v : Fin (r i)) → Fin (p ^ a ⟨i, v⟩)) → LayerQ G i := fun e =>
+    QuotientGroup.mk (⟨(List.ofFn fun w => g ⟨i, w⟩ ^ (e w).val).prod, hB e⟩ : lcs G i)
+  have hinj : Function.Injective β := by
+    intro e e' hee
+    have hee' : (QuotientGroup.mk (⟨(List.ofFn fun w => g ⟨i, w⟩ ^ (e w).val).prod, hB e⟩ :
+        lcs G i) : LayerQ G i) =
+        QuotientGroup.mk (⟨(List.ofFn fun w => g ⟨i, w⟩ ^ (e' w).val).prod, hB e'⟩ :
+          lcs G i) := hee
+    have h1 := Subgroup.mem_subgroupOf.mp (QuotientGroup.eq.mp hee')
+    have hd : ((List.ofFn fun w => g ⟨i, w⟩ ^ (e w).val).prod)⁻¹ *
+        (List.ofFn fun w => g ⟨i, w⟩ ^ (e' w).val).prod ∈ lcs G ((i : ℕ) + 1) := h1
+    funext v
+    apply Fin.ext
+    have hc1 := S.lf_coord_layer hp i (fun w => (e w).val) (fun w => (e w).isLt) hd hlast v
+    have hc2 := S.lf_coord_layer hp i (fun w => (e' w).val) (fun w => (e' w).isLt)
+      (Subgroup.one_mem _) hlast v
+    beta_reduce at hc1 hc2
+    rw [mul_one] at hc2
+    rw [mul_inv_cancel_left] at hc1
+    exact hc1.symm.trans hc2
+  have hsurj : Function.Surjective β := by
+    intro q
+    obtain ⟨⟨x, hx⟩, rfl⟩ := QuotientGroup.mk_surjective q
+    refine ⟨fun w => S.nf.coord x ⟨i, w⟩, ?_⟩
+    show (QuotientGroup.mk _ : LayerQ G i) = QuotientGroup.mk _
+    rw [QuotientGroup.eq, Subgroup.mem_subgroupOf]
+    have hl := S.lf_sims_lift i hx
+    have hdeep := deeper_mem g S.mem (fun h => (S.nf.coord x h).val) i
+    show (blockProd g (fun h => (S.nf.coord x h).val) i)⁻¹ * x ∈ lcs G ((i : ℕ) + 1)
+    have e1 : (blockProd g (fun h => (S.nf.coord x h).val) i)⁻¹ * x =
+        (List.ofFn fun u : Fin c => if i < u then
+          blockProd g (fun h => (S.nf.coord x h).val) u else 1).prod := by
+      calc _ = (blockProd g (fun h => (S.nf.coord x h).val) i)⁻¹ *
+            (blockProd g (fun h => (S.nf.coord x h).val) i * (List.ofFn fun u : Fin c =>
+              if i < u then blockProd g (fun h => (S.nf.coord x h).val) u else 1).prod) := by
+            rw [← hl]
+        _ = _ := inv_mul_cancel_left _ _
+    rw [e1]
+    exact hdeep
+  rw [← Nat.card_congr (Equiv.ofBijective β ⟨hinj, hsurj⟩), Nat.card_eq_fintype_card,
+    Fintype.card_pi]
+  simp only [Fintype.card_fin]
+  rw [Finset.prod_pow_eq_pow_sum]
 
 end LfSimsLift
 
