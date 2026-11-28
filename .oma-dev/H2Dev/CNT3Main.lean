@@ -530,6 +530,3 @@ theorem cnt3Stmt_imp_mm (h : CNT3Stmt) : CNT3StmtMM := by
 end CNT3MainThm
 
 end OMA.SimsLite
-
-#print axioms OMA.SimsLite.cnt3_main_strat
-#print axioms OMA.SimsLite.lf_realizedCBb_ncard_le
