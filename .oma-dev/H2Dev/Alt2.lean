@@ -1508,7 +1508,7 @@ noncomputable def simsRkLin (B : V →ₗ[F] V →ₗ[F] W) : ℕ :=
   sInf {d | ∃ U : Submodule F V, finrank F U = d ∧ GensLin B U}
 
 /-- The coordinate tuple of `B` in bases `bV`, `bW`: `(β_k)_{ij} = bW*_k (B(bV_i, bV_j))`. -/
-def matTuple (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V) (bW : Basis (Fin r2) F W) :
+noncomputable def matTuple (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V) (bW : Basis (Fin r2) F W) :
     Fin r2 → Matrix (Fin r1) (Fin r1) F :=
   fun k i j => bW.repr (B (bV i) (bV j)) k
 
@@ -1546,8 +1546,10 @@ theorem matTuple_isAlt (B : V →ₗ[F] V →ₗ[F] W) (hB : ∀ x, B x x = 0) (
   · have h2 : B (bV j) (bV i) = -B (bV i) (bV j) := by
       have := hB (bV i + bV j)
       simp only [map_add, LinearMap.add_apply, hB, zero_add, add_zero] at this
-      rw [eq_neg_iff_add_eq_zero, add_comm]
-      exact this
+      rw [eq_neg_iff_add_eq_zero]
+      first
+        | exact this
+        | exact (add_comm _ _).trans this
     show bW.repr (B (bV j) (bV i)) k = -bW.repr (B (bV i) (bV j)) k
     rw [h2, map_neg, Finsupp.neg_apply]
 
@@ -1576,8 +1578,10 @@ theorem gensOn_matTuple_iff (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1)
       obtain ⟨y, hy, rfl⟩ := Submodule.mem_map.1 hy'
       exact ⟨x, hx, y, hy, (valL_matTuple B bV bW x y).symm⟩
   unfold GensOn GensLin
-  rw [hv, Submodule.span_image, Submodule.map_eq_top_iff (LinearEquiv.range _),
-    LinearEquiv.ker, sup_bot_eq]
+  rw [hv, Submodule.span_image]
+  first
+    | exact Submodule.map_eq_top_iff
+    | rw [Submodule.map_eq_top_iff (LinearEquiv.range _), LinearEquiv.ker, sup_bot_eq]
 
 /-- The Sims rank of the coordinate tuple is the Sims rank of `B`. -/
 theorem simsRk_matTuple (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V)
