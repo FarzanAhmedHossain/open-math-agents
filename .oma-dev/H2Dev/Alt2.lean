@@ -18,7 +18,8 @@ the target is `F = ZMod 2`).  `X = Fin R → F`, alternating forms are `R × R` 
   span `F_2^r2` and whose Sims rank is `s` (eq. (21) at `p = 2`); `N2_support` (empty unless
   `s ≤ r1`, `r2 ≤ C(r1,2)` and `2 ≤ s` when `r2 ≥ 1`) and `N2_le` (`N2 ≤ 2^(r2 C(r1,2))`).
 * Lemma 2.7 (crude forms) : `card_GL_le` (`|GL_d(q)| ≤ q^(d^2)`, part (iii)), `ncard_grass_le`
-  (at most `q^(n k)` subspaces of dimension `k` in `F^n`).
+  (at most `q^(n k)` subspaces of dimension `k` in `F^n`), `exists_pivots` (pivot coordinates) and
+  `ncard_grass_le_pivot` (`[n, k]_q ≤ 2^n q^(k(n-k))`, part (i) up to the constant).
 * Lemma 8.1 (structural part) : `isotropic_of_le_rad`, `isoLocus_smul` (`Z_h(cA) = Z_h(A)`),
   `isoCount_le_grass`, and `two_mul_finrank_le_of_isotropic` (an isotropic `h`-space satisfies
   `2h ≤ R + dim rad A`, so `Z_h(A) = ∅` for `h > R - a` when `rank A = 2a`).
@@ -383,7 +384,8 @@ lemma simsRk_le_R (β : Fin M → Matrix (Fin R) (Fin R) F) (hg : GensOn β ⊤)
 
 lemma exists_gens_of_simsRk (β : Fin M → Matrix (Fin R) (Fin R) F) (hg : GensOn β ⊤) :
     ∃ U : Submodule F (Fin R → F), finrank F U = simsRk β ∧ GensOn β U :=
-  Nat.sInf_mem ⟨R, ⊤, by rw [finrank_top, Module.finrank_fin_fun], hg⟩
+  Nat.sInf_mem (s := {d | ∃ U : Submodule F (Fin R → F), finrank F U = d ∧ GensOn β U})
+    ⟨R, ⊤, by rw [finrank_top, Module.finrank_fin_fun], hg⟩
 
 /-- (92): `d < s(β)` iff no `d`-space generates `W`. -/
 theorem lt_simsRk_iff (β : Fin M → Matrix (Fin R) (Fin R) F) (hg : GensOn β ⊤) {d : ℕ}
@@ -495,6 +497,7 @@ noncomputable def N2 (r1 r2 s : ℕ) : ℕ :=
 /-- Support of `N_2`: nonzero only if `s ≤ r1`, `r2 ≤ C(r1, 2)` and (`r2 ≥ 1 → s ≥ 2`). -/
 theorem N2_support {r1 r2 s : ℕ} (h : 0 < N2 r1 r2 s) :
     s ≤ r1 ∧ r2 ≤ r1.choose 2 ∧ (1 ≤ r2 → 2 ≤ s) := by
+  classical
   unfold N2 at h
   obtain ⟨β, hβ⟩ := Finset.card_pos.1 h
   obtain ⟨-, hA, hg, hs⟩ := Finset.mem_filter.1 hβ
@@ -564,6 +567,156 @@ theorem ncard_grass_le [Finite F] (n k : ℕ) :
         rw [Set.ncard_univ, Nat.card_fun, Nat.card_fun, Nat.card_fin, Nat.card_fin, ← pow_mul]
 
 end Lemma27
+
+section Grass
+
+variable {F : Type*} [Field F] {n : ℕ}
+
+/-- Pivot coordinates: every subspace `U ≤ F^n` has a coordinate set `S` with `|S| = dim U` such
+that the coordinate projection `U → F^S` is bijective. -/
+theorem exists_pivots (U : Submodule F (Fin n → F)) :
+    ∃ S : Finset (Fin n), S.card = finrank F U ∧
+      (∀ v ∈ U, (∀ i ∈ S, v i = 0) → v = 0) ∧
+      (∀ w : S → F, ∃ v ∈ U, ∀ i : S, v i = w i) := by
+  classical
+  let P : Finset (Fin n) → Prop := fun S => ∀ v ∈ U, (∀ i ∈ S, v i = 0) → v = 0
+  have hne : (Finset.univ.filter P).Nonempty :=
+    ⟨Finset.univ, Finset.mem_filter.2 ⟨Finset.mem_univ _,
+      fun v _ hv => funext fun i => hv i (Finset.mem_univ i)⟩⟩
+  obtain ⟨S, hS, hmin⟩ := Finset.exists_min_image (Finset.univ.filter P) Finset.card hne
+  have hPS : P S := (Finset.mem_filter.1 hS).2
+  let L : U →ₗ[F] (S → F) := (LinearMap.funLeft F F (fun i : S => (i : Fin n))).comp U.subtype
+  have hinj : Function.Injective L := by
+    rw [← LinearMap.ker_eq_bot, LinearMap.ker_eq_bot']
+    intro v hv
+    apply Subtype.ext
+    exact hPS v v.2 (fun i hi => congrFun hv ⟨i, hi⟩)
+  have hsurj : Function.Surjective L := by
+    rw [← LinearMap.range_eq_top]
+    by_contra hne'
+    obtain ⟨φ, hφ0, hφ⟩ := Submodule.exists_le_ker_of_lt_top _ (lt_top_iff_ne_top.2 hne')
+    obtain ⟨c, key⟩ : ∃ c : S → F, ∀ w, φ w = ∑ i, c i * w i :=
+      ⟨fun i => φ (fun j => if i = j then 1 else 0), fun w => by
+        rw [LinearMap.pi_apply_eq_sum_univ φ w]
+        exact Finset.sum_congr rfl (fun i _ => by rw [smul_eq_mul, mul_comm])⟩
+    have hc : c ≠ 0 := by
+      intro h0
+      apply hφ0
+      exact LinearMap.ext fun w => by rw [key w, h0]; simp
+    obtain ⟨i0, hi0⟩ : ∃ i0, c i0 ≠ 0 := by
+      by_contra h
+      push_neg at h
+      exact hc (funext h)
+    have hrel : ∀ v ∈ U, ∑ i : S, c i * v i = 0 := by
+      intro v hv
+      have := LinearMap.mem_ker.1 (hφ (LinearMap.mem_range_self L ⟨v, hv⟩))
+      rw [key] at this
+      exact this
+    have hP' : P (S.erase (i0 : Fin n)) := by
+      intro v hv hz
+      apply hPS v hv
+      have hv0 : v i0 = 0 := by
+        have h1 := hrel v hv
+        rw [Finset.sum_eq_single i0] at h1
+        · exact (mul_eq_zero.1 h1).resolve_left hi0
+        · intro b _ hb
+          rw [hz b (Finset.mem_erase.2 ⟨fun h => hb (Subtype.ext h), b.2⟩), mul_zero]
+        · intro h
+          exact absurd (Finset.mem_univ _) h
+      intro i hi
+      by_cases h : i = (i0 : Fin n)
+      · rw [h]
+        exact hv0
+      · exact hz i (Finset.mem_erase.2 ⟨h, hi⟩)
+    have h1 := hmin (S.erase (i0 : Fin n)) (Finset.mem_filter.2 ⟨Finset.mem_univ _, hP'⟩)
+    have h2 := Finset.card_erase_lt_of_mem i0.2
+    omega
+  refine ⟨S, ?_, hPS, fun w => ?_⟩
+  · have e := (LinearEquiv.ofBijective L ⟨hinj, hsurj⟩).finrank_eq
+    rw [Module.finrank_fintype_fun_eq_card, Fintype.card_coe] at e
+    exact e.symm
+  · obtain ⟨v, hv⟩ := hsurj w
+    exact ⟨v, v.2, fun i => congrFun hv i⟩
+
+/-- Lemma 2.7 (i), upper bound in crude form: `F^n` has at most `2^n q^(k(n-k))` subspaces of
+dimension `k` (each is the graph over its pivot coordinates of a map `F^k → F^(n-k)`). -/
+theorem ncard_grass_le_pivot [Finite F] (k : ℕ) :
+    {U : Submodule F (Fin n → F) | finrank F U = k}.ncard ≤
+      2 ^ n * Nat.card F ^ (k * (n - k)) := by
+  classical
+  have hdata : ∀ U : {U : Submodule F (Fin n → F) // finrank F U = k},
+      ∃ S : Finset (Fin n), ∃ _ : S.card = k, ∃ u : Fin n → (Fin n → F),
+        (∀ i, u i ∈ U.1) ∧ (∀ i ∈ S, ∀ j ∈ S, u i j = if j = i then 1 else 0) ∧
+        (∀ v ∈ U.1, (∀ i ∈ S, v i = 0) → v = 0) := by
+    intro U
+    obtain ⟨S, hS, hinj, hsurj⟩ := exists_pivots U.1
+    choose u' hu'U hu' using fun i : S => hsurj (Pi.single i 1)
+    refine ⟨S, hS.trans U.2, fun i => if h : i ∈ S then u' ⟨i, h⟩ else 0, ?_, ?_, hinj⟩
+    · intro i
+      by_cases h : i ∈ S
+      · rw [dif_pos h]
+        exact hu'U _
+      · rw [dif_neg h]
+        exact U.1.zero_mem
+    · intro i hi j hj
+      rw [dif_pos hi, hu' ⟨i, hi⟩ ⟨j, hj⟩]
+      simp [Pi.single_apply]
+  choose S hS u hu hpiv hinj using hdata
+  have hc : ∀ U, ((S U)ᶜ).card = n - k := fun U => by
+    rw [Finset.card_compl, Fintype.card_fin, hS U]
+  let code : {U : Submodule F (Fin n → F) // finrank F U = k} →
+      Finset (Fin n) × (Fin k → Fin (n - k) → F) := fun U =>
+    (S U, fun a b => u U ((S U).orderEmbOfFin (hS U) a) (((S U)ᶜ).orderEmbOfFin (hc U) b))
+  have hemb : ∀ (T T' : Finset (Fin n)) {m : ℕ} (h : T.card = m) (h' : T'.card = m), T = T' →
+      ∀ a, T.orderEmbOfFin h a = T'.orderEmbOfFin h' a := by
+    rintro T _ m h h' rfl a
+    rfl
+  have hle : ∀ U U', code U = code U' → U.1 ≤ U'.1 := by
+    intro U U' h
+    have hSS : S U = S U' := congrArg Prod.fst h
+    have h2 := congrArg Prod.snd h
+    have huu : ∀ i ∈ S U, u U i = u U' i := by
+      intro i hi
+      funext j
+      by_cases hj : j ∈ S U
+      · rw [hpiv U i hi j hj, hpiv U' i (hSS ▸ hi) j (hSS ▸ hj)]
+      · have hjc : j ∈ (S U)ᶜ := Finset.mem_compl.2 hj
+        obtain ⟨b, hb⟩ : j ∈ Set.range ((S U)ᶜ.orderEmbOfFin (hc U)) := by
+          rw [Finset.range_orderEmbOfFin]
+          exact hjc
+        obtain ⟨a, ha⟩ : i ∈ Set.range ((S U).orderEmbOfFin (hS U)) := by
+          rw [Finset.range_orderEmbOfFin]
+          exact hi
+        have h3 := congrFun (congrFun h2 a) b
+        simp only [code] at h3
+        rw [← hemb _ _ (hS U) (hS U') hSS a, ← hemb _ _ (hc U) (hc U') (by rw [hSS]) b, ha,
+          hb] at h3
+        exact h3
+    intro v hv
+    have hw : v - ∑ i ∈ S U, v i • u U i = 0 := by
+      apply hinj U _ (sub_mem hv (sum_mem (fun i _ => Submodule.smul_mem _ _ (hu U i))))
+      intro j hj
+      have hsum : ∑ i ∈ S U, v i * u U i j = ∑ i ∈ S U, if j = i then v i else 0 :=
+        Finset.sum_congr rfl (fun i hi => by rw [hpiv U i hi j hj]; split_ifs <;> simp)
+      simp only [Pi.sub_apply, Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+      rw [hsum, Finset.sum_ite_eq, if_pos hj, sub_self]
+    have hv' : v = ∑ i ∈ S U, v i • u U i := sub_eq_zero.1 hw
+    rw [hv']
+    exact sum_mem (fun i hi => by rw [huu i hi]; exact Submodule.smul_mem _ _ (hu U' i))
+  have hinjc : Function.Injective code := by
+    intro U U' h
+    exact Subtype.ext (le_antisymm (hle U U' h) (hle U' U h.symm))
+  rw [← Nat.card_coe_set_eq]
+  calc Nat.card {U : Submodule F (Fin n → F) | finrank F U = k}
+      = Nat.card {U : Submodule F (Fin n → F) // finrank F U = k} := rfl
+    _ ≤ Nat.card (Finset (Fin n) × (Fin k → Fin (n - k) → F)) :=
+        Nat.card_le_card_of_injective code hinjc
+    _ = 2 ^ n * Nat.card F ^ (k * (n - k)) := by
+        rw [Nat.card_prod, Nat.card_fun, Nat.card_fun, Nat.card_fin, Nat.card_fin,
+          Nat.card_eq_fintype_card (α := Finset (Fin n)), Fintype.card_finset, Fintype.card_fin,
+          ← pow_mul, mul_comm (n - k) k]
+
+end Grass
 
 section Lemma81
 
