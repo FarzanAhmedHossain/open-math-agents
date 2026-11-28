@@ -43,7 +43,7 @@ which can exceed `max_b min (A b) (B b)` by an amount not absorbed in `C m log m
 `A b - B b = (C(r1,2) - r2) r2 - logN2 - C(r1-s,2) b` decreases in `b`, and when `A` and `B`
 cross between two consecutive admissible breadths `b, b + 1` (with `B` increasing and `A`
 decreasing there) the gap is up to `s (r2 + m3 - 2 b)`. The paper's (54) is indeed a per-breadth
-statement ("for each fixed family of higher core maps"), so the faithful input is a per-breadth
+statement (for each fixed family of higher core maps), so the faithful input is a per-breadth
 count on both sides (`HypStrat`). -/
 
 namespace OMA.SimsLite
