@@ -1419,12 +1419,30 @@ theorem SimsGen.lf_core (hS : SimsGen p u d X r) {c : ℕ} (hn : d.n = fOff r c)
   rw [hset] at hcore
   exact ⟨hsr, hcore⟩
 
-end LfFlat
+/-- The leading coefficients `c(1, j, k, 2, v)`, `j < k`, of `SimsGen.toSimsGenSet` are entries
+of the flattened commutator coefficient array `brCm` of the code. -/
+theorem SimsGen.lf_lead1_eq_brCm [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {c : ℕ}
+    (hn : d.n = fOff r c) (h2 : 2 < c) (j k : Fin (brR r c (lfI0 h2))) (hjk : j < k)
+    (v : Fin (brR r c (lfI1 h2))) :
+    brCm d (hS.brEquiv hn ⟨lfI0 h2, j⟩).val (hS.brEquiv hn ⟨lfI0 h2, k⟩).val
+        (hS.brEquiv hn ⟨lfI1 h2, v⟩).val = (hS.toSimsGenSet hp hn).lfLead1 h2 j k v :=
+  hS.lf_brCm_eq_coord hp hn _ _ _ (Or.inl ⟨hS.lv_brEquiv hn _, hS.lv_brEquiv hn _, by
+    rw [Fin.lt_def, hS.val_brEquiv hn, hS.val_brEquiv hn]
+    exact Nat.add_lt_add_left hjk _⟩)
 
-#print axioms OMA.SimsLite.lf_ncard_lead_le
-#print axioms OMA.SimsLite.SimsGen.lf_brCm_eq_coord
-#print axioms OMA.SimsLite.SimsGen.lf_core
-#print axioms OMA.SimsLite.lf_ncard_classes_le_fiberB_pw
-#print axioms OMA.SimsLite.lf_recover_eq
+/-- The recorded leading coefficients `c(2, j, k, 3, v)`, `k ≤ k(j)`, of `SimsGen.toSimsGenSet`
+are entries of `brCm` (the remaining ones are recovered by `lf_recover_eq`). -/
+theorem SimsGen.lf_lead2_eq_brCm [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {c : ℕ}
+    (hn : d.n = fOff r c) (h2 : 2 < c) (j : Fin (brR r c (lfI1 h2)))
+    (k : Fin (brR r c (lfI0 h2)))
+    (hk : (k : ℕ) ≤ (d.df (hS.brEquiv hn ⟨lfI1 h2, j⟩)).2.val) (v : Fin (brR r c (lfI2 h2))) :
+    brCm d (hS.brEquiv hn ⟨lfI1 h2, j⟩).val (hS.brEquiv hn ⟨lfI0 h2, k⟩).val
+        (hS.brEquiv hn ⟨lfI2 h2, v⟩).val = (hS.toSimsGenSet hp hn).lfLead2 h2 j k v :=
+  hS.lf_brCm_eq_coord hp hn _ _ _ (Or.inr (Or.inl ⟨hS.lv_brEquiv hn _, by
+    rw [hS.val_brEquiv hn]
+    show 0 + (k : ℕ) ≤ _
+    omega⟩))
+
+end LfFlat
 
 end OMA.SimsLite
