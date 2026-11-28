@@ -87,9 +87,10 @@ def bary {m k : ℕ} (v : Fin (k + 1) → Pt m) : Pt m :=
     · simp only [Pi.smul_apply, Finset.sum_apply, smul_eq_mul]
       exact mul_nonneg (by positivity) (Finset.sum_nonneg fun i _ => (v i).2.1 j)
     · simp only [Pi.smul_apply, Finset.sum_apply, smul_eq_mul]
-      rw [← Finset.mul_sum, Finset.sum_comm,
-        Finset.sum_congr rfl (fun i _ => (v i).2.2)]
-      simp only [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_one,
+      have h : ∀ i, ∑ x, (v i) x = 1 := fun i => (v i).2.2
+      have h' : ∀ i, ∑ x, (v i : Fin (m + 1) → ℝ) x = 1 := fun i => (v i).2.2
+      rw [← Finset.mul_sum, Finset.sum_comm]
+      simp only [h, h', Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, mul_one,
         Nat.cast_add, Nat.cast_one]
       field_simp⟩
 
@@ -98,14 +99,16 @@ abbrev tgen {m k : ℕ} (v : Fin (k + 1) → Pt m) : (Ch (Tup (Pt m))).X k :=
   gen (X := Tup (Pt m)) (n := k) v
 
 /-- Subdivision on linear chains: `S [v] = b_v · S (∂ [v])`, and `S = id` in degree 0. -/
-def SL (m : ℕ) : (k : ℕ) → ((Ch (Tup (Pt m))).X k ⟶ (Ch (Tup (Pt m))).X k)
+def SL (m : ℕ) (k : ℕ) : (Ch (Tup (Pt m))).X k ⟶ (Ch (Tup (Pt m))).X k :=
+  match k with
   | 0 => 𝟙 _
   | k + 1 => descGen (X := Tup (Pt m)) (n := k + 1) (fun v =>
       (cone (bary v) k).hom ((SL m k).hom (((Ch (Tup (Pt m))).d (k + 1) k).hom (tgen v))))
 
 /-- The subdivision homotopy on linear chains: `T [v] = b_v · ([v] - T (∂ [v]))`,
 and `T [v] = b_v · [v]` in degree 0. -/
-def TL (m : ℕ) : (k : ℕ) → ((Ch (Tup (Pt m))).X k ⟶ (Ch (Tup (Pt m))).X (k + 1))
+def TL (m : ℕ) (k : ℕ) : (Ch (Tup (Pt m))).X k ⟶ (Ch (Tup (Pt m))).X (k + 1) :=
+  match k with
   | 0 => descGen (X := Tup (Pt m)) (n := 0) (fun v => (cone (bary v) 0).hom (tgen v))
   | k + 1 => descGen (X := Tup (Pt m)) (n := k + 1) (fun v =>
       (cone (bary v) (k + 1)).hom
@@ -120,14 +123,15 @@ def affFun {m k : ℕ} (v : Fin (k + 1) → Pt m) (t : Pt k) : Pt m :=
     · simp only [Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
       exact Finset.sum_nonneg fun i _ => mul_nonneg (t.2.1 i) ((v i).2.1 j)
     · simp only [Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+      have h : ∀ i, ∑ x, (v i) x = 1 := fun i => (v i).2.2
+      have h' : ∀ i, ∑ x, (v i : Fin (m + 1) → ℝ) x = 1 := fun i => (v i).2.2
       rw [Finset.sum_comm]
-      simp only [← Finset.mul_sum]
-      rw [Finset.sum_congr rfl (fun i _ => by rw [(v i).2.2])]
-      simpa using t.2.2⟩
+      simp only [← Finset.mul_sum, h, h', mul_one]
+      exact t.2.2⟩
 
 lemma continuous_affFun {m k : ℕ} (v : Fin (k + 1) → Pt m) : Continuous (affFun v) := by
   apply Continuous.subtype_mk
-  exact continuous_finset_sum _ fun i _ =>
+  exact continuous_finsetSum _ fun i _ =>
     ((continuous_apply i).comp continuous_subtype_val).smul continuous_const
 
 /-- The affine singular simplex of `Δᵐ` with vertices `v`. -/
