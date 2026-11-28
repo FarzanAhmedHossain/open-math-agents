@@ -235,10 +235,10 @@ theorem prop105 {A : Matrix (Fin R) (Fin R) F} (hA : IsAltMat A)
     {H H1 X0 : Submodule F (Fin R → F)}
     (hH1H : H1 ≤ H) (hH1J : H1 ⊓ (H ⊓ rad A) = ⊥) (hH1J' : H1 ⊔ (H ⊓ rad A) = H)
     (hX0c : (rad A ⊔ H1) ⊓ X0 = ⊥) (hX0s : rad A ⊔ H1 ⊔ X0 = perpA A H) :
-    finrank F (perpA A H) + (finrank F H - finrank F (H ⊓ rad A)) = R ∧
+    finrank F (perpA A H) + (finrank F H - finrank F ↥(H ⊓ rad A)) = R ∧
     (∀ u ∈ X0, (∀ v ∈ X0, bfL u v A = 0) → u = 0) ∧
     X0 ⊓ H = ⊥ ∧
-    A.rank = 2 * (finrank F H - finrank F (H ⊓ rad A)) + finrank F X0 ∧
+    A.rank = 2 * (finrank F H - finrank F ↥(H ⊓ rad A)) + finrank F X0 ∧
     A.rank ≤ 2 * finrank F H + finrank F X0 := by
   have hJH : finrank F ↥(H ⊓ rad A) ≤ finrank F H := Submodule.finrank_mono inf_le_left
   have ha : finrank F H + finrank F (perpA A H) = R + finrank F ↥(H ⊓ rad A) := by
@@ -509,7 +509,7 @@ theorem lemma107 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r
     rw [hS_eq]
     omega
   rw [linearIndependent_iff_notMem_span] at hnotli
-  push_neg at hnotli
+  push Not at hnotli
   obtain ⟨p0, hp0⟩ := hnotli
   have hS' : Submodule.span F (ρ '' (Set.univ \ {p0})) = V0 i0 := by
     rw [← hS_eq]
@@ -519,7 +519,7 @@ theorem lemma107 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r
     by_cases hp : p = p0
     · subst hp
       exact hp0
-    · exact Submodule.subset_span ⟨p, Set.mem_diff_of_mem (Set.mem_univ _) hp, rfl⟩
+    · exact Submodule.subset_span ⟨p, Set.mem_sdiff_of_mem (Set.mem_univ _) hp, rfl⟩
   -- Step 5: reorder so that the redundant pair is the last one
   obtain ⟨⟨a, b⟩, hab⟩ := p0
   have hab' : a < b := hab
@@ -535,7 +535,7 @@ theorem lemma107 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r
   have hsmem : ∀ j, j ∈ s → j ≠ a ∧ j ≠ b := by
     intro j hj
     rw [hs, Finset.mem_sdiff, Finset.mem_insert, Finset.mem_singleton] at hj
-    push_neg at hj
+    push Not at hj
     exact ⟨hj.2.1, hj.2.2⟩
   have hembs : ∀ i, emb i ≠ a ∧ emb i ≠ b := fun i => hsmem _ (hemb_mem i)
   let ι : Fin k ⊕ Fin 2 → Fin (k + 2) := Sum.elim (fun i => emb i) ![a, b]
@@ -561,7 +561,7 @@ theorem lemma107 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r
     · exact ⟨Sum.inr 1, hjb.symm⟩
     have hjs : j ∈ s := by
       rw [hs, Finset.mem_sdiff, Finset.mem_insert, Finset.mem_singleton]
-      exact ⟨Finset.mem_univ _, by push_neg; exact ⟨hja, hjb⟩⟩
+      exact ⟨Finset.mem_univ _, by push Not; exact ⟨hja, hjb⟩⟩
     have : j ∈ Set.range emb := by
       rw [hemb_range]
       exact hjs
@@ -797,5 +797,246 @@ theorem lemma109 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (i0 : Fin M
       exact hcoef (Sum.inr (Sum.inr i))
 
 end Rows
+
+/-! ### Lemma 10.11 (Reed-Muller support) -/
+
+section ReedMuller
+
+open MvPolynomial
+
+/-- `f : F_2^n → F_2` has (algebraic) degree at most `d`: it is the evaluation of a polynomial
+of total degree at most `d`. -/
+def HasDeg {n : ℕ} (f : (Fin n → ZMod 2) → ZMod 2) (d : ℕ) : Prop :=
+  ∃ p : MvPolynomial (Fin n) (ZMod 2), p.totalDegree ≤ d ∧ ∀ x, eval x p = f x
+
+/-- `|supp f|`. -/
+def suppCard {n : ℕ} (f : (Fin n → ZMod 2) → ZMod 2) : ℕ :=
+  (Finset.univ.filter fun x => f x ≠ 0).card
+
+/-- `(t, x') ↦ (t, x'_1, ..., x'_n)`. -/
+def cons2 {n : ℕ} (t : ZMod 2) (x' : Fin n → ZMod 2) : Fin (n + 1) → ZMod 2 := Fin.cons t x'
+
+lemma suppCard_of_const {n : ℕ} {f : (Fin n → ZMod 2) → ZMod 2} {c : ZMod 2} (hc : c ≠ 0)
+    (hf : ∀ x, f x = c) : suppCard f = 2 ^ n := by
+  unfold suppCard
+  rw [Finset.filter_true_of_mem (fun x _ => by rw [hf x]; exact hc), Finset.card_univ,
+    Fintype.card_fun, ZMod.card, Fintype.card_fin]
+
+lemma suppCard_congr {n : ℕ} {f g : (Fin n → ZMod 2) → ZMod 2} (h : ∀ x, f x ≠ 0 ↔ g x ≠ 0) :
+    suppCard f = suppCard g := by
+  unfold suppCard
+  rw [Finset.filter_congr (fun x _ => h x)]
+
+lemma suppCard_cons_ge {n : ℕ} (f : (Fin (n + 1) → ZMod 2) → ZMod 2) :
+    suppCard (fun x' => f (cons2 0 x')) + suppCard (fun x' => f (cons2 1 x')) ≤ suppCard f := by
+  classical
+  unfold suppCard
+  let e0 : (Fin n → ZMod 2) ↪ (Fin (n + 1) → ZMod 2) :=
+    ⟨cons2 0, Fin.cons_right_injective (α := fun _ => ZMod 2) 0⟩
+  let e1 : (Fin n → ZMod 2) ↪ (Fin (n + 1) → ZMod 2) :=
+    ⟨cons2 1, Fin.cons_right_injective (α := fun _ => ZMod 2) 1⟩
+  have hdisj : Disjoint ((Finset.univ.filter fun x' => f (cons2 0 x') ≠ 0).map e0)
+      ((Finset.univ.filter fun x' => f (cons2 1 x') ≠ 0).map e1) := by
+    rw [Finset.disjoint_left]
+    intro x hx0 hx1
+    obtain ⟨a, _, rfl⟩ := Finset.mem_map.1 hx0
+    obtain ⟨b, _, hb⟩ := Finset.mem_map.1 hx1
+    have h := congrFun hb 0
+    have h' : (1 : ZMod 2) = 0 := h
+    exact absurd h' (by decide)
+  rw [← Finset.card_map e0, ← Finset.card_map e1, ← Finset.card_union_of_disjoint hdisj]
+  apply Finset.card_le_card
+  intro x hx
+  rcases Finset.mem_union.1 hx with h | h
+  · obtain ⟨a, ha, rfl⟩ := Finset.mem_map.1 h
+    rw [Finset.mem_filter] at ha ⊢
+    exact ⟨Finset.mem_univ _, ha.2⟩
+  · obtain ⟨a, ha, rfl⟩ := Finset.mem_map.1 h
+    rw [Finset.mem_filter] at ha ⊢
+    exact ⟨Finset.mem_univ _, ha.2⟩
+
+/-- Lemma 10.11, first assertion (minimum distance of `RM(d, n)`): a nonzero `f : F_2^n → F_2` of
+degree at most `d` has `|supp f| ≥ 2^(n-d)`. -/
+theorem rm_support : ∀ (n d : ℕ) (f : (Fin n → ZMod 2) → ZMod 2), HasDeg f d →
+    (∃ x, f x ≠ 0) → 2 ^ (n - d) ≤ suppCard f := by
+  intro n
+  induction n with
+  | zero =>
+    intro d f _ ⟨x, hx⟩
+    rw [Nat.zero_sub, pow_zero]
+    unfold suppCard
+    exact Finset.card_pos.2 ⟨x, Finset.mem_filter.2 ⟨Finset.mem_univ _, hx⟩⟩
+  | succ n ih =>
+    intro d f ⟨p, hpd, hpf⟩ ⟨x, hx⟩
+    by_cases hd : d = 0
+    · subst hd
+      have h0 : p.totalDegree = 0 := Nat.le_zero.1 hpd
+      have hC := totalDegree_eq_zero_iff_eq_C.1 h0
+      have hconst : ∀ y, f y = p.coeff 0 := fun y => by
+        have := congrArg (eval y) hC
+        rw [eval_C] at this
+        rw [← hpf y]
+        exact this
+      exact le_of_eq (by rw [suppCard_of_const (c := p.coeff 0) (by rw [← hconst x]; exact hx)
+        hconst, Nat.sub_zero])
+    · set q := finSuccEquiv (ZMod 2) n p with hq
+      have heval : ∀ t x', f (cons2 t x') =
+          ∑ i ∈ Finset.range (q.natDegree + 1), eval x' (q.coeff i) * t ^ i := by
+        intro t x'
+        rw [← hpf, cons2, eval_eq_eval_mv_eval', ← hq,
+          Polynomial.eval_eq_sum_range' (n := q.natDegree + 1)
+            (lt_of_le_of_lt Polynomial.natDegree_map_le (Nat.lt_succ_self _))]
+        simp only [Polynomial.coeff_map]
+      have hcd : ∀ i, (q.coeff i).totalDegree ≤ d - i := fun i => by
+        by_cases h : q.coeff i = 0
+        · rw [h, totalDegree_zero]
+          exact Nat.zero_le _
+        · have := totalDegree_coeff_finSuccEquiv_add_le p i h
+          rw [← hq] at this
+          omega
+      have hf0 : ∀ x', f (cons2 0 x') = eval x' (q.coeff 0) := by
+        intro x'
+        rw [heval, Finset.sum_range_succ']
+        simp
+      have hf1 : ∀ x', f (cons2 1 x') = eval x' (∑ i ∈ Finset.range (q.natDegree + 1), q.coeff i) := by
+        intro x'
+        rw [heval, map_sum]
+        simp only [one_pow, mul_one]
+      have hfd : ∀ x', f (cons2 1 x') - f (cons2 0 x') =
+          eval x' (∑ i ∈ Finset.range q.natDegree, q.coeff (i + 1)) := by
+        intro x'
+        rw [hf1, hf0, Finset.sum_range_succ', map_add, add_sub_cancel_right]
+      have hD0 : HasDeg (fun x' => f (cons2 0 x')) d :=
+        ⟨q.coeff 0, (hcd 0).trans (Nat.sub_le _ _), fun x' => (hf0 x').symm⟩
+      have hD1 : HasDeg (fun x' => f (cons2 1 x')) d :=
+        ⟨∑ i ∈ Finset.range (q.natDegree + 1), q.coeff i,
+          totalDegree_finsetSum_le (fun i _ => (hcd i).trans (Nat.sub_le _ _)),
+          fun x' => (hf1 x').symm⟩
+      have hDd : HasDeg (fun x' => f (cons2 1 x') - f (cons2 0 x')) (d - 1) :=
+        ⟨∑ i ∈ Finset.range q.natDegree, q.coeff (i + 1),
+          totalDegree_finsetSum_le (fun i _ => (hcd (i + 1)).trans (by omega)),
+          fun x' => (hfd x').symm⟩
+      have hsplit := suppCard_cons_ge f
+      have hx' : f (cons2 (x 0) (Fin.tail x)) ≠ 0 := by
+        rw [cons2, Fin.cons_self_tail]
+        exact hx
+      by_cases h0 : ∃ y, f (cons2 0 y) ≠ 0 <;> by_cases h1 : ∃ y, f (cons2 1 y) ≠ 0
+      · have a0 := ih d _ hD0 h0
+        have a1 := ih d _ hD1 h1
+        have : 2 ^ (n + 1 - d) ≤ 2 ^ (n - d) * 2 := by
+          rw [← pow_succ]
+          exact Nat.pow_le_pow_right (by norm_num) (by omega)
+        omega
+      · push Not at h1
+        obtain ⟨y, hy⟩ := h0
+        have hne : ∃ y, f (cons2 1 y) - f (cons2 0 y) ≠ 0 :=
+          ⟨y, by rw [h1 y, zero_sub, neg_ne_zero]; exact hy⟩
+        have a := ih (d - 1) _ hDd hne
+        have heq : suppCard (fun x' => f (cons2 1 x') - f (cons2 0 x')) =
+            suppCard (fun x' => f (cons2 0 x')) :=
+          suppCard_congr (fun z => by simp only [h1 z, zero_sub, neg_ne_zero])
+        have : 2 ^ (n + 1 - d) ≤ 2 ^ (n - (d - 1)) :=
+          Nat.pow_le_pow_right (by norm_num) (by omega)
+        omega
+      · push Not at h0
+        obtain ⟨y, hy⟩ := h1
+        have hne : ∃ y, f (cons2 1 y) - f (cons2 0 y) ≠ 0 :=
+          ⟨y, by rw [h0 y, sub_zero]; exact hy⟩
+        have a := ih (d - 1) _ hDd hne
+        have heq : suppCard (fun x' => f (cons2 1 x') - f (cons2 0 x')) =
+            suppCard (fun x' => f (cons2 1 x')) :=
+          suppCard_congr (fun z => by simp only [h0 z, sub_zero])
+        have : 2 ^ (n + 1 - d) ≤ 2 ^ (n - (d - 1)) :=
+          Nat.pow_le_pow_right (by norm_num) (by omega)
+        omega
+      · push Not at h0 h1
+        exfalso
+        apply hx'
+        have h01 : ∀ t : ZMod 2, t = 0 ∨ t = 1 := by decide
+        rcases h01 (x 0) with ht | ht
+        · rw [ht]
+          exact h0 _
+        · rw [ht]
+          exact h1 _
+
+/-- Substituting linear forms does not raise the total degree. -/
+theorem totalDegree_bind₁_le_of {σ τ : Type*} {S : Type*} [CommSemiring S]
+    (g : σ → MvPolynomial τ S) (hg : ∀ i, (g i).totalDegree ≤ 1) (p : MvPolynomial σ S) :
+    (bind₁ g p).totalDegree ≤ p.totalDegree := by
+  conv_lhs => rw [p.as_sum]
+  rw [map_sum]
+  apply totalDegree_finsetSum_le
+  intro m hm
+  rw [bind₁_monomial]
+  refine (totalDegree_mul _ _).trans ?_
+  rw [totalDegree_C, zero_add]
+  refine (totalDegree_finsetProd _ _).trans ?_
+  refine le_trans ?_ (le_totalDegree hm)
+  rw [Finsupp.sum]
+  apply Finset.sum_le_sum
+  intro i _
+  calc (g i ^ m i).totalDegree ≤ m i * (g i).totalDegree := totalDegree_pow _ _
+    _ ≤ m i * 1 := Nat.mul_le_mul_left _ (hg i)
+    _ = m i := mul_one _
+
+/-- Lemma 10.11, second assertion: if `f` has degree at most `d` and `f 0 = 1`, then
+`codim span (supp f) ≤ d`. -/
+theorem rm_span (n d : ℕ) (f : (Fin n → ZMod 2) → ZMod 2) (hf : HasDeg f d) (h0 : f 0 = 1) :
+    n ≤ finrank (ZMod 2) ↥(Submodule.span (ZMod 2) {x | f x ≠ 0}) + d := by
+  classical
+  obtain ⟨p, hpd, hpf⟩ := hf
+  set S := Submodule.span (ZMod 2) {x : Fin n → ZMod 2 | f x ≠ 0} with hS
+  obtain ⟨T, hT⟩ := S.exists_isCompl
+  have hST : finrank (ZMod 2) S + finrank (ZMod 2) T = n := by
+    have := Submodule.finrank_add_eq_of_isCompl hT
+    rwa [Module.finrank_fin_fun] at this
+  set c := finrank (ZMod 2) T with hc
+  let bT := Module.finBasis (ZMod 2) T
+  let v : Fin c → (Fin n → ZMod 2) := fun i => (bT i : Fin n → ZMod 2)
+  have hvli : LinearIndependent (ZMod 2) v :=
+    bT.linearIndependent.map' T.subtype (Submodule.ker_subtype T)
+  have hvT : ∀ t : Fin c → ZMod 2, ∑ i, t i • v i ∈ T := fun t =>
+    Submodule.sum_mem _ (fun i _ => Submodule.smul_mem _ _ (bT i).2)
+  let g : (Fin c → ZMod 2) → ZMod 2 := fun t => f (∑ i, t i • v i)
+  let φ : Fin n → MvPolynomial (Fin c) (ZMod 2) := fun j => ∑ i, C (v i j) * X i
+  have hφ : ∀ j, (φ j).totalDegree ≤ 1 := fun j =>
+    totalDegree_finsetSum_le (fun i _ => (totalDegree_mul _ _).trans (by
+      simp [totalDegree_C, totalDegree_X]))
+  have hg : HasDeg g d := by
+    refine ⟨bind₁ φ p, (totalDegree_bind₁_le_of φ hφ p).trans hpd, fun t => ?_⟩
+    have hb : eval t (bind₁ φ p) = eval (fun i => eval t (φ i)) p := aeval_bind₁ t φ p
+    rw [hb, hpf]
+    show f _ = f _
+    congr 1
+    funext j
+    simp only [φ, map_sum, map_mul, eval_C, eval_X, Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+    exact Finset.sum_congr rfl (fun i _ => mul_comm _ _)
+  have hg0 : g 0 = 1 := by
+    show f (∑ i, (0 : Fin c → ZMod 2) i • v i) = 1
+    simp only [Pi.zero_apply, zero_smul, Finset.sum_const_zero]
+    exact h0
+  have hgsupp : ∀ t, g t ≠ 0 → t = 0 := by
+    intro t ht
+    have hmemS : ∑ i, t i • v i ∈ S := Submodule.subset_span ht
+    have hmem : ∑ i, t i • v i ∈ S ⊓ T := Submodule.mem_inf.2 ⟨hmemS, hvT t⟩
+    rw [hT.inf_eq_bot] at hmem
+    funext i
+    exact Fintype.linearIndependent_iff.1 hvli t ((Submodule.mem_bot _).1 hmem) i
+  have hcard : suppCard g ≤ 1 := by
+    unfold suppCard
+    apply Finset.card_le_one.2
+    intro a ha b hb
+    rw [hgsupp a (Finset.mem_filter.1 ha).2, hgsupp b (Finset.mem_filter.1 hb).2]
+  have hrm := rm_support c d g hg ⟨0, by rw [hg0]; exact one_ne_zero⟩
+  have hcd : c - d = 0 := by
+    by_contra hne
+    have : 2 ≤ 2 ^ (c - d) := by
+      calc 2 = 2 ^ 1 := by norm_num
+        _ ≤ 2 ^ (c - d) := Nat.pow_le_pow_right (by norm_num) (by omega)
+    omega
+  omega
+
+end ReedMuller
+
 
 end OMA.SimsLite.N2B
