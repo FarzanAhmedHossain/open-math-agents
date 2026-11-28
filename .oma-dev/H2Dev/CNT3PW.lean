@@ -184,8 +184,8 @@ theorem SimsGen.c3_r1_eq [hp : Fact p.Prime] (hS : SimsGen p u d X r) : r 1 = r2
     rw [h1, h2, mul_comm]
   exact Nat.pow_right_injective hp.out.two_le (Nat.eq_of_mul_eq_mul_right h4 h6)
 
-/-- `γ_3` is abelian when `γ_4 = 1`. -/
 omit [Finite G] in
+/-- `γ_3` is abelian when `γ_4 = 1`. -/
 theorem c3_commutator_lcs_two_eq_bot (h4 : lcs G 3 = ⊥) : commutator (lcs G 2) = ⊥ := by
   rw [eq_bot_iff, commutator_def, Subgroup.commutator_le]
   intro x _ y _
@@ -228,8 +228,8 @@ theorem SimsGen.c3_r2_eq (hp : p.Prime) (hS : SimsGen p u d X r) (h4 : lcs G 3 =
       _ = p ^ Group.rank (lcs G 2) * Nat.card (pPhi p (lcs G 2)) := mul_comm _ _
   exact Nat.pow_right_injective hp.two_le (Nat.eq_of_mul_eq_mul_right h5 h6)
 
-/-- The Sims rank is at most the core size `d.s` of any Sims generating set. -/
 omit [Finite G] in
+/-- The Sims rank is at most the core size `d.s` of any Sims generating set. -/
 theorem SimsGen.c3_simsRank_le (hS : SimsGen p u d X r) : simsRank G ≤ d.s := by
   unfold simsRank
   apply Nat.sInf_le
