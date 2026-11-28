@@ -1638,7 +1638,9 @@ theorem exists_sims_data_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.ca
     refine ⟨Nat.card G, e, ?_⟩
     rw [he, Subgroup.closure_univ]
     exact le_sup_left
-  obtain ⟨u, hu⟩ := Nat.sInf_mem hne
+  obtain ⟨u, hu⟩ : ∃ u : Fin (simsRank G) → G,
+      lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔ lcs G 2 :=
+    Nat.sInf_mem hne
   have hs : 2 ≤ simsRank G := by
     by_contra hlt
     have hk : simsRank G ≤ 1 := by omega
