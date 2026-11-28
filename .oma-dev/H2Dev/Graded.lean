@@ -118,12 +118,12 @@ theorem grOf_mul {i : ℕ} {g h : G} (hg : g ∈ F i) (hh : h ∈ F i) :
     grOf F i (g * h) = grOf F i g + grOf F i h := by
   rw [grOf_of_mem hg, grOf_of_mem hh, grOf_of_mem (Subgroup.mul_mem _ hg hh)]
   have e : (⟨g * h, Subgroup.mul_mem _ hg hh⟩ : F i) = ⟨g, hg⟩ * ⟨h, hh⟩ := rfl
-  rw [e, map_mul, Additive.ofMul_mul]
+  rw [e, map_mul, ofMul_mul]
 
 theorem grOf_one (i : ℕ) : grOf F i 1 = 0 := by
   rw [grOf_of_mem (Subgroup.one_mem _)]
   have e : (⟨1, Subgroup.one_mem _⟩ : F i) = 1 := rfl
-  rw [e, map_one, Additive.ofMul_one]
+  rw [e, map_one, ofMul_one]
 
 theorem grOf_inv {i : ℕ} {g : G} (hg : g ∈ F i) : grOf F i g⁻¹ = - grOf F i g := by
   have h := grOf_mul hg (Subgroup.inv_mem _ hg)
@@ -137,7 +137,7 @@ theorem grOf_pow {i : ℕ} {g : G} (hg : g ∈ F i) (k : ℕ) : grOf F i (g ^ k)
 
 theorem grOf_eq_zero_iff (hF : NSeries F) {i : ℕ} {g : G} (hg : g ∈ F i) :
     grOf F i g = 0 ↔ g ∈ F (i + 1) := by
-  rw [grOf_of_mem hg, Additive.ofMul_eq_zero, ← MonoidHom.mem_ker, ker_grPi hF i,
+  rw [grOf_of_mem hg, ofMul_eq_zero, ← MonoidHom.mem_ker, ker_grPi hF i,
     Subgroup.mem_subgroupOf]
 
 theorem grOf_of_mem_succ (hF : NSeries F) {i : ℕ} {g : G} (hg : g ∈ F (i + 1)) :
@@ -157,7 +157,7 @@ theorem grOf_surjective (F : ℕ → Subgroup G) (i : ℕ) (z : GrL F i) :
   refine ⟨x, x.2, ?_⟩
   rw [grOf_of_mem x.2]
   show Additive.ofMul (elemPi 0 (F i) (grK F i) x) = z
-  rw [hx, Additive.ofMul_toMul]
+  rw [hx, ofMul_toMul]
 
 /-- A chosen lift of `z ∈ L_i` to `F i`. -/
 noncomputable def grLift (F : ℕ → Subgroup G) (i : ℕ) (z : GrL F i) : G :=
@@ -435,13 +435,13 @@ theorem grToV_add (z z' : GrL (lcs G) 0) : grToV p G (z + z') = grToV p G z + gr
   obtain ⟨g, -, rfl⟩ := grOf_surjective (lcs G) 0 z
   obtain ⟨g', -, rfl⟩ := grOf_surjective (lcs G) 0 z'
   rw [← grOf_mul (mem_lcs_zero g) (mem_lcs_zero g'), grToV_mk, grToV_mk, grToV_mk, map_mul,
-    Additive.ofMul_mul]
+    ofMul_mul]
 
 theorem grToV_surjective : Function.Surjective (grToV p G) := by
   intro v
   obtain ⟨g, hg⟩ := piV_surjective (p := p) (Additive.toMul v)
   refine ⟨grOf (lcs G) 0 g, ?_⟩
-  rw [grToV_mk, hg, Additive.ofMul_toMul]
+  rw [grToV_mk, hg, ofMul_toMul]
 
 /-- `L_2 → W = L_2 / p L_2`. -/
 noncomputable def grToW (p : ℕ) (G : Type u) [Group G] (z : GrL (lcs G) 1) :
@@ -462,7 +462,7 @@ theorem grToW_add (z z' : GrL (lcs G) 1) : grToW p G (z + z') = grToW p G z + gr
   obtain ⟨g', hg', rfl⟩ := grOf_surjective (lcs G) 1 z'
   rw [← grOf_mul hg hg', grToW_mk hg, grToW_mk hg', grToW_mk (Subgroup.mul_mem _ hg hg')]
   have e : (⟨g * g', Subgroup.mul_mem _ hg hg'⟩ : lcs G 1) = ⟨g, hg⟩ * ⟨g', hg'⟩ := rfl
-  rw [e, map_mul, Additive.ofMul_mul]
+  rw [e, map_mul, ofMul_mul]
 
 theorem grToW_surjective : Function.Surjective (grToW p G) := by
   intro w
@@ -470,7 +470,7 @@ theorem grToW_surjective : Function.Surjective (grToW p G) := by
   refine ⟨grOf (lcs G) 1 a, ?_⟩
   rw [grToW_mk a.2]
   show Additive.ofMul (piW p G a) = w
-  rw [ha, Additive.ofMul_toMul]
+  rw [ha, ofMul_toMul]
 
 /-- Remark 2.6: `β_G(x mod p, y mod p) = [x, y]_L mod p` for `x, y ∈ L_1`. -/
 theorem remark_2_6 [Fact p.Prime] (x y : GrL (lcs G) 0) :
@@ -512,7 +512,7 @@ def grSub (F : ℕ → Subgroup G) (n : ℕ) (S : AddSubgroup (GrL F n)) : Subgr
 theorem mem_grSub (F : ℕ → Subgroup G) (n : ℕ) (S : AddSubgroup (GrL F n)) (g : G) :
     g ∈ grSub F n S ↔ g ∈ F n ∧ grOf F n g ∈ S := Iff.rfl
 
-theorem grSub_top (hF : NSeries F) {n : ℕ} {S : AddSubgroup (GrL F n)} (h : F n ≤ grSub F n S) :
+theorem grSub_top {n : ℕ} {S : AddSubgroup (GrL F n)} (h : F n ≤ grSub F n S) :
     S = ⊤ := by
   rw [eq_top_iff]
   intro z _
@@ -530,7 +530,7 @@ theorem succ_le_grSub (hF : NSeries F) (n : ℕ) (S : AddSubgroup (GrL F n)) :
 theorem closure_grOf_eq_top (hF : NSeries F) {i : ℕ} {X : Set G} (hX : X ⊆ F i)
     (h : F i ≤ Subgroup.closure X ⊔ F (i + 1)) :
     AddSubgroup.closure (grOf F i '' X) = ⊤ := by
-  refine grSub_top hF (h.trans (sup_le ?_ (succ_le_grSub hF i _)))
+  refine grSub_top (h.trans (sup_le ?_ (succ_le_grSub hF i _)))
   rw [Subgroup.closure_le]
   intro x hx
   exact (mem_grSub F i _ x).mpr ⟨hX hx, AddSubgroup.subset_closure ⟨x, hx, rfl⟩⟩
@@ -585,7 +585,7 @@ theorem core_L2_closure (hF : NSeries F) {s : ℕ} {u : ℕ → G} (hu : ∀ k <
       grBrHom hF 0 0 1 rfl a b ∈ AddSubgroup.closure (coreBr2 F s u) := by
     rintro _ ⟨a, ha, rfl⟩ _ ⟨b, hb, rfl⟩
     exact AddSubgroup.subset_closure ⟨a, ha, b, hb, rfl⟩
-  refine grSub_top hF (hcore.trans (sup_le ?_ (succ_le_grSub hF 1 _)))
+  refine grSub_top (hcore.trans (sup_le ?_ (succ_le_grSub hF 1 _)))
   rw [Subgroup.commutator_le]
   intro g1 hg1 g2 hg2
   obtain ⟨m1, c1⟩ := (mem_grSub F 0 _ _).mp (hH hg1)
@@ -626,7 +626,7 @@ theorem core_L3_closure (hF : NSeries F) {s : ℕ} {u : ℕ → G} (hu : ∀ k <
       AddSubgroup.subset_closure (Set.mem_univ w)
     have key := bil_mem_closure (grBrHom hF 1 0 2 rfl) hgen hv hw
     rwa [grBrHom_apply] at key
-  refine grSub_top hF (h2.trans (sup_le ?_ (succ_le_grSub hF 2 _)))
+  refine grSub_top (h2.trans (sup_le ?_ (succ_le_grSub hF 2 _)))
   rw [Subgroup.commutator_le]
   intro x hx y hy
   refine (mem_grSub F 2 _ _).mpr ⟨hF.comm_mem hx hy (by omega), ?_⟩
@@ -808,7 +808,7 @@ theorem log_le_mul_breadthOf [Finite N] {p : ℕ} (hp : p.Prime) {sN : ℕ}
     intro k hk
     have hd : Nat.card (ad (u k)).range ∣ p ^ sN := by
       rw [← hN]
-      exact AddSubgroup.card_subgroup_dvd_card _
+      exact Dvd.intro _ (AddSubgroup.card_mul_index _)
     obtain ⟨j, -, hj⟩ := (Nat.dvd_prime_pow hp).mp hd
     have hl : imLog p (ad (u k)) = j := by rw [imLog, hj, Nat.log_pow hp.one_lt]
     rw [hj]
@@ -849,7 +849,7 @@ theorem grBreadth_spec [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = 
   have hne : (C : Set (GrL F 0)).Nonempty := ⟨0, C.zero_mem⟩
   obtain ⟨h, hh, e⟩ := exists_breadthOf p (adHom hF i) hne
   refine ⟨⟨h, hh, e, ?_⟩, fun x hx => le_breadthOf p (adHom hF i) _ hx, ?_, ?_⟩
-  · rw [← e]
+  · rw [show grBreadth p hF i C = imLog p (adHom hF i h) from e.symm]
     exact (card_ker_eq hp (card_grL_pow hp hG hF i) (adHom hF i h)).1
   · have h1 := breadthOf_le_source p (adHom hF i) hne
     rw [card_grL_pow hp hG hF i, Nat.log_pow hp.one_lt] at h1
