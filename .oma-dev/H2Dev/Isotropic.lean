@@ -1424,8 +1424,3 @@ theorem isoCount_saturated_two_of_le {A : Matrix (Fin R) (Fin R) (ZMod 2)} (hA :
 end Final
 
 end OMA.SimsLite.Alt2
-
-#print axioms OMA.SimsLite.Alt2.exists_finrank_rad_add_two_mul
-#print axioms OMA.SimsLite.Alt2.isoCount_uniform_of_le
-#print axioms OMA.SimsLite.Alt2.isoCount_saturated_two_of_le
-#print axioms OMA.SimsLite.Alt2.sub_one_le_kappaH
