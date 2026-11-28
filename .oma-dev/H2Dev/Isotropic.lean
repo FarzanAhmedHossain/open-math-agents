@@ -917,7 +917,10 @@ lemma cast_prod_eq_isoQ {x : ℝ} (hxq : x * (Fintype.card F : ℝ) = 1) {h : �
   rw [h1, h2]
 
 /-- **Lemma 8.1 (upper bound, normalised form).** For an alternating `A` with `dim rad A = r0`
-and `R = r0 + 2a`:  `I_h(A) · Q(h) ≤ |Gr(h, X)| · Σ_{j ≤ h} P(h, j)`, `x = 1/q`. -/
+and `R = r0 + 2a`:  `I_h(A) · Q(h) ≤ |Gr(h, X)| · Σ_{j ≤ h} P(h, j)`, `x = 1/q`.
+Only this upper bound is formalized: the equality (93) and the identification of `P(h, j)`
+with the paper's summand are not proved here (the latter was checked numerically only).
+Downstream uses go through (95)/(96) (`isoCount_uniform`, `isoCount_saturated`). -/
 theorem isoCount_mul_isoQ_le (hA : IsAltMat A) {a r0 h : ℕ} (hr : finrank F (rad A) = r0)
     (hR : r0 + 2 * a = R) (hh : h ≤ R) {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1)
     (hxq : x * (Fintype.card F : ℝ) = 1) :
@@ -938,6 +941,86 @@ theorem isoCount_mul_isoQ_le (hA : IsAltMat A) {a r0 h : ℕ} (hr : finrank F (r
   have h3 := mul_le_mul_of_nonneg_left h1
     (Nat.cast_nonneg (α := ℝ) {H : Submodule F (Fin R → F) | finrank F H = h}.ncard)
   linarith
+
+/-! ### The rank of an alternating form is even
+
+A maximal isotropic subspace `H` containing `rad A` satisfies `H^⊥ = H`; then
+`2 dim H = R + dim rad A` by `finrank_orth`, so `R - dim rad A = 2 (dim H - dim rad A)`. -/
+
+lemma toBilin'_eq_bfL (A : Matrix (Fin R) (Fin R) F) (x z : Fin R → F) :
+    Matrix.toBilin' A x z = bfL x z A := by
+  rw [Matrix.toBilin'_apply', bfL_apply]
+
+lemma mem_orth_iff_bfL {A : Matrix (Fin R) (Fin R) F} {U : Submodule F (Fin R → F)}
+    {y : Fin R → F} :
+    y ∈ (Matrix.toBilin' A).orthogonal U ↔ ∀ u ∈ U, bfL u y A = 0 := by
+  rw [LinearMap.BilinForm.mem_orthogonal_iff]
+  refine forall₂_congr fun u _ => ?_
+  show Matrix.toBilin' A u y = 0 ↔ _
+  rw [toBilin'_eq_bfL]
+
+/-- Adjoining a vector of `U^⊥` to an isotropic `U` keeps it isotropic. -/
+lemma isotropic_sup_span {A : Matrix (Fin R) (Fin R) F} (hA : IsAltMat A)
+    {U : Submodule F (Fin R → F)} (hU : Isotropic A U) {y : Fin R → F}
+    (hy : y ∈ (Matrix.toBilin' A).orthogonal U) :
+    Isotropic A (Submodule.span F {y} ⊔ U) := by
+  have hy' := mem_orth_iff_bfL.1 hy
+  intro w1 hw1 w2 hw2
+  obtain ⟨a1, ha1, u1, hu1, rfl⟩ := Submodule.mem_sup.1 hw1
+  obtain ⟨a2, ha2, u2, hu2, rfl⟩ := Submodule.mem_sup.1 hw2
+  obtain ⟨c1, rfl⟩ := Submodule.mem_span_singleton.1 ha1
+  obtain ⟨c2, rfl⟩ := Submodule.mem_span_singleton.1 ha2
+  have e1 := bfL_self_eq_zero hA y
+  have e2 : bfL y u2 A = 0 := by rw [bfL_swap hA, hy' u2 hu2, neg_zero]
+  have e3 := hy' u1 hu1
+  have e4 := hU u1 hu1 u2 hu2
+  rw [← toBilin'_eq_bfL]
+  simp only [map_add, map_smul, LinearMap.add_apply, LinearMap.smul_apply, smul_eq_mul]
+  simp only [toBilin'_eq_bfL, e1, e2, e3, e4, mul_zero, add_zero]
+
+/-- Every isotropic `U ⊇ rad A` lies in an isotropic `H` with `H^⊥ ≤ H`. -/
+lemma exists_isotropic_orth_le (hA : IsAltMat A) :
+    ∀ n (U : Submodule F (Fin R → F)), Isotropic A U → rad A ≤ U → R - finrank F U = n →
+      ∃ H : Submodule F (Fin R → F),
+        Isotropic A H ∧ rad A ≤ H ∧ (Matrix.toBilin' A).orthogonal H ≤ H := by
+  intro n
+  induction n with
+  | zero =>
+    intro U hU hrU hn
+    by_cases hle : (Matrix.toBilin' A).orthogonal U ≤ U
+    · exact ⟨U, hU, hrU, hle⟩
+    · exfalso
+      obtain ⟨y, -, hyU⟩ := SetLike.not_le_iff_exists.1 hle
+      have h1 := finrank_span_sup hyU
+      have h2 := Submodule.finrank_le (Submodule.span F {y} ⊔ U)
+      rw [Module.finrank_fin_fun] at h2
+      omega
+  | succ n ih =>
+    intro U hU hrU hn
+    by_cases hle : (Matrix.toBilin' A).orthogonal U ≤ U
+    · exact ⟨U, hU, hrU, hle⟩
+    · obtain ⟨y, hy, hyU⟩ := SetLike.not_le_iff_exists.1 hle
+      refine ih _ (isotropic_sup_span hA hU hy) (hrU.trans le_sup_right) ?_
+      rw [finrank_span_sup hyU]
+      omega
+
+/-- **The rank of an alternating form is even**: `dim rad A + 2a = R` for some `a`. -/
+theorem exists_finrank_rad_add_two_mul (hA : IsAltMat A) :
+    ∃ a : ℕ, finrank F (rad A) + 2 * a = R := by
+  obtain ⟨H, hH, hrH, hHo⟩ := exists_isotropic_orth_le hA _ (rad A)
+    (fun x hx y _ => bfL_rad_left hx y) le_rfl rfl
+  have hle : H ≤ (Matrix.toBilin' A).orthogonal H :=
+    fun y hy => mem_orth_iff_bfL.2 fun u hu => hH u hu y hy
+  have hEq : (Matrix.toBilin' A).orthogonal H = H := le_antisymm hHo hle
+  have hf := finrank_orth A H
+  rw [hEq, inf_eq_right.2 hrH] at hf
+  have hm := Submodule.finrank_mono hrH
+  exact ⟨finrank F H - finrank F (rad A), by omega⟩
+
+/-- `R - dim rad A` is even for alternating `A`. -/
+theorem even_sub_finrank_rad (hA : IsAltMat A) : Even (R - finrank F (rad A)) := by
+  obtain ⟨a, ha⟩ := exists_finrank_rad_add_two_mul hA
+  exact ⟨a, by omega⟩
 
 end Count
 
@@ -1020,6 +1103,25 @@ lemma kappaH_of_le {h a : ℕ} (hah : h ≤ a + 1) : kappaH h a = h.choose 2 := 
   unfold kappaH
   rw [show min a (h - 1) = h - 1 by omega,
     Nat.choose_eq_zero_of_lt (by omega : h - (h - 1) < 2), Nat.sub_zero]
+
+lemma kappaH_mono (h : ℕ) {a b : ℕ} (hab : a ≤ b) : kappaH h a ≤ kappaH h b := by
+  unfold kappaH
+  exact Nat.sub_le_sub_left (Nat.choose_le_choose 2 (by omega)) _
+
+/-- `κ_h(1) = h - 1`. -/
+lemma kappaH_one (h : ℕ) : kappaH h 1 = h - 1 := by
+  unfold kappaH
+  rcases Nat.lt_or_ge h 2 with hh | hh
+  · interval_cases h <;> rfl
+  · obtain ⟨n, rfl⟩ : ∃ n, h = n + 2 := ⟨h - 2, by omega⟩
+    rw [show min 1 (n + 2 - 1) = 1 by omega, show n + 2 - 1 = n + 1 by omega,
+      show n + 2 = n + 1 + 1 by omega, choose_two_succ (n + 1)]
+    omega
+
+/-- `κ_h(a) ≥ κ_h(1) = h - 1` for `a ≥ 1`. -/
+lemma sub_one_le_kappaH {h a : ℕ} (ha : 1 ≤ a) : h - 1 ≤ kappaH h a := by
+  rw [← kappaH_one]
+  exact kappaH_mono h ha
 
 end Exponents
 
@@ -1285,6 +1387,38 @@ theorem isoCount_saturated_two {A : Matrix (Fin R) (Fin R) (ZMod 2)} (hA : IsAlt
     (isoCount A h : ℝ) * 2 ^ h.choose 2 ≤
       15 / 8 * ({H : Submodule (ZMod 2) (Fin R → ZMod 2) | finrank (ZMod 2) H = h}.ncard : ℝ) := by
   have := isoCount_saturated hA hr hR hah
+  rwa [ZMod.card, Nat.cast_ofNat] at this
+
+/-- (95) for an alternating `A` given only a rank lower bound: if `2b ≤ R - dim rad A` then
+`I_h(A) q^(κ_h(b)) ≤ 32 |Gr(h, X)|` (uses evenness of the rank and monotonicity of `κ_h`). -/
+theorem isoCount_uniform_of_le (hA : IsAltMat A) {b : ℕ} (hb : 2 * b ≤ R - finrank F (rad A))
+    (h : ℕ) :
+    (isoCount A h : ℝ) * (Fintype.card F : ℝ) ^ kappaH h b ≤
+      32 * ({H : Submodule F (Fin R → F) | finrank F H = h}.ncard : ℝ) := by
+  obtain ⟨a, ha⟩ := exists_finrank_rad_add_two_mul hA
+  have main := isoCount_uniform hA rfl ha h
+  have hk : kappaH h b ≤ kappaH h a := kappaH_mono h (by omega)
+  have hq : 0 < Fintype.card F := Fintype.card_pos
+  have hpow : (Fintype.card F : ℝ) ^ kappaH h b ≤ (Fintype.card F : ℝ) ^ kappaH h a := by
+    exact_mod_cast Nat.pow_le_pow_right hq hk
+  have hI0 : (0 : ℝ) ≤ isoCount A h := Nat.cast_nonneg _
+  exact (mul_le_mul_of_nonneg_left hpow hI0).trans main
+
+/-- (96) for an alternating `A` given only a rank lower bound: if `2(h-1) ≤ R - dim rad A` then
+`I_h(A) q^(C(h,2)) ≤ (15/8) |Gr(h, X)|`. -/
+theorem isoCount_saturated_of_le (hA : IsAltMat A) {h : ℕ}
+    (hh : 2 * (h - 1) ≤ R - finrank F (rad A)) :
+    (isoCount A h : ℝ) * (Fintype.card F : ℝ) ^ h.choose 2 ≤
+      15 / 8 * ({H : Submodule F (Fin R → F) | finrank F H = h}.ncard : ℝ) := by
+  obtain ⟨a, ha⟩ := exists_finrank_rad_add_two_mul hA
+  exact isoCount_saturated hA rfl ha (by omega)
+
+/-- `isoCount_saturated_of_le` over `F_2`. -/
+theorem isoCount_saturated_two_of_le {A : Matrix (Fin R) (Fin R) (ZMod 2)} (hA : IsAltMat A)
+    {h : ℕ} (hh : 2 * (h - 1) ≤ R - finrank (ZMod 2) (rad A)) :
+    (isoCount A h : ℝ) * 2 ^ h.choose 2 ≤
+      15 / 8 * ({H : Submodule (ZMod 2) (Fin R → ZMod 2) | finrank (ZMod 2) H = h}.ncard : ℝ) := by
+  have := isoCount_saturated_of_le hA hh
   rwa [ZMod.card, Nat.cast_ofNat] at this
 
 end Final
