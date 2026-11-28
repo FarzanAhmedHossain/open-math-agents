@@ -426,6 +426,18 @@ theorem cor_14_1_dim_bound {r1 s δ z : ℕ} (hz : z ≤ r1) (hz' : r1 ≤ z + s
       mul_le_mul_of_nonneg_left (by linarith) hs0
     nlinarith [h1, h2]
 
+/-- The division step of Corollary 14.1 (with Proposition 2.4): if each of the classes in `S`
+produces at least `T` array pairs, pairs of distinct classes are distinct (rigidity), and all of
+them lie among `E` counted pairs, then `#S · T ≤ #E`. -/
+theorem cor_14_1_div {ι α : Type*} [DecidableEq α] (S : Finset ι) (P : ι → Finset α)
+    (hdisj : ∀ x ∈ S, ∀ y ∈ S, x ≠ y → Disjoint (P x) (P y)) (E : Finset α)
+    (hsub : ∀ i ∈ S, P i ⊆ E) (T : ℕ) (hT : ∀ i ∈ S, T ≤ (P i).card) :
+    S.card * T ≤ E.card := by
+  calc S.card * T = ∑ _i ∈ S, T := by rw [Finset.sum_const, smul_eq_mul]
+    _ ≤ ∑ i ∈ S, (P i).card := Finset.sum_le_sum hT
+    _ = (S.biUnion P).card := (Finset.card_biUnion hdisj).symm
+    _ ≤ E.card := Finset.card_le_card (Finset.biUnion_subset.mpr hsub)
+
 /-- The exponent of (153): the saving of Proposition 13.2 (`k (r1 - k)` subspaces `K`, each
 imposing `s k r2` conditions) minus the multiplicity `z^2 - z k` of Proposition 13.1. -/
 theorem mult3_exponent_eq (r1 r2 s z k : ℝ) :
@@ -624,3 +636,11 @@ end Mult3Group
 end Mult3
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.Mult3.mult3_k_add_s_le
+#print axioms OMA.SimsLite.Mult3.prop_13_1_count
+#print axioms OMA.SimsLite.Mult3.prop_13_2_fiber
+#print axioms OMA.SimsLite.Mult3.rem_6_4_fiber
+#print axioms OMA.SimsLite.Mult3.cor_14_1_dim_bound
+#print axioms OMA.SimsLite.Mult3.cor_14_1_div
+#print axioms OMA.SimsLite.mult3_ncard_le_cnt3
