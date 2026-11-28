@@ -258,3 +258,5 @@ theorem cnt3_stmt : CNT3Stmt :=
 end CNT3Final
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.cnt3_stmt
