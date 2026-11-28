@@ -1365,7 +1365,7 @@ theorem pow_le_ncard_grass [Finite F] (hk : k ≤ n) :
     simpa [Pi.single_apply] using this.symm
   rw [← Nat.card_coe_set_eq]
   calc Nat.card F ^ (k * (n - k)) = Nat.card (Fin k → Fin (n - k) → F) := by
-        rw [Nat.card_fun, Nat.card_fun, Nat.card_fin, Nat.card_fin, ← pow_mul]
+        rw [Nat.card_fun, Nat.card_fun, Nat.card_fin, Nat.card_fin, ← pow_mul, mul_comm]
     _ ≤ Nat.card {U : Submodule F (Fin n → F) // finrank F U = k} :=
         Nat.card_le_card_of_injective code hc
     _ = Nat.card {U : Submodule F (Fin n → F) | finrank F U = k} := rfl
@@ -1489,5 +1489,116 @@ theorem exists_le_card_pow [Finite G] {p b c : ℕ} [Fact p.Prime] (hdvd : p ^ b
   Sylow.exists_subgroup_card_pow_prime_le p hdvd H hH hcb
 
 end SubgroupCount
+
+section Transport
+
+/-! Transport to an abstract bilinear map `B : V × V → W` (such as the group-level
+`OMA.SimsLite.lamLin`): in bases `bV`, `bW` it becomes the tuple `matTuple B bV bW`, with the same
+Sims rank. -/
+
+variable {F V W : Type*} [Field F] [AddCommGroup V] [Module F V] [AddCommGroup W] [Module F W]
+  {r1 r2 : ℕ}
+
+/-- `B(U × U)` spans `W`. -/
+def GensLin (B : V →ₗ[F] V →ₗ[F] W) (U : Submodule F V) : Prop :=
+  Submodule.span F {w | ∃ x ∈ U, ∃ y ∈ U, w = B x y} = ⊤
+
+/-- The Sims rank (91) of a bilinear map: `min {dim U : B(U × U)` spans `W}`. -/
+noncomputable def simsRkLin (B : V →ₗ[F] V →ₗ[F] W) : ℕ :=
+  sInf {d | ∃ U : Submodule F V, finrank F U = d ∧ GensLin B U}
+
+/-- The coordinate tuple of `B` in bases `bV`, `bW`: `(β_k)_{ij} = bW*_k (B(bV_i, bV_j))`. -/
+def matTuple (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V) (bW : Basis (Fin r2) F W) :
+    Fin r2 → Matrix (Fin r1) (Fin r1) F :=
+  fun k i j => bW.repr (B (bV i) (bV j)) k
+
+lemma equivFun_symm_single (b : Basis (Fin r1) F V) (i : Fin r1) :
+    b.equivFun.symm (Pi.single i 1) = b i := by
+  rw [Basis.equivFun_symm_apply]
+  simp [Pi.single_apply]
+
+/-- `β(x, y) = bW*(B(x, y))` in coordinates. -/
+theorem valL_matTuple (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V)
+    (bW : Basis (Fin r2) F W) (x y : Fin r1 → F) :
+    valL (matTuple B bV bW) x y =
+      bW.equivFun (B (bV.equivFun.symm x) (bV.equivFun.symm y)) := by
+  have h : valL (matTuple B bV bW) =
+      (B.compl₁₂ bV.equivFun.symm.toLinearMap bV.equivFun.symm.toLinearMap).compr₂
+        bW.equivFun.toLinearMap := by
+    refine LinearMap.ext_basis (Pi.basisFun F (Fin r1)) (Pi.basisFun F (Fin r1)) fun i j => ?_
+    show valL (matTuple B bV bW) (Pi.basisFun F (Fin r1) i) (Pi.basisFun F (Fin r1) j) =
+      bW.equivFun (B (bV.equivFun.symm (Pi.basisFun F (Fin r1) i))
+        (bV.equivFun.symm (Pi.basisFun F (Fin r1) j)))
+    rw [Pi.basisFun_apply, Pi.basisFun_apply, equivFun_symm_single, equivFun_symm_single,
+      valL_apply]
+    funext k
+    rw [bfL_single, Basis.equivFun_apply]
+    rfl
+  rw [h]
+  rfl
+
+/-- For alternating `B` the coordinate matrices are alternating. -/
+theorem matTuple_isAlt (B : V →ₗ[F] V →ₗ[F] W) (hB : ∀ x, B x x = 0) (bV : Basis (Fin r1) F V)
+    (bW : Basis (Fin r2) F W) (k : Fin r2) : IsAltMat (matTuple B bV bW k) := by
+  refine ⟨fun i => ?_, fun i j => ?_⟩
+  · show bW.repr (B (bV i) (bV i)) k = 0
+    rw [hB, map_zero, Finsupp.zero_apply]
+  · have h2 : B (bV j) (bV i) = -B (bV i) (bV j) := by
+      have := hB (bV i + bV j)
+      simp only [map_add, LinearMap.add_apply, hB, zero_add, add_zero] at this
+      rw [eq_neg_iff_add_eq_zero, add_comm]
+      exact this
+    show bW.repr (B (bV j) (bV i)) k = -bW.repr (B (bV i) (bV j)) k
+    rw [h2, map_neg, Finsupp.neg_apply]
+
+lemma map_map_equivFun (bV : Basis (Fin r1) F V) (U : Submodule F V) :
+    (U.map bV.equivFun.toLinearMap).map bV.equivFun.symm.toLinearMap = U := by
+  rw [← Submodule.map_comp]
+  convert Submodule.map_id U
+  ext v
+  simp
+
+/-- `β(∧²U) = W` iff `B(U' × U')` spans `W`, for `U'` the image of `U` in `V`. -/
+theorem gensOn_matTuple_iff (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V)
+    (bW : Basis (Fin r2) F W) (U : Submodule F (Fin r1 → F)) :
+    GensOn (matTuple B bV bW) U ↔ GensLin B (U.map bV.equivFun.symm.toLinearMap) := by
+  set U' := U.map bV.equivFun.symm.toLinearMap with hU'
+  set S : Set W := {w | ∃ x ∈ U', ∃ y ∈ U', w = B x y} with hS
+  have hv : vals (matTuple B bV bW) U = bW.equivFun.toLinearMap '' S := by
+    ext w
+    constructor
+    · rintro ⟨x, hx, y, hy, rfl⟩
+      refine ⟨B (bV.equivFun.symm x) (bV.equivFun.symm y),
+        ⟨_, Submodule.mem_map_of_mem hx, _, Submodule.mem_map_of_mem hy, rfl⟩, ?_⟩
+      exact (valL_matTuple B bV bW x y).symm
+    · rintro ⟨_, ⟨x', hx', y', hy', rfl⟩, rfl⟩
+      obtain ⟨x, hx, rfl⟩ := Submodule.mem_map.1 hx'
+      obtain ⟨y, hy, rfl⟩ := Submodule.mem_map.1 hy'
+      exact ⟨x, hx, y, hy, (valL_matTuple B bV bW x y).symm⟩
+  unfold GensOn GensLin
+  rw [hv, Submodule.span_image, Submodule.map_eq_top_iff (LinearEquiv.range _),
+    LinearEquiv.ker, sup_bot_eq]
+
+/-- The Sims rank of the coordinate tuple is the Sims rank of `B`. -/
+theorem simsRk_matTuple (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V)
+    (bW : Basis (Fin r2) F W) : simsRk (matTuple B bV bW) = simsRkLin B := by
+  unfold simsRk simsRkLin
+  congr 1
+  ext d
+  constructor
+  · rintro ⟨U, hU, hg⟩
+    exact ⟨U.map bV.equivFun.symm.toLinearMap, by rw [LinearEquiv.finrank_map_eq, hU],
+      (gensOn_matTuple_iff B bV bW U).1 hg⟩
+  · rintro ⟨U', hU', hg⟩
+    refine ⟨U'.map bV.equivFun.toLinearMap, by rw [LinearEquiv.finrank_map_eq, hU'], ?_⟩
+    rw [gensOn_matTuple_iff, map_map_equivFun]
+    exact hg
+
+/-- The coordinate tuple is surjective iff the values of `B` span `W`. -/
+theorem gensOn_top_matTuple_iff (B : V →ₗ[F] V →ₗ[F] W) (bV : Basis (Fin r1) F V)
+    (bW : Basis (Fin r2) F W) : GensOn (matTuple B bV bW) ⊤ ↔ GensLin B ⊤ := by
+  rw [gensOn_matTuple_iff, Submodule.map_top, LinearEquiv.range]
+
+end Transport
 
 end OMA.SimsLite.Alt2
