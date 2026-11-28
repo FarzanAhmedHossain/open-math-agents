@@ -416,6 +416,161 @@ theorem liqiao_thm_3_1 (c : ℕ) (r : Fin c → ℕ) (a : SimsIdx c r → ℕ) (
   (liqiao_thm_3_1_bound1 c r a).trans
     (Nat.pow_le_pow_right hp.out.pos (pwBound1_le_pwBound2 a ha))
 
+/-! ### Bridge from a Sims generating set with normal forms (Section 2.1, (25)-(27))
+
+`SimsGenSet p a g` records the data of a Sims generating set as in Section 2.1 of the paper:
+generators in the right lower central term, layer images forming a minimum generating set of
+`L_i`, positive relative orders with the relative order relation (25), and the Sims normal
+form (26), stated as uniqueness of coordinates together with existence of normal forms supported
+on the generators of each term `⟨g_{i,1}, ..., g_{i,j-1}, G_{i+1}⟩` of the Sims series.
+From this the power word array `B k = coord (g_k ^ p ^ a k)` gives `SimsPowerData`. -/
+
+/-- A minimum generating family of a group is irredundant. -/
+theorem irredundant_of_minimum {Q : Type u} [Group Q] {n : ℕ} (y : Fin n → Q)
+    (hmin : ∀ (m : ℕ) (z : Fin m → Q), Subgroup.closure (Set.range z) = ⊤ → n ≤ m)
+    (v : Fin n) : Subgroup.closure (y '' {w | w ≠ v}) ≠ ⊤ := by
+  intro htop
+  obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by have := v.isLt; omega⟩
+  have hr : Set.range (y ∘ v.succAbove) = y '' {w | w ≠ v} := by
+    rw [Set.range_comp, Fin.range_succAbove]
+    ext w
+    simp
+  have h := hmin m (y ∘ v.succAbove) (by rw [hr]; exact htop)
+  omega
+
+/-- Splitting an ordered product at the first nontrivial factor. -/
+theorem list_prod_ofFn_split {M : Type*} [Monoid M] (n : ℕ) : ∀ (f : Fin n → M) (i : Fin n),
+    (∀ u, u < i → f u = 1) →
+    (List.ofFn f).prod = f i * (List.ofFn fun u => if i < u then f u else 1).prod := by
+  induction n with
+  | zero => intro f i; exact i.elim0
+  | succ n ih =>
+    intro f i hf
+    rcases Fin.eq_zero_or_eq_succ i with rfl | ⟨i', rfl⟩
+    · simp [List.ofFn_succ, Fin.succ_pos]
+    · have hf0 : f 0 = 1 := hf 0 (Fin.succ_pos i')
+      have hrec := ih (fun u => f u.succ) i'
+        (fun u hu => hf u.succ (Fin.succ_lt_succ_iff.mpr hu))
+      rw [List.ofFn_succ, List.prod_cons, hf0, one_mul, hrec]
+      conv_rhs => rw [List.ofFn_succ, List.prod_cons]
+      simp [Fin.succ_lt_succ_iff, Fin.not_lt_zero]
+
+section Bridge
+
+variable {G : Type u} [Group G] {c : ℕ} {r : Fin c → ℕ}
+
+/-- The weight-`u` block `Π_v g_{u,v} ^ e(u,v)` (increasing `v`). -/
+def blockProd (g : SimsIdx c r → G) (e : SimsIdx c r → ℕ) (u : Fin c) : G :=
+  (List.ofFn fun v : Fin (r u) => g ⟨u, v⟩ ^ e ⟨u, v⟩).prod
+
+/-- The full Sims normal form product `Π_u Π_v g_{u,v} ^ e(u,v)` of (26). -/
+def fullProd (g : SimsIdx c r → G) (e : SimsIdx c r → ℕ) : G :=
+  (List.ofFn fun u : Fin c => blockProd g e u).prod
+
+/-- The term `⟨g_{i,v} : v < j⟩ G_{i+1}` of the Sims series (0-based `i`, `v`). -/
+def relSub (g : SimsIdx c r → G) (i : Fin c) (j : ℕ) : Subgroup G :=
+  Subgroup.closure {x | ∃ v : Fin (r i), v.val < j ∧ g ⟨i, v⟩ = x} ⊔ lcs G ((i : ℕ) + 1)
+
+/-- Coordinates supported on the generators of `relSub g i j`. -/
+def SupportedIn (i : Fin c) (j : ℕ) (e : SimsIdx c r → ℕ) : Prop :=
+  ∀ h : SimsIdx c r, (h.1 < i ∨ (h.1 = i ∧ j ≤ h.2.val)) → e h = 0
+
+/-- Sims normal form (26): coordinates are unique, and every element of a term of the Sims
+series has a normal form using only the generators of that term. -/
+structure SimsNormalForm (p : ℕ) (a : SimsIdx c r → ℕ) (g : SimsIdx c r → G) where
+  coord : G → (h : SimsIdx c r) → Fin (p ^ a h)
+  uniq : ∀ e : (h : SimsIdx c r) → Fin (p ^ a h), coord (fullProd g fun h => (e h).val) = e
+  sub : ∀ (i : Fin c) (j : ℕ) (x : G), x ∈ relSub g i j →
+    ∃ e : (h : SimsIdx c r) → Fin (p ^ a h),
+      SupportedIn i j (fun h => (e h).val) ∧ fullProd g (fun h => (e h).val) = x
+
+/-- The normal form of an element of a Sims series term is supported on its generators. -/
+theorem SimsNormalForm.coord_spec {p : ℕ} {a : SimsIdx c r → ℕ} {g : SimsIdx c r → G}
+    (nf : SimsNormalForm p a g) (i : Fin c) (j : ℕ) (x : G) (hx : x ∈ relSub g i j) :
+    SupportedIn i j (fun h => (nf.coord x h).val) ∧
+      fullProd g (fun h => (nf.coord x h).val) = x := by
+  obtain ⟨e, he, hprod⟩ := nf.sub i j x hx
+  have hc : nf.coord x = e := by
+    rw [← hprod]
+    exact nf.uniq e
+  rw [hc]
+  exact ⟨he, hprod⟩
+
+/-- A Sims generating set (Section 2.1): layer images form a minimum generating set of each
+layer, relative orders are positive and satisfy (25), and normal forms (26) exist. -/
+structure SimsGenSet (p : ℕ) (a : SimsIdx c r → ℕ) (g : SimsIdx c r → G) where
+  mem : ∀ k, g k ∈ lcs G k.1
+  gen : ∀ i : Fin c, Subgroup.closure (Set.range fun v : Fin (r i) =>
+      (QuotientGroup.mk (⟨g ⟨i, v⟩, mem ⟨i, v⟩⟩ : lcs G i) : LayerQ G i)) = ⊤
+  minimum : ∀ (i : Fin c) (n : ℕ) (y : Fin n → LayerQ G i),
+    Subgroup.closure (Set.range y) = ⊤ → r i ≤ n
+  pos : ∀ k, 1 ≤ a k
+  rel : ∀ (i : Fin c) (j : Fin (r i)), g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩ ∈ relSub g i j.val
+  nf : SimsNormalForm p a g
+
+/-- The power word array (27) of a Sims generating set. -/
+def SimsGenSet.powerWords {p : ℕ} {a : SimsIdx c r → ℕ} {g : SimsIdx c r → G}
+    (S : SimsGenSet p a g) : PWArray p c r a :=
+  fun k => S.nf.coord (g k ^ p ^ a k)
+
+/-- Bridge: the normal form coordinates of `g_{ij} ^ p ^ a(i,j)` give Sims power data. -/
+theorem SimsGenSet.powerData {p : ℕ} {a : SimsIdx c r → ℕ} {g : SimsIdx c r → G}
+    (S : SimsGenSet p a g) : SimsPowerData p a g S.powerWords where
+  mem := S.mem
+  gen := S.gen
+  irr := fun i v => irredundant_of_minimum _ (S.minimum i) v
+  pos := S.pos
+  supp := by
+    rintro ⟨i, j⟩ ⟨u, v⟩ h1 h2
+    have hs := (S.nf.coord_spec i j.val _ (S.rel i j)).1
+    refine hs ⟨u, v⟩ ?_
+    rcases lt_or_eq_of_le (not_lt.mp h1) with hu | hu
+    · exact Or.inl hu
+    · subst hu
+      exact Or.inr ⟨rfl, not_lt.mp fun hv => h2 ⟨rfl, hv⟩⟩
+  pow := by
+    intro i j
+    obtain ⟨hs, hprod⟩ := S.nf.coord_spec i j.val _ (S.rel i j)
+    show g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩ =
+      (List.ofFn fun v : Fin (r i) =>
+        g ⟨i, v⟩ ^ (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) ⟨i, v⟩).val).prod *
+      (List.ofFn fun u : Fin c => if i < u then
+        (List.ofFn fun v : Fin (r u) =>
+          g ⟨u, v⟩ ^ (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) ⟨u, v⟩).val).prod else 1).prod
+    have hf : ∀ u, u < i →
+        blockProd g (fun h => (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) h).val) u = 1 := by
+      intro u hu
+      refine List.prod_eq_one fun x hx => ?_
+      rw [List.mem_ofFn'] at hx
+      obtain ⟨v, rfl⟩ := hx
+      dsimp only
+      rw [hs ⟨u, v⟩ (Or.inl hu), pow_zero]
+    have hsplit := list_prod_ofFn_split _
+      (fun u => blockProd g (fun h => (S.nf.coord (g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩) h).val) u) i hf
+    conv_lhs => rw [← hprod]
+    exact hsplit
+
+end Bridge
+
+/-- The power word array of any Sims generating set of a finite p-group is realised. -/
+theorem SimsGenSet.mem_realizedPW {G : Type} [Group G] [Finite G] (hG : IsPGroup p G)
+    {c : ℕ} {r : Fin c → ℕ} {a : SimsIdx c r → ℕ} {g : SimsIdx c r → G}
+    (S : SimsGenSet p a g) : S.powerWords ∈ realizedPW p c r a :=
+  ⟨G, inferInstance, inferInstance, g, hG, S.powerData⟩
+
+/-- Theorem 3.1 for Sims generating sets: the power word arrays of Sims generating sets of finite
+p-groups, with fixed relative order array, number at most `p ^ PW`. -/
+theorem liqiao_thm_3_1_simsGenSet (c : ℕ) (r : Fin c → ℕ) (a : SimsIdx c r → ℕ)
+    (ha : ∀ k, 1 ≤ a k) :
+    {B : PWArray p c r a | ∃ (G : Type) (_ : Group G) (_ : Finite G) (g : SimsIdx c r → G)
+      (S : SimsGenSet p a g), IsPGroup p G ∧ S.powerWords = B}.ncard ≤ p ^ pwBound2 a := by
+  refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _)) (liqiao_thm_3_1 c r a ha)
+  rintro B ⟨G, _, _, g, S, hG, rfl⟩
+  exact S.mem_realizedPW hG
+
 end PowerWordGroup
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.liqiao_thm_3_1
+#print axioms OMA.SimsLite.liqiao_thm_3_1_simsGenSet
