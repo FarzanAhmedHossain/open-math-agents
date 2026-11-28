@@ -847,7 +847,7 @@ theorem ncard_alt_rank_le [Finite F] (ρ : ℕ) (hρ : ρ ≤ R) :
         exact hent ⟨(b, a), hab⟩
     apply Subtype.ext
     ext i j
-    have hdec : ∀ i : Fin R, ∃ k ∈ K A, ∀ l ∈ P (K A), (Pi.single i (1 : F) - k) l = 0 := by
+    have hdec : ∀ i : Fin R, ∃ k ∈ K A, ∀ l ∈ P (K A), ((Pi.single i (1 : F) : Fin R → F) - k) l = 0 := by
       intro i
       obtain ⟨k, hk, hkP⟩ := hPsurj (K A) (fun l => (Pi.single i (1 : F) : Fin R → F) l)
       refine ⟨k, hk, fun l hl => ?_⟩
