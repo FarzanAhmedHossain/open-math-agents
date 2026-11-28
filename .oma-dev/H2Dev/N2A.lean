@@ -96,7 +96,7 @@ theorem n2a_exists_tuple [FiniteDimensional F V] (S : Set V) : ∀ (k : ℕ) (U 
         Submodule.span_mono (Set.singleton_subset_iff.2 hxS)
       apply le_antisymm
       · exact sup_le (sup_le (hx.trans le_sup_right) le_sup_left) le_sup_right
-      · exact sup_le (le_sup_left.trans le_sup_right) le_sup_right
+      · exact sup_le (le_sup_right.trans le_sup_left) le_sup_right
     obtain ⟨w, hwS, hw⟩ := ih (Submodule.span F {x} ⊔ U) (by rw [hsup, hU']; omega)
     refine ⟨Fin.cons x w, ?_, ?_⟩
     · intro i
@@ -130,7 +130,7 @@ lemma n2a_ncard_biUnion_le {ι α : Type*} [DecidableEq ι] (I : Finset ι) (T :
 /-- Submodules of a finite module form a finite type. -/
 lemma n2a_finite_submodule [Finite V] : Finite (Submodule F V) :=
   Finite.of_injective (fun p : Submodule F V => fun x : V => x ∈ p)
-    (fun p q hpq => SetLike.ext fun x => Iff.of_eq (congrFun hpq x))
+    (fun _ _ hpq => SetLike.ext fun x => Iff.of_eq (congrFun hpq x))
 
 /-- `n ≤ 2 ^ k` gives `log_2 n ≤ k` in the reals. -/
 theorem n2a_logb_le {n k : ℕ} (h : n ≤ 2 ^ k) : Real.logb 2 (n : ℝ) ≤ k := by
@@ -482,13 +482,13 @@ theorem prop92 {M h : ℕ} (hhR : h ≤ R) (hM : M + 1 ≤ h.choose 2) :
     intro 𝒜 h𝒜
     obtain ⟨hAlt, hdim, hH⟩ := mem_hollowSet.1 h𝒜
     have hk := hollow_lowrank_dim hAlt hdim hH hhR (by omega) hcase
-    obtain ⟨v, hvS, hv⟩ := n2a_exists_tuple
+    obtain ⟨v, hvS, hv⟩ := n2a_exists_tuple (F := ZMod 2)
       {A | A ∈ 𝒜 ∧ R - finrank (ZMod 2) (rad A) ≤ 2 * a} (h - 10) ⊥
       (by rw [bot_sup_eq, finrank_bot]; omega)
     rw [bot_sup_eq, finrank_bot, zero_add] at hv
     have hUle : Submodule.span (ZMod 2) (Set.range v) ≤ 𝒜 :=
       Submodule.span_le.2 (Set.range_subset_iff.2 fun i => (hvS i).1)
-    obtain ⟨w, hwS, hw⟩ := n2a_exists_tuple (𝒜 : Set (Matrix (Fin R) (Fin R) (ZMod 2)))
+    obtain ⟨w, hwS, hw⟩ := n2a_exists_tuple (F := ZMod 2) (𝒜 : Set (Matrix (Fin R) (Fin R) (ZMod 2)))
       (M - (h - 10)) (Submodule.span (ZMod 2) (Set.range v))
       (by rw [Submodule.span_eq, sup_eq_right.2 hUle, hv, hdim]; omega)
     have heq : Submodule.span (ZMod 2) (Set.range v) ⊔ Submodule.span (ZMod 2) (Set.range w) =
@@ -554,7 +554,7 @@ theorem nonmin_decomp {M h : ℕ} {𝒜 : Submodule (ZMod 2) (Matrix (Fin R) (Fi
   have hfl : finrank (ZMod 2) 𝒝 < M := by
     have := Submodule.finrank_lt_finrank_of_lt hlt
     rwa [hdim] at this
-  obtain ⟨w, hwS, hw⟩ := n2a_exists_tuple (𝒜 : Set (Matrix (Fin R) (Fin R) (ZMod 2)))
+  obtain ⟨w, hwS, hw⟩ := n2a_exists_tuple (F := ZMod 2) (𝒜 : Set (Matrix (Fin R) (Fin R) (ZMod 2)))
     (M - 1 - finrank (ZMod 2) 𝒝) 𝒝
     (by rw [Submodule.span_eq, sup_eq_right.2 hlt.le, hdim]; omega)
   obtain ⟨𝒞, h𝒞⟩ : ∃ 𝒞, 𝒞 = 𝒝 ⊔ Submodule.span (ZMod 2) (Set.range w) := ⟨_, rfl⟩
@@ -570,7 +570,7 @@ theorem nonmin_decomp {M h : ℕ} {𝒜 : Submodule (ZMod 2) (Matrix (Fin R) (Fi
     omega
   have h𝒞mem : 𝒞 ∈ hollowSet R (M - 1) h :=
     mem_hollowSet.2 ⟨h𝒞le.trans hAlt, h𝒞dim, n2a_isHollowing_mono hB𝒞 hB⟩
-  obtain ⟨x, hxS, hx⟩ := n2a_exists_tuple (𝒜 : Set (Matrix (Fin R) (Fin R) (ZMod 2))) 1 𝒞
+  obtain ⟨x, hxS, hx⟩ := n2a_exists_tuple (F := ZMod 2) (𝒜 : Set (Matrix (Fin R) (Fin R) (ZMod 2))) 1 𝒞
     (by rw [Submodule.span_eq, sup_eq_right.2 h𝒞le, h𝒞dim, hdim]; omega)
   have heq : 𝒞 ⊔ Submodule.span (ZMod 2) (Set.range x) = 𝒜 :=
     Submodule.eq_of_le_of_finrank_eq
