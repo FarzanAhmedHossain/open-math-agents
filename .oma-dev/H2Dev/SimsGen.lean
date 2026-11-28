@@ -1699,9 +1699,7 @@ lemma gLay_cVal_w3 (s : ℕ) (u : ℕ → G) (L : SLay G) (K : Subgroup G) {i : 
       cCor s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i)) ∨
       ((1 : ℕ) = 1 ∧ L.cor (cPar s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i)) <
         cCor s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i)) := Or.inr ⟨rfl, hlt⟩
-  have h1 : cVal s u 1 L (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i) = 1 := by
-    unfold cVal
-    rw [if_pos hc]
+  have h1 : cVal s u 1 L (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i) = 1 := if_pos hc
   rw [h1]
   exact one_mem _
 
@@ -2714,7 +2712,7 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
     have h5 : ((fDf L r pa co t).1).val - fOff (fLen L r) (0 + 1) =
         pa (1 + 1) (t.val - fOff (fLen L r) (1 + 1)) := by
       rw [h1]
-      exact Nat.add_sub_cancel_left
+      exact Nat.add_sub_cancel_left _ _
     show ((fDf L r pa co t).2).val ≤ ((fDf L r pa co (fDf L r pa co t).1).2).val
     rw [h4, h2, h5]
     exact Hw3 _ hi
