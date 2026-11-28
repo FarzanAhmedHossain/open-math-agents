@@ -278,9 +278,9 @@ theorem cnt3_cfactor_A (D : RecData m) (hL : cnt3Layers r1 r2 s m2 m3 D)
       ∑ β ∈ cnt3Adm s m2 m3, cnt3Aterm r1 r2 s m2 m3 β := by
   obtain ⟨h2, h3, hs, hr1, hr2, hs2, hs3⟩ := hL
   have h := lf_realizedCB_ncard_le Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D h2 h3 B
-  rw [hs2, hs3, hr1, hr2, hs] at h
+  rw [hs2, hs3, hr1, hr2] at h
   refine h.trans (le_of_eq ?_)
-  rw [Finset.sum_mul]
+  rw [hs, Finset.sum_mul]
   rfl
 
 /-- The facts used by the assembly, for a nonempty parameter set. -/
@@ -302,8 +302,8 @@ theorem cnt3_setup (hPW : HypPW) (hne : (cnt3Set m r1 r2 s lam m2 m3 r3).Nonempt
     obtain ⟨h2, -, -, -, hr2, hs2, -⟩ := hL
     have hsum : ∑ _v : Fin (fibRk D (lfI1 h2)), 1 ≤ ∑ v, fibAk D ⟨lfI1 h2, v⟩ :=
       Finset.sum_le_sum fun v _ => fibAk_pos D _
-    simp only [Finset.sum_const, Finset.card_univ, Fintype.card_fin, smul_eq_mul,
-      mul_one] at hsum
+    have hcard : ∑ _v : Fin (fibRk D (lfI1 h2)), (1 : ℕ) = fibRk D (lfI1 h2) := by
+      rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, smul_eq_mul, mul_one]
     omega
   have hC : C ∈ realizedCB Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D B :=
     ⟨G, hG, hcode⟩
