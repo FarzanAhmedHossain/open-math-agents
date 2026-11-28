@@ -721,10 +721,3 @@ end Frame
 
 end OMA.SimsLite
 
-#print axioms OMA.SimsLite.frame_core_flag
-#print axioms OMA.SimsLite.frame_core_bounds
-#print axioms OMA.SimsLite.finrank_V
-#print axioms OMA.SimsLite.lamLin_span
-#print axioms OMA.SimsLite.rank_lcs_quot_eq_r2
-#print axioms OMA.SimsLite.core_iff_lcs
-#print axioms OMA.SimsLite.sims_core_bounds_rank

@@ -584,5 +584,3 @@ end PowerWordGroup
 
 end OMA.SimsLite
 
-#print axioms OMA.SimsLite.liqiao_thm_3_1
-#print axioms OMA.SimsLite.liqiao_thm_3_1_simsGenSet
