@@ -1175,3 +1175,6 @@ end Mult3Cover
 end Mult3
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.Mult3.cnt3Set_mem_mult3Set
+#print axioms OMA.SimsLite.Mult3.mult3_z_add_s_le
