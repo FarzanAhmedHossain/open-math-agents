@@ -407,7 +407,7 @@ structure Struct (d : SimsData) : Prop where
 
 /-- Validity of Sims data: the shape, and the zero patterns of the power word and commutator
 coefficient arrays. -/
-structure Valid (d : SimsData) extends Struct d : Prop where
+structure Valid (d : SimsData) : Prop extends Struct d where
   b_supp : ∀ t u, d.b t u ≠ 0 → d.prec t u
   c_supp : ∀ t k u, d.c t k u ≠ 0 → d.lv t < d.lv u
 
@@ -1189,7 +1189,7 @@ lemma bLv_spec {s r L t : ℕ} (ht : t < bOff s r (L + 1)) :
   · rw [hL]
     exact ht
   · have h4 := Nat.findGreatest_is_greatest (P := fun w => bOff s r w ≤ t)
-      (k := bLv s r L t + 1) (by unfold bLv; omega) (by omega)
+      (n := L) (k := bLv s r L t + 1) (by unfold bLv; omega) (by omega)
     exact not_le.mp h4
 
 lemma bLv_mono {s r L t t' : ℕ} (ht' : t' < bOff s r (L + 1)) (h : t ≤ t') :
@@ -1316,12 +1316,14 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
         have := (bData_s_le : s ≤ bOff s r (L + 1))
         omega
       show bLv s r L (bFin _ (bPair s (t.val - bOff s r 1)).1 t).val + 1 = 1
-      rw [bFin_val t hn, bLv_small (by omega)]
+      rw [bFin_val (n := bOff s r (L + 1)) t hn, bLv_small (by omega)]
     · rw [bDf_two t hw]
       rw [hw] at hsp
       obtain ⟨h1, h2, h3⟩ := hsp
+      have h1' : bOff s r (w + 2) ≤ t.val := h1
+      have h2' : t.val < bOff s r (w + 2) + bLen s r (w + 1) * s := h2
+      have h3' : w + 2 ≤ L := h3
       have hi : t.val - bOff s r (w + 2) < bLen s r (w + 1) * s := by
-        have : bOff s r (w + 2 + 1) = bOff s r (w + 2) + bLen s r (w + 1) * s := rfl
         omega
       have hdiv : (t.val - bOff s r (w + 2)) / s < bLen s r (w + 1) :=
         (Nat.div_lt_iff_lt_mul hspos).mpr hi
@@ -1332,7 +1334,8 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
         omega
       show bLv s r L (bFin _ (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val + 1 =
         w + 2
-      rw [bFin_val t hn, bLv_eq (w := w + 1) (by omega) (by omega) (by omega)]
+      rw [bFin_val (n := bOff s r (L + 1)) t hn,
+        bLv_eq (w := w + 1) (by omega) (by omega) (by omega)]
   · intro t ht
     show ((bDf s r L t).2).val < s
     have hsl : s ≤ bOff s r (L + 1) := bData_s_le
@@ -1347,12 +1350,12 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
         · exact Nat.mod_lt _ hspos
         · omega
       show (bFin _ (bPair s (t.val - bOff s r 1)).2 t).val < s
-      rw [bFin_val t (by omega)]
+      rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
       exact hp2
     · rw [bDf_two t hw]
       have hp2 : (t.val - bOff s r (w + 2)) % s < s := Nat.mod_lt _ hspos
       show (bFin _ ((t.val - bOff s r (w + 2)) % s) t).val < s
-      rw [bFin_val t (by omega)]
+      rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
       exact hp2
   · intro t ht
     have ht' : bLv s r L t.val = 1 := ht
@@ -1369,7 +1372,8 @@ lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
       split_ifs with h
       · exact Nat.mod_lt _ hspos
       · omega
-    rw [bFin_val t (by omega), bFin_val t (by omega)]
+    rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le (lt_trans hp1 hp2) hsl),
+      bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
     exact hp1
 
 
@@ -1392,13 +1396,13 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
   have hd := bData_struct (r := r) (L := L) hs
   have hsl : s ≤ bOff s r (L + 1) := bData_s_le
   -- the core positions
-  have hXc : ∀ k (hk : k < s), bX (L := L) u v ⟨k, by omega⟩ = u ⟨k, hk⟩ := by
+  have hXc : ∀ k (hk : k < s), bX (L := L) u v ⟨k, lt_of_lt_of_le hk hsl⟩ = u ⟨k, hk⟩ := by
     intro k hk
     rw [bX_core u v _ hk rfl, bCore_lt u hk]
   have hgen : Subgroup.closure (Set.range (bX (L := L) u v)) = ⊤ := by
     rw [eq_top_iff, ← hUV, Subgroup.closure_le]
     rintro _ (⟨a, rfl⟩ | ⟨j, rfl⟩)
-    · exact Subgroup.subset_closure ⟨⟨a.val, by omega⟩, by rw [hXc a.val a.isLt]⟩
+    · exact Subgroup.subset_closure ⟨⟨a.val, lt_of_lt_of_le a.isLt hsl⟩, by rw [hXc a.val a.isLt]⟩
     · have hj := j.isLt
       have hn : s + j.val < (bData s r L).n := by
         have := bOff_mono (s := s) (r := r) (show 1 ≤ L + 1 by omega)
@@ -1426,13 +1430,16 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
         split_ifs with h
         · exact Nat.mod_lt _ hspos
         · omega
-      rw [bX_core u v _ hp1 (bFin_val t (by omega)), bX_core u v _ hp2 (bFin_val t (by omega))]
+      rw [bX_core u v _ hp1 (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp1 hsl)),
+        bX_core u v _ hp2 (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl))]
       rfl
     · rw [bDf_two t hw, bX_eq u v t hw]
       rw [hw] at hsp
       obtain ⟨h1, h2, h3⟩ := hsp
+      have h1' : bOff s r (w + 2) ≤ t.val := h1
+      have h2' : t.val < bOff s r (w + 2) + bLen s r (w + 1) * s := h2
+      have h3' : w + 2 ≤ L := h3
       have hi : t.val - bOff s r (w + 2) < bLen s r (w + 1) * s := by
-        have : bOff s r (w + 2 + 1) = bOff s r (w + 2) + bLen s r (w + 1) * s := rfl
         omega
       have hdiv : (t.val - bOff s r (w + 2)) / s < bLen s r (w + 1) :=
         (Nat.div_lt_iff_lt_mul hspos).mpr hi
@@ -1442,12 +1449,12 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
       have hn : bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s < bOff s r (L + 1) := by
         omega
       have hm : (t.val - bOff s r (w + 2)) % s < s := Nat.mod_lt _ hspos
-      have hlv1 : bLv s r L (bFin _ (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val =
-          w + 1 := by
-        rw [bFin_val t hn]
+      have hlv1 : bLv s r L (bFin (bOff s r (L + 1))
+          (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val = w + 1 := by
+        rw [bFin_val (n := bOff s r (L + 1)) t hn]
         exact bLv_eq (by omega) (by omega) (by omega)
-      rw [bX_eq u v _ hlv1, bFin_val t hn, Nat.add_sub_cancel_left,
-        bX_core u v _ hm (bFin_val t (by omega))]
+      rw [bX_eq u v _ hlv1, bFin_val (n := bOff s r (L + 1)) t hn, Nat.add_sub_cancel_left,
+        bX_core u v _ hm (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hm hsl))]
       rfl
   have hlv := lv_mem_lcs (bData s r L) hd (bX u v) hdf
   -- weight-1 commutators of core generators are weight-2 entries
@@ -1456,6 +1463,7 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
     intro a b hab
     have hi : a.val * s + b.val < s * s := slot_lt a.isLt b.isLt
     have h2 : bOff s r 2 = bOff s r 1 + s * s := rfl
+    have h2' : bOff s r (1 + 1) = bOff s r 1 + s * s := rfl
     have hle := bOff_mono (s := s) (r := r) (show 2 ≤ L + 1 by omega)
     have hn : bOff s r 1 + (a.val * s + b.val) < (bData s r L).n := by
       show _ < bOff s r (L + 1)
@@ -1463,7 +1471,7 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
     have hlv1 : bLv s r L (bOff s r 1 + (a.val * s + b.val)) = 1 :=
       bLv_eq hL1 (by omega) (by omega)
     refine ⟨⟨_, hn⟩, hlv1, ?_⟩
-    rw [bX_eq u v _ hlv1]
+    rw [bX_eq u v ⟨_, hn⟩ hlv1]
     show bVal u v 1 (bOff s r 1 + (a.val * s + b.val) - bOff s r 1) = ⁅u a, u b⁆
     rw [Nat.add_sub_cancel_left]
     have hpr : bPair s (a.val * s + b.val) = (a.val, b.val) := by
@@ -1522,7 +1530,7 @@ theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin
       have hlv2 : bLv s r L (bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val)) =
           w + 2 := bLv_eq hwL (by omega) (by omega)
       refine Subgroup.mem_sup_left (Subgroup.subset_closure ⟨⟨_, hn⟩, hlv2, ?_⟩)
-      rw [bX_eq u v _ hlv2, bX_eq u v t hw, bX_core u v k hk rfl]
+      rw [bX_eq u v ⟨_, hn⟩ hlv2, bX_eq u v t hw, bX_core u v k hk rfl]
       show bVal u v (w + 2) (bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) -
         bOff s r (w + 2)) = _
       rw [Nat.add_sub_cancel_left]
@@ -1582,9 +1590,10 @@ theorem exists_sims_data [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G 
     show bLv s r (N + 1) t.val = 0 ↔ t.val < s + r
     constructor
     · intro h0
-      obtain ⟨-, h2, -⟩ := bLv_spec t.isLt
+      have htn : t.val < bOff s r (N + 1 + 1) := t.isLt
+      obtain ⟨-, h2, -⟩ := bLv_spec htn
       rw [h0] at h2
-      have h1 : bOff s r 1 = 0 + (s + r) := rfl
+      have h2' : t.val < 0 + (s + r) := h2
       omega
     · exact bLv_small
   · intro t h
