@@ -654,11 +654,14 @@ theorem ncard_grass_le_pivot [Finite F] (k : ℕ) :
     refine ⟨S, hS.trans U.2, fun i => if h : i ∈ S then u' ⟨i, h⟩ else 0, ?_, ?_, hinj⟩
     · intro i
       by_cases h : i ∈ S
-      · rw [dif_pos h]
+      · dsimp only
+        rw [dif_pos h]
         exact hu'U _
-      · rw [dif_neg h]
+      · dsimp only
+        rw [dif_neg h]
         exact U.1.zero_mem
     · intro i hi j hj
+      dsimp only
       rw [dif_pos hi, hu' ⟨i, hi⟩ ⟨j, hj⟩]
       simp [Pi.single_apply]
   choose S hS u hu hpiv hinj using hdata
