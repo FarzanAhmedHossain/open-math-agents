@@ -5,3 +5,6 @@ H2Dev.SimsGen
 H2Dev.DataCount
 H2Dev.PowerWords
 H2Dev.Graded
+H2Dev.Breadth
+H2Dev.Alt2
+H2Dev.Bridge
