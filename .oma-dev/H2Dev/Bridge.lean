@@ -1308,5 +1308,304 @@ theorem ncard_classes_le_closed (p m : ℕ) (hp : p.Prime) (hm : 1 ≤ m) :
 
 end DataBridge
 
-end OMA.SimsLite
+/-! ### Part 3: the fibrewise count and the link with Theorem 3.1
 
+For a set `T` of groups and recorded data `D : RecData m`, `realizedB hp T D` and
+`realizedC hp T D` are the power word arrays and commutator coefficient arrays occurring in the
+Sims codes (with recorded component `D`) of groups of `T`. `ncard_classes_le_fiber` is INF-1
+fibred over the recorded data: the number of classes of `T` is at most
+`Σ_{D ∈ I} N_b(D) N_c(D)` whenever every group of `T` has a code whose recorded component lies in
+`I`. `SimsGen.powerWords_toSimsGenSet` identifies the power word array of the code with the power
+word array (27) of the `SimsGenSet` of Part 1, and `ncard_realizedB_le` bounds `N_b(D)` by the
+number of realised power word arrays of Theorem 3.1 for the layer ranks and relative orders read
+off `D`; `ncard_classes_le_fiber_pw` combines the two. -/
+
+section FiberCount
+
+variable {G : Type u} [Group G] {p : ℕ} {u : ℕ → G} {d : SimsData} {X : Fin d.n → G}
+  {r : ℕ → ℕ}
+
+lemma SimsGen.brA_brEquiv (hS : SimsGen p u d X r) {c : ℕ} (hn : d.n = fOff r c)
+    (k : SimsIdx c (brR r c)) : brA d (fOff r k.1.val + k.2.val) = d.a (hS.brEquiv hn k) := by
+  unfold brA
+  exact dif_pos (hS.brEquiv hn k).isLt
+
+lemma SimsGen.brB_brEquiv (hS : SimsGen p u d X r) {c : ℕ} (hn : d.n = fOff r c)
+    (k k' : SimsIdx c (brR r c)) :
+    brB d (fOff r k.1.val + k.2.val) (fOff r k'.1.val + k'.2.val) =
+      d.b (hS.brEquiv hn k) (hS.brEquiv hn k') := by
+  unfold brB
+  exact dif_pos ⟨(hS.brEquiv hn k).isLt, (hS.brEquiv hn k').isLt⟩
+
+/-- The power word array (27) of the `SimsGenSet` of Part 1 is the power word array `d.b` of
+the Sims data, through `brEquiv`. -/
+lemma SimsGen.powerWords_toSimsGenSet [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r)
+    {c : ℕ} (hn : d.n = fOff r c) (k k' : SimsIdx c (brR r c)) :
+    ((hS.toSimsGenSet hp hn).powerWords k k').val = d.b (hS.brEquiv hn k) (hS.brEquiv hn k') := by
+  have hx := Classical.choose_spec
+    (hS.nf_exists (X (hS.brEquiv hn k) ^ p ^ d.a (hS.brEquiv hn k)))
+  have h2 := hS.nf_unique _ (d.b (hS.brEquiv hn k)) hx.1 (fun t => hS.bounded.1 _ t)
+    (hx.2.symm.trans (hS.realizes.pow _))
+  show Classical.choose (hS.nf_exists (X (hS.brEquiv hn k) ^ p ^ d.a (hS.brEquiv hn k)))
+    (hS.brEquiv hn k') = _
+  rw [h2]
+
+/-- The flattened power word component `brB` of the code is the power word array of the
+`SimsGenSet` of Part 1. -/
+lemma SimsGen.brB_eq_powerWords [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r)
+    {c : ℕ} (hn : d.n = fOff r c) (k k' : SimsIdx c (brR r c)) :
+    brB d (hS.brEquiv hn k).val (hS.brEquiv hn k').val =
+      ((hS.toSimsGenSet hp hn).powerWords k k').val := by
+  rw [hS.powerWords_toSimsGenSet hp hn]
+  exact hS.brB_brEquiv hn k k'
+
+lemma brLayer_of_lt (r : ℕ → ℕ) : ∀ c i, i < fOff r c → ∃ w < c, ∃ v < r w, i = fOff r w + v
+  | 0, i, h => absurd h (by show ¬ i < 0; omega)
+  | c + 1, i, h => by
+    by_cases hi : i < fOff r c
+    · obtain ⟨w, hw, v, hv, e⟩ := brLayer_of_lt r c i hi
+      exact ⟨w, by omega, v, hv, e⟩
+    · rw [fOff_succ] at h
+      exact ⟨c, by omega, i - fOff r c, by omega, by omega⟩
+
+/-- A flattened array as a function on `ℕ` (`0` outside the range). -/
+def flatB {n q : ℕ} (B : Fin n → Fin n → Fin q) (i j : ℕ) : ℕ :=
+  if h : i < n ∧ j < n then (B ⟨i, h.1⟩ ⟨j, h.2⟩).val else 0
+
+lemma flatB_fin {n q : ℕ} (B : Fin n → Fin n → Fin q) (i j : Fin n) :
+    flatB B i.val j.val = (B i j).val := by
+  unfold flatB
+  rw [dif_pos ⟨i.isLt, j.isLt⟩]
+
+/-- The layer ranks of recorded data, on `ℕ`. -/
+def fibR {m : ℕ} (D : RecData m) (i : ℕ) : ℕ :=
+  if h : i < D.1.val then (D.2.2.1.1 ⟨i, h⟩).val else 0
+
+/-- The relative order array of recorded data, flattened on `ℕ`. -/
+def fibA {m : ℕ} (D : RecData m) (j : ℕ) : ℕ :=
+  if h : j < D.2.2.1.tot then (D.2.2.2.2.2.1 ⟨j, h⟩).val else 0
+
+/-- The layer ranks of recorded data, on `Fin c`. -/
+abbrev fibRk {m : ℕ} (D : RecData m) : Fin D.1.val → ℕ := brR (fibR D) D.1.val
+
+/-- The relative order array of recorded data, indexed by `SimsIdx`. -/
+def fibAk {m : ℕ} (D : RecData m) : SimsIdx D.1.val (fibRk D) → ℕ :=
+  fun k => fibA D (fOff (fibR D) k.1.val + k.2.val)
+
+lemma fibTot {m : ℕ} (D : RecData m) : D.2.2.1.tot = fOff (fibR D) D.1.val := by
+  unfold RankVec.tot
+  rw [← sum_fin_eq_fOff]
+  refine Finset.sum_congr rfl fun i _ => ?_
+  unfold fibR
+  rw [dif_pos i.isLt]
+
+lemma fibPos_lt {m : ℕ} (D : RecData m) (k : SimsIdx D.1.val (fibRk D)) :
+    fOff (fibR D) k.1.val + k.2.val < D.2.2.1.tot :=
+  brPos_lt (fibR D) (fibTot D) k.1 k.2
+
+lemma fibAk_pos {m : ℕ} (D : RecData m) (k : SimsIdx D.1.val (fibRk D)) : 1 ≤ fibAk D k := by
+  unfold fibAk fibA
+  rw [dif_pos (fibPos_lt D k)]
+  exact D.2.2.2.2.2.2.1 _
+
+/-- The power word arrays of the Sims codes, with recorded component `D`, of groups of `T`. -/
+def realizedB {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0}) (D : RecData m) :
+    Set (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) :=
+  {B | ∃ G ∈ T, ∃ C, SimsCode hp m G (⟨D, (B, C)⟩ : FullData p m)}
+
+/-- The commutator coefficient arrays of the Sims codes, with recorded component `D`, of groups
+of `T`. -/
+def realizedC {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0}) (D : RecData m) :
+    Set (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) :=
+  {C | ∃ G ∈ T, ∃ B, SimsCode hp m G (⟨D, (B, C)⟩ : FullData p m)}
+
+/-- INF-1 fibred over the recorded data (Propositions 2.4 and 2.5): if every group of `T` has a
+Sims code whose recorded component lies in `I`, the number of isomorphism classes of groups of
+`T` is at most `Σ_{D ∈ I} N_b(D) N_c(D)`, with `N_b(D)`, `N_c(D)` the numbers of realised power
+word and commutator coefficient arrays over `D`. -/
+theorem ncard_classes_le_fiber {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0})
+    (I : Finset (RecData m)) (hI : ∀ G ∈ T, ∃ D : FullData p m, SimsCode hp m G D ∧ D.1 ∈ I) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) '' T).ncard ≤
+      ∑ D ∈ I, (realizedB hp T D).ncard * (realizedC hp T D).ncard := by
+  refine (ncard_le_sum_of_rel I
+    (fun D => (Set.toFinite (realizedB hp T D)).toFinset ×ˢ
+      (Set.toFinite (realizedC hp T D)).toFinset)
+    (fun D s x => ∃ G ∈ T,
+      Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) G = s ∧
+        SimsCode hp m G (⟨D, x⟩ : FullData p m)) ?_ ?_).trans_eq
+    (Finset.sum_congr rfl fun D _ => ?_)
+  · rintro s ⟨G, hG, rfl⟩
+    obtain ⟨⟨D, B, C⟩, hD, hDI⟩ := hI G hG
+    refine ⟨D, hDI, (B, C), ?_, G, hG, rfl, hD⟩
+    exact Finset.mem_product.mpr ⟨((Set.toFinite (realizedB hp T D)).mem_toFinset).mpr
+      ⟨G, hG, C, hD⟩, ((Set.toFinite (realizedC hp T D)).mem_toFinset).mpr ⟨G, hG, B, hD⟩⟩
+  · rintro s₁ - s₂ - D x ⟨G₁, hG₁, rfl, h₁⟩ ⟨G₂, hG₂, rfl, h₂⟩
+    obtain ⟨e⟩ := simsCode_rigid hp h₁ h₂
+    exact Quotient.sound ⟨CategoryTheory.InducedCategory.isoMk (MulEquiv.toGrpIso e)⟩
+  · rw [Finset.card_product, Set.ncard_eq_toFinset_card (realizedB hp T D) (Set.toFinite _),
+      Set.ncard_eq_toFinset_card (realizedC hp T D) (Set.toFinite _)]
+
+/-- The fibrewise count with the selection given by a predicate on the recorded data that holds
+for every Sims code of every group of `T`. -/
+theorem ncard_classes_le_fiber_pred {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0})
+    (hT : ∀ G ∈ T, Nat.card G = p ^ m ∧ lcs G 1 ≠ ⊥) (P : RecData m → Prop) [DecidablePred P]
+    (hP : ∀ G ∈ T, ∀ D : FullData p m, SimsCode hp m G D → P D.1) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) '' T).ncard ≤
+      ∑ D ∈ Finset.univ.filter P, (realizedB hp T D).ncard * (realizedC hp T D).ncard :=
+  ncard_classes_le_fiber hp T _ fun G hG => by
+    obtain ⟨D, hD⟩ := exists_simsCode hp (hT G hG).1 (hT G hG).2
+    exact ⟨D, hD, Finset.mem_filter.mpr ⟨Finset.mem_univ _, hP G hG D hD⟩⟩
+
+/-- The set of isomorphism classes of a set of nonabelian groups of order `p ^ m` is finite. -/
+theorem classes_finite {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0})
+    (hT : ∀ G ∈ T, Nat.card G = p ^ m ∧ lcs G 1 ≠ ⊥) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) '' T).Finite := by
+  have hsub : ∀ D : FullData p m, Set.Subsingleton {s | ∃ G ∈ T,
+      Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) G = s ∧
+        SimsCode hp m G D} := by
+    intro D
+    rintro s₁ ⟨G₁, hG₁, rfl, h₁⟩ s₂ ⟨G₂, hG₂, rfl, h₂⟩
+    obtain ⟨e⟩ := simsCode_rigid hp h₁ h₂
+    exact Quotient.sound ⟨CategoryTheory.InducedCategory.isoMk (MulEquiv.toGrpIso e)⟩
+  refine Set.Finite.subset (Set.finite_iUnion fun D : FullData p m => (hsub D).finite) ?_
+  rintro s ⟨G, hG, rfl⟩
+  obtain ⟨D, hD⟩ := exists_simsCode hp (hT G hG).1 (hT G hG).2
+  exact Set.mem_iUnion.mpr ⟨D, G, hG, rfl, hD⟩
+
+/-- Readback of a Sims code with recorded component `D`. -/
+lemma code_facts {m : ℕ} (hp : p.Prime) {H : Type u} [Group H] [Finite H] {D : RecData m}
+    {B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    {C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    (hc : SimsCode hp m H (⟨D, (B, C)⟩ : FullData p m)) :
+    ∃ (u : ℕ → H) (d : SimsData) (X : Fin d.n → H) (r : ℕ → ℕ) (hS : SimsGen p u d X r),
+      D.1.val = hS.nL ∧ (∀ i < hS.nL, fibR D i = r i) ∧ (∀ j, fibA D j = brA d j) ∧
+        D.2.2.1.tot = d.n ∧ (∀ i j, flatB B i j = brB d i j) := by
+  obtain ⟨u, d, X, r, hS, hnm, hs2, hsum, e⟩ := hc
+  refine ⟨u, d, X, r, hS, (congrArg rdC e).symm, ?_, ?_, ?_, ?_⟩
+  · intro i hi
+    have h := congrFun (congrArg rdR e) i
+    rw [hS.rdR_enc hp hnm hs2 hsum, dif_pos hi] at h
+    exact h.symm
+  · intro j
+    have h := congrFun (congrArg rdA e) j
+    rw [hS.rdA_enc hp hnm hs2 hsum] at h
+    exact h.symm
+  · have h : (hS.rankVec hp hnm).tot = D.2.2.1.tot :=
+      congrArg (fun E : FullData p m => E.1.2.2.1.tot) e
+    exact h.symm.trans (hS.rankVec_tot hp hnm)
+  · intro i j
+    have h := congrFun (congrFun (congrArg rdB e) i) j
+    rw [hS.rdB_enc hp hnm hs2 hsum] at h
+    exact h.symm
+
+lemma flatB_lt_of_code {m : ℕ} (hp : p.Prime) {H : Type u} [Group H] [Finite H]
+    {D : RecData m} {B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    {C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    (hc : SimsCode hp m H (⟨D, (B, C)⟩ : FullData p m)) (i j : ℕ) (hj : j < D.2.2.1.tot) :
+    flatB B i j < p ^ fibA D j := by
+  obtain ⟨u, d, X, r, hS, -, -, hA, htot, hB⟩ := code_facts hp hc
+  rw [hB, hA]
+  rw [htot] at hj
+  unfold brB brA
+  rw [dif_pos hj]
+  split_ifs with h
+  · exact hS.bounded.1 _ _
+  · exact pow_pos hp.pos _
+
+/-- The power word array read off a flattened array, for the ranks and relative orders of `D`
+(entries out of range are replaced by `0`). -/
+def pwOfB {m : ℕ} (hp0 : 0 < p) (D : RecData m)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) :
+    PWArray p D.1.val (fibRk D) (fibAk D) :=
+  fun k h => if hlt : flatB B (fOff (fibR D) k.1.val + k.2.val)
+      (fOff (fibR D) h.1.val + h.2.val) < p ^ fibAk D h then ⟨_, hlt⟩
+    else ⟨0, pow_pos hp0 _⟩
+
+lemma pwOfB_val_of_code {m : ℕ} (hp : p.Prime) {H : Type u} [Group H] [Finite H]
+    {D : RecData m} {B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    {C : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)}
+    (hc : SimsCode hp m H (⟨D, (B, C)⟩ : FullData p m)) (k h : SimsIdx D.1.val (fibRk D)) :
+    (pwOfB hp.pos D B k h).val =
+      flatB B (fOff (fibR D) k.1.val + k.2.val) (fOff (fibR D) h.1.val + h.2.val) := by
+  have hlt : flatB B (fOff (fibR D) k.1.val + k.2.val) (fOff (fibR D) h.1.val + h.2.val) <
+      p ^ fibAk D h := flatB_lt_of_code hp hc _ _ (fibPos_lt D h)
+  unfold pwOfB
+  rw [dif_pos hlt]
+
+/-- Transport of realised power word arrays along equal ranks and relative orders. -/
+lemma realizedPW_congr {c c' : ℕ} {r : Fin c → ℕ} {r' : Fin c' → ℕ} {a : SimsIdx c r → ℕ}
+    {a' : SimsIdx c' r' → ℕ} {B : PWArray p c r a} {B' : PWArray p c' r' a'} (hc : c = c')
+    (hr : ∀ i : Fin c, r i = r' (Fin.cast hc i))
+    (ha : ∀ (i : Fin c) (v : Fin (r i)), a ⟨i, v⟩ = a' ⟨Fin.cast hc i, Fin.cast (hr i) v⟩)
+    (hB : ∀ (i : Fin c) (v : Fin (r i)) (i' : Fin c) (v' : Fin (r i')),
+      (B ⟨i, v⟩ ⟨i', v'⟩).val =
+        (B' ⟨Fin.cast hc i, Fin.cast (hr i) v⟩ ⟨Fin.cast hc i', Fin.cast (hr i') v'⟩).val)
+    (h : B ∈ realizedPW p c r a) : B' ∈ realizedPW p c' r' a' := by
+  subst hc
+  have er : r = r' := funext hr
+  subst er
+  have ea : a = a' := funext fun k => ha k.1 k.2
+  subst ea
+  have eB : B = B' := funext fun k => funext fun k' => Fin.ext (hB k.1 k.2 k'.1 k'.2)
+  subst eB
+  exact h
+
+/-- Theorem 3.1 bounds the power word factor of the fibre: `N_b(D)` is at most the number of
+power word arrays realised for the layer ranks and relative orders recorded in `D`. -/
+theorem ncard_realizedB_le {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0}) (D : RecData m) :
+    (realizedB hp T D).ncard ≤ (realizedPW p D.1.val (fibRk D) (fibAk D)).ncard := by
+  haveI : Fact p.Prime := ⟨hp⟩
+  refine Set.ncard_le_ncard_of_injOn (pwOfB hp.pos D) ?_ ?_ (Set.toFinite _)
+  · rintro B ⟨G, -, C, hc⟩
+    obtain ⟨u, d, X, r, hS, hc1, hR, hA, -, hBf⟩ := code_facts hp hc
+    have hn : d.n = fOff r hS.nL := hS.nL_spec.symm
+    have hG : IsPGroup p G := IsPGroup.of_card hS.realizes.card
+    have hmem := (hS.toSimsGenSet hp hn).mem_realizedPW hG
+    refine realizedPW_congr hc1.symm ?_ ?_ ?_ hmem
+    · intro i
+      exact (hR i.val i.isLt).symm
+    · intro i v
+      show d.a (hS.brEquiv hn ⟨i, v⟩) = fibA D (fOff (fibR D) i.val + v.val)
+      rw [hA, fOff_congr hR i.val i.isLt.le]
+      exact (hS.brA_brEquiv hn ⟨i, v⟩).symm
+    · intro i v i' v'
+      rw [hS.powerWords_toSimsGenSet hp hn, pwOfB_val_of_code hp hc]
+      show _ = flatB B (fOff (fibR D) i.val + v.val) (fOff (fibR D) i'.val + v'.val)
+      rw [hBf, fOff_congr hR i.val i.isLt.le, fOff_congr hR i'.val i'.isLt.le]
+      exact (hS.brB_brEquiv hn ⟨i, v⟩ ⟨i', v'⟩).symm
+  · rintro B₁ ⟨G₁, -, C₁, hc₁⟩ B₂ ⟨G₂, -, C₂, hc₂⟩ heq
+    have hall : ∀ k k' : SimsIdx D.1.val (fibRk D),
+        flatB B₁ (fOff (fibR D) k.1.val + k.2.val) (fOff (fibR D) k'.1.val + k'.2.val) =
+          flatB B₂ (fOff (fibR D) k.1.val + k.2.val) (fOff (fibR D) k'.1.val + k'.2.val) := by
+      intro k k'
+      have h := congrArg Fin.val (congrFun (congrFun heq k) k')
+      rw [pwOfB_val_of_code hp hc₁, pwOfB_val_of_code hp hc₂] at h
+      exact h
+    funext i j
+    apply Fin.ext
+    obtain ⟨w, hw, v, hv, ei⟩ :=
+      brLayer_of_lt (fibR D) D.1.val i.val (lt_of_lt_of_eq i.isLt (fibTot D))
+    obtain ⟨w', hw', v', hv', ej⟩ :=
+      brLayer_of_lt (fibR D) D.1.val j.val (lt_of_lt_of_eq j.isLt (fibTot D))
+    have h2 : flatB B₁ (fOff (fibR D) w + v) (fOff (fibR D) w' + v') =
+        flatB B₂ (fOff (fibR D) w + v) (fOff (fibR D) w' + v') :=
+      hall ⟨⟨w, hw⟩, ⟨v, hv⟩⟩ ⟨⟨w', hw'⟩, ⟨v', hv'⟩⟩
+    rw [← ei, ← ej, flatB_fin, flatB_fin] at h2
+    exact h2
+
+/-- The fibrewise count with Theorem 3.1 plugged into the power word factor: the number of
+classes of `T` is at most `Σ_{D ∈ I} p ^ PW(D) N_c(D)`, where `PW(D)` is the exponent
+`Σ_i [ r_i m_{i+1} + (r_i - 1)(s_i - r_i) ]` of Theorem 3.1 for the ranks and relative orders
+recorded in `D`. -/
+theorem ncard_classes_le_fiber_pw {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0})
+    (I : Finset (RecData m)) (hI : ∀ G ∈ T, ∃ D : FullData p m, SimsCode hp m G D ∧ D.1 ∈ I) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) '' T).ncard ≤
+      ∑ D ∈ I, p ^ pwBound2 (fibAk D) * (realizedC hp T D).ncard := by
+  haveI : Fact p.Prime := ⟨hp⟩
+  refine (ncard_classes_le_fiber hp T I hI).trans (Finset.sum_le_sum fun D _ => ?_)
+  exact Nat.mul_le_mul_right _ ((ncard_realizedB_le hp T D).trans
+    (liqiao_thm_3_1 D.1.val (fibRk D) (fibAk D) (fibAk_pos D)))
+
+end FiberCount
+
+end OMA.SimsLite
