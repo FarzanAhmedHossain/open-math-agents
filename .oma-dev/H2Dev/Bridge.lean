@@ -1375,7 +1375,7 @@ def flatB {n q : ℕ} (B : Fin n → Fin n → Fin q) (i j : ℕ) : ℕ :=
 lemma flatB_fin {n q : ℕ} (B : Fin n → Fin n → Fin q) (i j : Fin n) :
     flatB B i.val j.val = (B i j).val := by
   unfold flatB
-  rw [dif_pos ⟨i.isLt, j.isLt⟩] <;> rfl
+  rw [dif_pos ⟨i.isLt, j.isLt⟩]
 
 /-- The layer ranks of recorded data, on `ℕ`. -/
 def fibR {m : ℕ} (D : RecData m) (i : ℕ) : ℕ :=
@@ -1397,7 +1397,7 @@ lemma fibTot {m : ℕ} (D : RecData m) : D.2.2.1.tot = fOff (fibR D) D.1.val := 
   rw [← sum_fin_eq_fOff]
   refine Finset.sum_congr rfl fun i _ => ?_
   unfold fibR
-  rw [dif_pos i.isLt] <;> rfl
+  rw [dif_pos i.isLt]
 
 lemma fibPos_lt {m : ℕ} (D : RecData m) (k : SimsIdx D.1.val (fibRk D)) :
     fOff (fibR D) k.1.val + k.2.val < D.2.2.1.tot :=
@@ -1556,7 +1556,7 @@ lemma realizedPW_congr {c c' : ℕ} {r : Fin c → ℕ} {r' : Fin c' → ℕ} {a
 power word arrays realised for the layer ranks and relative orders recorded in `D`. -/
 theorem ncard_realizedB_le {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0}) (D : RecData m) :
     (realizedB hp T D).ncard ≤ (realizedPW p D.1.val (fibRk D) (fibAk D)).ncard := by
-  haveI : Fact p.Prime := ⟨hp⟩
+  have : Fact p.Prime := ⟨hp⟩
   refine Set.ncard_le_ncard_of_injOn (pwOfB hp.pos D) ?_ ?_ (Set.toFinite _)
   · rintro B ⟨G, -, C, hc⟩
     obtain ⟨u, d, X, r, hS, hc1, hR, hA, -, hBf⟩ := code_facts hp hc
@@ -1603,7 +1603,7 @@ theorem ncard_classes_le_fiber_pw {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0
     (I : Finset (RecData m)) (hI : ∀ G ∈ T, ∃ D : FullData p m, SimsCode hp m G D ∧ D.1 ∈ I) :
     (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) '' T).ncard ≤
       ∑ D ∈ I, p ^ pwBound2 (fibAk D) * (realizedC hp T D).ncard := by
-  haveI : Fact p.Prime := ⟨hp⟩
+  have : Fact p.Prime := ⟨hp⟩
   refine (ncard_classes_le_fiber hp T I hI).trans (Finset.sum_le_sum fun D _ => ?_)
   exact Nat.mul_le_mul ((ncard_realizedB_le hp T D).trans
     (liqiao_thm_3_1 D.1.val (fibRk D) (fibAk D) (fibAk_pos D))) le_rfl
@@ -1611,3 +1611,8 @@ theorem ncard_classes_le_fiber_pw {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0
 end FiberCount
 
 end OMA.SimsLite
+
+#print axioms OMA.SimsLite.ncard_classes_le_fiber_pw
+#print axioms OMA.SimsLite.ncard_classes_le_fiber_pred
+#print axioms OMA.SimsLite.classes_finite
+#print axioms OMA.SimsLite.SimsGen.brB_eq_powerWords
