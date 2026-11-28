@@ -2772,8 +2772,4 @@ theorem exists_sims_gen [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G =
 
 end SimsGenSet
 
-#print axioms exists_sims_gen
-#print axioms prop_2_4
-#print axioms nfw_unique
-
 end OMA.SimsLite
