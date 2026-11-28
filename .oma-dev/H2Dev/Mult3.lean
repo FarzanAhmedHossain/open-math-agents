@@ -759,7 +759,7 @@ lemma card_abel_eq_mul [Finite G] :
 /-- `|G^ab| ≤ |(G^ab)^p ...| · |Ω|`, through the `p`-power map. -/
 lemma card_abel_le_omQ [Finite G] :
     Nat.card (Abelianization G) ≤ Nat.card (elemK p G (pPhi p G)) * Nat.card (omQ p G) := by
-  haveI : Finite (Abelianization G) := Finite.of_surjective _ abel_of_surjective
+  have : Finite (Abelianization G) := Finite.of_surjective _ abel_of_surjective
   have h := card_le_card_range_mul (fun x : Abelianization G => x ^ p) (Nat.card (omQ p G)) (by
     intro a
     let g : {a' : Abelianization G // a' ^ p = a ^ p} → omQ p G := fun y =>
@@ -782,7 +782,7 @@ lemma card_abel_le_omQ [Finite G] :
 
 lemma card_ker_omPsi_le [Finite G] :
     Nat.card (LinearMap.ker (omPsi (p := p) (G := G))) ≤ Nat.card (elemK p G (pPhi p G)) := by
-  haveI : Finite (Abelianization G) := Finite.of_surjective _ abel_of_surjective
+  have : Finite (Abelianization G) := Finite.of_surjective _ abel_of_surjective
   let g : LinearMap.ker (omPsi (p := p) (G := G)) → elemK p G (pPhi p G) := fun w =>
     ⟨((Additive.toMul w.1 : omQ p G) : Abelianization G), by
       have h0 : omPsi (p := p) (G := G) w.1 = 0 := LinearMap.mem_ker.mp w.2
@@ -793,7 +793,8 @@ lemma card_ker_omPsi_le [Finite G] :
     intro w w' h
     apply Subtype.ext
     have h1 : ((Additive.toMul w.1 : omQ p G) : Abelianization G) =
-        ((Additive.toMul w'.1 : omQ p G) : Abelianization G) := congrArg Subtype.val h
+        ((Additive.toMul w'.1 : omQ p G) : Abelianization G) :=
+      congrArg (fun x : elemK p G (pPhi p G) => (x : Abelianization G)) h
     exact Additive.toMul.injective (Subtype.ext h1)
   exact Nat.card_le_card_of_injective g hg
 
@@ -821,8 +822,8 @@ theorem exists_summand [Finite G] (hG : IsPGroup p G)
     ∃ A B : Subgroup G, lcs G 1 ≤ A ∧ lcs G 1 ≤ B ∧ A ⊓ B = lcs G 1 ∧ A ⊔ B = ⊤ ∧
       (∀ g : G, Additive.ofMul (piV p G g) ∈ U → g ∈ B) ∧ (∀ a ∈ A, a ^ p ∈ lcs G 1) ∧
       ∃ z : ℕ, r1 ≤ z + t + lam ∧ Nat.card A = p ^ z * Nat.card (lcs G 1) := by
-  haveI : Finite (Abelianization G) := Finite.of_surjective _ abel_of_surjective
-  haveI : Finite (VQ p G) := Finite.of_surjective _ piV_surjective
+  have : Finite (Abelianization G) := Finite.of_surjective _ abel_of_surjective
+  have : Finite (VQ p G) := Finite.of_surjective _ piV_surjective
   have hp2 : 2 ≤ p := hp.out.two_le
   have hppos : 0 < p := hp.out.pos
   -- the orders
@@ -974,7 +975,8 @@ theorem exists_summand [Finite G] (hG : IsPGroup p G)
         Abelianization G), mem_omSubQ.mpr ⟨w.1, w.2, rfl⟩⟩ : omSubQ Z)) ⟨?_, ?_⟩
       · intro w w' h
         have h1 : ((Additive.toMul w.1 : omQ p G) : Abelianization G) =
-            ((Additive.toMul w'.1 : omQ p G) : Abelianization G) := congrArg Subtype.val h
+            ((Additive.toMul w'.1 : omQ p G) : Abelianization G) :=
+          congrArg (fun x : omSubQ Z => (x : Abelianization G)) h
         exact Subtype.ext (Additive.toMul.injective (Subtype.ext h1))
       · rintro ⟨x, hx⟩
         obtain ⟨w, hw, rfl⟩ := mem_omSubQ.mp hx
@@ -983,11 +985,11 @@ theorem exists_summand [Finite G] (hG : IsPGroup p G)
       rw [Module.natCard_eq_pow_finrank (K := ZMod p), Nat.card_zmod]
     have e1 := Subgroup.card_mul_index ((omSubQ Z).comap Abelianization.of)
     have e2 : ((omSubQ Z).comap Abelianization.of).index = (omSubQ Z).index :=
-      Subgroup.index_comap_of_surjective abel_of_surjective
+      Subgroup.index_comap_of_surjective (H := omSubQ Z) abel_of_surjective
     have e3 := Subgroup.card_mul_index (omSubQ Z)
     have e4 := Subgroup.card_mul_index (lcs G 1)
     have hcQ := card_abel_eq_index (G := G)
-    haveI : Finite (Abelianization G ⧸ omSubQ Z) :=
+    have : Finite (Abelianization G ⧸ omSubQ Z) :=
       Finite.of_surjective (fun x : Abelianization G => (x : Abelianization G ⧸ omSubQ Z))
         QuotientGroup.mk_surjective
     have hpos : 0 < (omSubQ Z).index := Nat.pos_of_ne_zero Subgroup.index_ne_zero_of_finite
@@ -1003,7 +1005,7 @@ theorem pPhi_le_of_summand {A B : Subgroup G} (hB : lcs G 1 ≤ B) (hsup : A ⊔
   have hcB : commutator G ≤ B := by
     rw [commutator_eq_lcs_one]
     exact hB
-  haveI : B.Normal := normal_of_commutator_le hcB
+  have : B.Normal := normal_of_commutator_le hcB
   refine sup_le ?_ hcB
   rw [Subgroup.closure_le]
   rintro _ ⟨g, rfl⟩
@@ -1028,7 +1030,7 @@ theorem summand_dim_le [Finite G] (hG : IsPGroup p G) {A B : Subgroup G}
     (hUB : ∀ x ∈ U, ∃ b ∈ B, Additive.ofMul (piV p G b) = x) {z : ℕ}
     (hz : Nat.card A = p ^ z * Nat.card (lcs G 1)) :
     z + finrank (ZMod p) U ≤ Group.rank G := by
-  haveI : Finite (VQ p G) := Finite.of_surjective _ piV_surjective
+  have : Finite (VQ p G) := Finite.of_surjective _ piV_surjective
   have hp2 : 2 ≤ p := hp.out.two_le
   have hΦ := pPhi_le_of_summand hB hsup hsq
   have key : ∀ a ∈ A, ∀ b ∈ B, piV p G a = piV p G b → a ∈ lcs G 1 := by
