@@ -1967,7 +1967,7 @@ theorem SimsGen.lf_good {G : Type} [Group G] [Finite G] {p : ℕ} {u : ℕ → G
         · rw [Nat.add_sub_cancel_left] at b4
           exact hk (by omega)
   · -- the deeper part vanishes off the non-defining pairs
-    simp only [lfDset, Set.mem_setOf_eq]
+    simp only [lfDset, Set.mem_ofPred_eq]
     intro q hq
     funext v
     apply Fin.ext
@@ -2197,5 +2197,8 @@ theorem lf_sum_le_max {s s2 s3 : ℕ} (f : ℕ → ℕ) (M : ℕ)
   exact Nat.mul_le_mul_right _ ((Finset.card_filter_le _ _).trans (Finset.card_range _).le)
 
 end LfCBCount
+
+#print axioms lf_realizedCB_ncard_le
+#print axioms SimsGen.lf_good
 
 end OMA.SimsLite
