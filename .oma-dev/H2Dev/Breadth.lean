@@ -15,7 +15,7 @@ Abstract layer (commutative groups written multiplicatively, brackets as `L →*
   (prescribed defining values on a set `D` of core pairs), for any index set of generators with
   a core/outside split of the generator pairs; `br_prop43_fin` is the paper's form
   `((r_1 choose 2) - |D|) s_2 - (r_1 - s choose 2) b_2` for generators `Fin r_1` with core the first
-  `s`;
+  `s`; `br_eq53` is the class-3 case of (53), Props 4.2 and 4.3 combined through Lemma 4.1;
 * `br_rem44_lift` : the second alternative of Remark 4.4 (lifts of a reduction mod `p`);
 * `br_lemma61` : Lemma 6.1, `log_p |p L_2| ≤ (δ choose 2)` where `|p L_1| = p ^ δ`;
 * `br_card_le_of_exp`, `br_s2_le` : the bound `s_2 ≤ r_2 (δ + 1)` of (126).
@@ -110,7 +110,9 @@ theorem br_card_ker_le {M N : Type*} [Group M] [Group N] [Finite M] {p s b : ℕ
     (f : M →* N) (hM : Nat.card M = p ^ s) (hb : p ^ b ≤ Nat.card f.range) :
     Nat.card f.ker ≤ p ^ (s - b) := by
   have h1 : Nat.card f.ker * Nat.card f.range = p ^ s := by
-    rw [← MonoidHom.index_ker, Subgroup.card_mul_index, hM]
+    have e := Nat.card_congr (QuotientGroup.quotientKerEquivRange f).toEquiv
+    rw [← e, ← hM]
+    exact Subgroup.card_mul_index f.ker
   obtain ⟨k, -, hk⟩ := (Nat.dvd_prime_pow hp).1 (⟨_, h1.symm⟩ : Nat.card f.ker ∣ p ^ s)
   obtain ⟨j, -, hj⟩ := (Nat.dvd_prime_pow hp).1
     (⟨Nat.card f.ker, by rw [mul_comm]; exact h1.symm⟩ : Nat.card f.range ∣ p ^ s)
@@ -312,7 +314,7 @@ theorem br_prop42_crude [Finite L2] [Finite L3] {p s3 n b : ℕ} (hp : p.Prime)
     rw [← e1, ← e2]
     exact e
   calc _ ≤ Nat.card (Fin s → S1) := br_ncard_le_card_of_injOn _ F hinj
-    _ = S1.ncard ^ s := by rw [Nat.card_fun, Nat.card_fin, Set.Nat.card_coe_set_eq]
+    _ = S1.ncard ^ s := by rw [Nat.card_fun, Nat.card_fin, Nat.card_coe_set_eq]
     _ ≤ (p ^ (b * (n + s3))) ^ s := Nat.pow_le_pow_left (br_card_homs_le hp hL3 y hy) s
     _ = p ^ (s * (b * (n + s3))) := by rw [← pow_mul, mul_comm]
 
@@ -349,7 +351,7 @@ abbrev brJacobi (β1 : L1 →* L1 →* L2) (β2 : L2 →* L1 →* L3) : Prop :=
 theorem br_antisymm {β : L1 →* L1 →* L2} (hA : brAlt β) (x y : L1) : β y x = (β x y)⁻¹ := by
   have h := hA (x * y)
   simp only [map_mul, MonoidHom.mul_apply, hA x, hA y, one_mul, mul_one] at h
-  exact eq_inv_of_mul_eq_one_right h
+  exact eq_inv_of_mul_eq_one_left h
 
 theorem br_map_pow_left (β : L1 →* L1 →* L2) (x y : L1) (n : ℕ) :
     β (x ^ n) y = (β x y) ^ n := by
@@ -511,8 +513,8 @@ theorem br_prop43_gen [Finite L2] {ι : Type*} [DecidableEq ι] (g : ι → L1)
           have e := congrArg Subtype.val (congrFun hF ⟨q, hq⟩)
           rw [hv β hβ ⟨q, hq⟩, hv β' hβ' ⟨q, hq⟩] at e
           exact div_left_inj.mp e
-        have hA : brAlt β := hβ.1.1
-        have hA' : brAlt β' := hβ'.1.1
+        obtain ⟨⟨hA, -⟩, -⟩ := id hβ
+        obtain ⟨⟨hA', -⟩, -⟩ := id hβ'
         exact br_ext_of_agree hg hA hA' Po hcovo
           (fun x u hu => (hag β hβ x u hu).trans (hag β' hβ' x u hu).symm) hpo
       calc (S ∩ fc ⁻¹' {a}).ncard ≤ Nat.card (↥Po → (κ.flip h).ker) :=
@@ -544,6 +546,239 @@ theorem br_prop43 [Finite L2] {ι : Type*} [DecidableEq ι] {p s2 b : ℕ} (hp :
   refine le_trans (br_prop43_gen g hg Cidx κ hh Pc Po D hcov hcovo v) ?_
   rw [hL2, pow_add, pow_mul, pow_mul]
   exact Nat.mul_le_mul_left _ (Nat.pow_le_pow_left (br_card_ker_le hp _ hL2 hb) _)
+
+/-- The pairs `i < j` in `ℕ` below `r` with `s ≤ i`: `(r - s) choose 2` of them. -/
+theorem br_card_pairs_nat (s : ℕ) : ∀ r : ℕ,
+    ((Finset.range r ×ˢ Finset.range r).filter (fun q : ℕ × ℕ => q.1 < q.2 ∧ s ≤ q.1)).card =
+      (r - s).choose 2
+  | 0 => by simp
+  | r + 1 => by
+    classical
+    have hsplit : (Finset.range (r + 1) ×ˢ Finset.range (r + 1)).filter
+          (fun q : ℕ × ℕ => q.1 < q.2 ∧ s ≤ q.1) =
+        (Finset.range r ×ˢ Finset.range r).filter (fun q : ℕ × ℕ => q.1 < q.2 ∧ s ≤ q.1) ∪
+          (Finset.Ico s r).image (fun i => (i, r)) := by
+      ext ⟨i, j⟩
+      simp only [Finset.mem_filter, Finset.mem_product, Finset.mem_range, Finset.mem_union,
+        Finset.mem_image, Finset.mem_Ico, Prod.mk.injEq]
+      constructor
+      · rintro ⟨⟨hi, hj⟩, hij, hsi⟩
+        by_cases hjr : j < r
+        · exact Or.inl ⟨⟨by omega, hjr⟩, hij, hsi⟩
+        · exact Or.inr ⟨i, ⟨hsi, by omega⟩, rfl, by omega⟩
+      · rintro (⟨⟨hi, hj⟩, hij, hsi⟩ | ⟨a, ⟨hsa, har⟩, rfl, rfl⟩)
+        · exact ⟨⟨by omega, by omega⟩, hij, hsi⟩
+        · exact ⟨⟨by omega, by omega⟩, har, hsa⟩
+    have hdisj : Disjoint ((Finset.range r ×ˢ Finset.range r).filter
+        (fun q : ℕ × ℕ => q.1 < q.2 ∧ s ≤ q.1)) ((Finset.Ico s r).image (fun i => (i, r))) := by
+      rw [Finset.disjoint_left]
+      rintro ⟨i, j⟩ h1 h2
+      simp only [Finset.mem_filter, Finset.mem_product, Finset.mem_range, Finset.mem_image,
+        Finset.mem_Ico, Prod.mk.injEq] at h1 h2
+      obtain ⟨a, -, -, hj⟩ := h2
+      omega
+    have hinj : Function.Injective (fun i : ℕ => (i, r)) := fun a b h => (Prod.mk.inj h).1
+    have hu := Finset.card_union_add_card_inter
+      ((Finset.range r ×ˢ Finset.range r).filter (fun q : ℕ × ℕ => q.1 < q.2 ∧ s ≤ q.1))
+      ((Finset.Ico s r).image (fun i => (i, r)))
+    rw [Finset.disjoint_iff_inter_eq_empty.1 hdisj, Finset.card_empty, add_zero] at hu
+    rw [hsplit, hu, br_card_pairs_nat s r, Finset.card_image_of_injective _ hinj, Nat.card_Ico]
+    rcases Nat.lt_or_ge r s with h | h
+    · rw [show r - s = 0 by omega, show r + 1 - s = 0 by omega]
+    · rw [show r + 1 - s = (r - s) + 1 by omega, Nat.choose_succ_succ', Nat.choose_one_right,
+        Nat.add_comm]
+
+/-- The pairs `i < j` in `Fin r` with `¬ i < s`: `(r - s) choose 2` of them. -/
+theorem br_card_pairs_fin (r s : ℕ) :
+    ((Finset.univ : Finset (Fin r × Fin r)).filter
+      (fun q => q.1 < q.2 ∧ ¬ (q.1 : ℕ) < s)).card = (r - s).choose 2 := by
+  classical
+  rw [← br_card_pairs_nat s r]
+  have hinj : Function.Injective (fun q : Fin r × Fin r => ((q.1 : ℕ), (q.2 : ℕ))) := by
+    intro q1 q2 h
+    simp only [Prod.mk.injEq] at h
+    exact Prod.ext (Fin.ext h.1) (Fin.ext h.2)
+  rw [← Finset.card_image_of_injective _ hinj]
+  congr 1
+  ext ⟨i, j⟩
+  simp only [Finset.mem_image, Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_product,
+    Finset.mem_range, Prod.mk.injEq]
+  constructor
+  · rintro ⟨q, ⟨h1, h2⟩, rfl, rfl⟩
+    exact ⟨⟨q.1.2, q.2.2⟩, h1, not_lt.1 h2⟩
+  · rintro ⟨⟨hi, hj⟩, hij, hsi⟩
+    exact ⟨(⟨i, hi⟩, ⟨j, hj⟩), ⟨hij, not_lt.2 hsi⟩, rfl, rfl⟩
+
+/-- Proposition 4.3 / Remark 4.4 (first alternative) in the paper's form: generators
+`g_{1,1}, ..., g_{1,r_1}` indexed by `Fin r_1`, core the first `s`, prescribed values on a set `D`
+of core pairs `j < k` (`j < s`; the `r_2` defining pairs in Remark 4.4, `D = ∅` in
+Proposition 4.3), `|L_2| = p ^ s_2` and breadth `b_2` attained at `h ∈ C_core`: at most
+`p ^ (((r_1 choose 2) - |D|) s_2 - ((r_1 - s) choose 2) b_2)` first-layer brackets. -/
+theorem br_prop43_fin [Finite L2] {p r s s2 b : ℕ} (hp : p.Prime)
+    (hL2 : Nat.card L2 = p ^ s2) (g : Fin r → L1)
+    (hg : Subgroup.closure (Set.range g) = ⊤) (κ : L2 →* L1 →* L3) {h : L1}
+    (hh : h ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}))
+    (hb : p ^ b ≤ Nat.card (κ.flip h).range) (D : Finset (Fin r × Fin r))
+    (hD : ∀ q ∈ D, q.1 < q.2 ∧ (q.1 : ℕ) < s) (v : Fin r × Fin r → L2) :
+    {β1 : L1 →* L1 →* L2 | brAlt β1 ∧
+        Subgroup.closure {w | ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}),
+          ∃ u' ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β1 u u' = w} = ⊤ ∧
+        (∃ β2 : L2 →* L1 →* L3,
+          (∀ z, ∀ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β2 z u = κ z u) ∧
+          brJacobi β1 β2) ∧
+        ∀ q ∈ D, β1 (g q.1) (g q.2) = v q}.ncard ≤
+      p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
+  classical
+  set T := (Finset.univ : Finset (Fin r × Fin r)).filter (fun q => q.1 < q.2) with hTdef
+  set Pc := T.filter (fun q => (q.1 : ℕ) < s) with hPcdef
+  set Po := T.filter (fun q => ¬ (q.1 : ℕ) < s) with hPodef
+  have hcov : ∀ i, ∀ j ∈ {j : Fin r | (j : ℕ) < s}, i = j ∨ (i, j) ∈ Pc ∨ (j, i) ∈ Pc := by
+    intro i j hj
+    have hj' : (j : ℕ) < s := hj
+    rcases lt_trichotomy i j with hij | hij | hij
+    · refine Or.inr (Or.inl ?_)
+      rw [hPcdef, hTdef, Finset.mem_filter, Finset.mem_filter]
+      exact ⟨⟨Finset.mem_univ _, hij⟩, Nat.lt_trans (show (i : ℕ) < j from hij) hj'⟩
+    · exact Or.inl hij
+    · refine Or.inr (Or.inr ?_)
+      rw [hPcdef, hTdef, Finset.mem_filter, Finset.mem_filter]
+      exact ⟨⟨Finset.mem_univ _, hij⟩, hj'⟩
+  have hcovo : ∀ i j, i ∉ {j : Fin r | (j : ℕ) < s} → j ∉ {j : Fin r | (j : ℕ) < s} →
+      i = j ∨ (i, j) ∈ Po ∨ (j, i) ∈ Po := by
+    intro i j hi hj
+    have hi' : ¬ (i : ℕ) < s := hi
+    have hj' : ¬ (j : ℕ) < s := hj
+    rcases lt_trichotomy i j with hij | hij | hij
+    · refine Or.inr (Or.inl ?_)
+      rw [hPodef, hTdef, Finset.mem_filter, Finset.mem_filter]
+      exact ⟨⟨Finset.mem_univ _, hij⟩, hi'⟩
+    · exact Or.inl hij
+    · refine Or.inr (Or.inr ?_)
+      rw [hPodef, hTdef, Finset.mem_filter, Finset.mem_filter]
+      exact ⟨⟨Finset.mem_univ _, hij⟩, hj'⟩
+  have main := br_prop43 hp hL2 g hg {j : Fin r | (j : ℕ) < s} κ hh hb Pc Po D hcov hcovo v
+  refine le_trans main (Nat.pow_le_pow_right hp.pos ?_)
+  have hTc : T.card = r.choose 2 := by
+    have h0 := br_card_pairs_fin r 0
+    rw [Nat.sub_zero] at h0
+    rw [← h0, hTdef]
+    congr 1
+    ext q
+    simp
+  have hT : Pc.card + Po.card = r.choose 2 := by
+    rw [hPcdef, hPodef, Finset.card_filter_add_card_filter_not, hTc]
+  have hPo : Po.card = (r - s).choose 2 := by
+    rw [← br_card_pairs_fin r s, hPodef, hTdef]
+    congr 1
+    ext q
+    simp
+  have hDsub : D ⊆ Pc := by
+    intro q hq
+    rw [hPcdef, hTdef, Finset.mem_filter, Finset.mem_filter]
+    exact ⟨⟨Finset.mem_univ _, (hD q hq).1⟩, (hD q hq).2⟩
+  have hsd : (Pc \ D).card + D.card = Pc.card := Finset.card_sdiff_add_card_eq_card hDsub
+  have hrange : Nat.card (κ.flip h).range ≤ Nat.card L2 :=
+    Nat.card_le_card_of_surjective _ (κ.flip h).rangeRestrict_surjective
+  have hbs : b ≤ s2 := br_pow_le_cancel hp.one_lt (hb.trans (hrange.trans hL2.le))
+  have key : ∀ a o b c : ℕ, (b + c) * a + c * o ≤ (a + o) * (b + c) - o * b := by
+    intro a o b c
+    have e : (a + o) * (b + c) = o * b + ((b + c) * a + c * o) := by ring
+    rw [e, Nat.add_sub_cancel_left]
+  have e1 : r.choose 2 - D.card = (Pc \ D).card + Po.card := by omega
+  rw [e1, ← hPo]
+  obtain ⟨c, hc⟩ : ∃ c, s2 = b + c := ⟨s2 - b, by omega⟩
+  rw [hc, Nat.add_sub_cancel_left]
+  exact key _ _ _ _
+
+/-- Eq. (53) at `c = 3`, with Remark 4.4 (first alternative): the graded brackets
+`(β_1, β_2)` (`L_1 × L_1 → L_2` and `L_2 × L_1 → L_3`) with the Jacobi identity, generation of
+`L_2` by the core, core slices of breadth `≤ b` attained at some `h ∈ C_core`, and prescribed
+values on `D`, number at most `p ^ (s b (n + s_3)) · p ^ (((r_1 choose 2) - |D|) s_2 -
+((r_1 - s) choose 2) b)`, where `L_2` is generated by `n` elements (`n = r_2`). -/
+theorem br_eq53 [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : ℕ} (hp : p.Prime)
+    (hsr : s ≤ r) (hL2 : Nat.card L2 = p ^ s2) (hL3 : Nat.card L3 = p ^ s3) (y : Fin n → L2)
+    (hy : Subgroup.closure (Set.range y) = ⊤) (g : Fin r → L1)
+    (hg : Subgroup.closure (Set.range g) = ⊤) (D : Finset (Fin r × Fin r))
+    (hD : ∀ q ∈ D, q.1 < q.2 ∧ (q.1 : ℕ) < s) (v : Fin r × Fin r → L2) :
+    {β : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) | brAlt β.1 ∧
+        Subgroup.closure {w | ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}),
+          ∃ u' ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.1 u u' = w} = ⊤ ∧
+        brJacobi β.1 β.2 ∧
+        (∀ j : Fin r, (j : ℕ) < s → Nat.card (β.2.flip (g j)).range ≤ p ^ b) ∧
+        (∃ h ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), p ^ b ≤ Nat.card (β.2.flip h).range) ∧
+        ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q}.ncard ≤
+      p ^ (s * (b * (n + s3))) * p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
+  classical
+  haveI : Finite (L2 →* L3) :=
+    Finite.of_injective (fun f : L2 →* L3 => (f : L2 → L3)) DFunLike.coe_injective
+  haveI : Finite (L1 →* L2) :=
+    Finite.of_injective (fun f : L1 →* L2 => (f : L1 → L2)) DFunLike.coe_injective
+  haveI : Finite (L1 →* L1 →* L2) :=
+    Finite.of_injective (fun f : L1 →* L1 →* L2 => (f : L1 → (L1 →* L2))) DFunLike.coe_injective
+  set C := Subgroup.closure (g '' {j | (j : ℕ) < s}) with hCdef
+  let c : Fin s → L1 := fun k => g (Fin.castLE hsr k)
+  set BR := {β : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) | brAlt β.1 ∧
+        Subgroup.closure {w | ∃ u ∈ C, ∃ u' ∈ C, β.1 u u' = w} = ⊤ ∧
+        brJacobi β.1 β.2 ∧
+        (∀ j : Fin r, (j : ℕ) < s → Nat.card (β.2.flip (g j)).range ≤ p ^ b) ∧
+        (∃ h ∈ C, p ^ b ≤ Nat.card (β.2.flip h).range) ∧
+        ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q} with hBR
+  let ρ : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) → (Fin s → (L2 →* L3)) :=
+    fun β k => β.2.flip (c k)
+  have himg : (ρ '' BR).ncard ≤ p ^ (s * (b * (n + s3))) := by
+    refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _))
+      (br_prop42_crude hp hL3 y hy s (b := b))
+    rintro _ ⟨β, hβ, rfl⟩ k
+    obtain ⟨-, -, -, hsl0, -⟩ := id hβ
+    exact hsl0 (Fin.castLE hsr k) (by simp)
+  have hfib : ∀ a, (BR ∩ ρ ⁻¹' {a}).ncard ≤
+      p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
+    intro a
+    rcases (BR ∩ ρ ⁻¹' {a}).eq_empty_or_nonempty with he | ⟨β0, hβ0, hβ0a⟩
+    · rw [he, Set.ncard_empty]
+      exact Nat.zero_le _
+    · obtain ⟨-, -, -, -, ⟨h0, hh0, hb0⟩, -⟩ := id hβ0
+      have hβ0a' : ρ β0 = a := hβ0a
+      have hsl : ∀ β ∈ BR ∩ ρ ⁻¹' {a}, ∀ z, ∀ u ∈ C, β.2 z u = β0.2 z u := by
+        rintro β ⟨-, hβa⟩ z u hu
+        have hβa' : ρ β = a := hβa
+        have hgen : ∀ j : Fin r, (j : ℕ) < s → β.2.flip (g j) = β0.2.flip (g j) := by
+          intro j hj
+          have e := congrFun (hβa'.trans hβ0a'.symm) ⟨(j : ℕ), hj⟩
+          change β.2.flip (c ⟨(j : ℕ), hj⟩) = β0.2.flip (c ⟨(j : ℕ), hj⟩) at e
+          have e2 : c ⟨(j : ℕ), hj⟩ = g j := congrArg g (Fin.ext rfl)
+          rw [e2] at e
+          exact e
+        have hle : C ≤ (β.2 z).eqLocus (β0.2 z) := by
+          rw [hCdef, Subgroup.closure_le]
+          rintro _ ⟨j, hj, rfl⟩
+          show β.2 z (g j) = β0.2 z (g j)
+          have := congrArg (fun φ : L2 →* L3 => φ z) (hgen j hj)
+          simpa [MonoidHom.flip_apply] using this
+        exact hle hu
+      let S43 : Set (L1 →* L1 →* L2) := {β1 | brAlt β1 ∧
+        Subgroup.closure {w | ∃ u ∈ C, ∃ u' ∈ C, β1 u u' = w} = ⊤ ∧
+        (∃ β2 : L2 →* L1 →* L3, (∀ z, ∀ u ∈ C, β2 z u = β0.2 z u) ∧ brJacobi β1 β2) ∧
+        ∀ q ∈ D, β1 (g q.1) (g q.2) = v q}
+      have hmaps : ∀ β ∈ BR ∩ ρ ⁻¹' {a}, Prod.fst β ∈ S43 := by
+        intro β hβ
+        obtain ⟨⟨hA, hgen, hJ, -, -, hDv⟩, -⟩ := id hβ
+        exact ⟨hA, hgen, ⟨β.2, hsl β hβ, hJ⟩, hDv⟩
+      have hinj : Set.InjOn Prod.fst (BR ∩ ρ ⁻¹' {a}) := by
+        intro β hβ β' hβ' h1
+        obtain ⟨⟨hA, hgen, hJ, -⟩, -⟩ := id hβ
+        obtain ⟨⟨hA', -, hJ', -⟩, -⟩ := id hβ'
+        have h1' : β.1 = β'.1 := h1
+        have h2 : β.2 = β'.2 := br_lemma41 C hA hA' hJ hJ' hgen (fun x u _ => by rw [h1'])
+          (fun z u hu => (hsl β hβ z u hu).trans (hsl β' hβ' z u hu).symm)
+        exact Prod.ext h1' h2
+      calc (BR ∩ ρ ⁻¹' {a}).ncard ≤ S43.ncard :=
+            Set.ncard_le_ncard_of_injOn Prod.fst hmaps hinj (Set.toFinite _)
+        _ ≤ _ := br_prop43_fin hp hL2 g hg β0.2 hh0 hb0 D hD v
+  calc BR.ncard ≤ (ρ '' BR).ncard * p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) :=
+        br_ncard_le_image_mul BR ρ _ hfib
+    _ ≤ p ^ (s * (b * (n + s3))) * p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) :=
+        Nat.mul_le_mul_right _ himg
 
 /-- Remark 4.4, second alternative: counting alternating brackets through a reduction
 `π : L_2 → W` (e.g. `L_2 → L_2 / p L_2`). If all brackets in `S` take prescribed values on the
@@ -579,8 +814,10 @@ theorem br_rem44_lift [Finite L2] {W : Type*} [Group W] {ι : Type*} [DecidableE
       exact br_dite_val (hker β hβ q.1 (Finset.mem_sdiff.1 q.2).1)
     have hinj : Set.InjOn F (S ∩ R ⁻¹' {a}) := by
       intro β hβ β' hβ' hF
-      obtain ⟨hA, hD⟩ := hS β hβ.1
-      obtain ⟨hA', hD'⟩ := hS β' hβ'.1
+      obtain ⟨hβS, -⟩ := id hβ
+      obtain ⟨hβS', -⟩ := id hβ'
+      obtain ⟨hA, hD⟩ := hS β hβS
+      obtain ⟨hA', hD'⟩ := hS β' hβS'
       have hP : ∀ q ∈ P, β (g q.1) (g q.2) = β' (g q.1) (g q.2) := by
         intro q hq
         by_cases hqD : q ∈ D
@@ -643,8 +880,10 @@ theorem br_alt_closure_card {A B : Type*} [CommGroup A] [CommGroup B] [Finite A]
       set S := Subgroup.closure ((insert x T : Finset A) : Set A) with hSdef
       have hS : S = Subgroup.closure {x} ⊔ S' := by
         rw [hSdef, Finset.coe_insert, Set.insert_eq, Subgroup.closure_union]
-      obtain ⟨j', -, hj'⟩ := (Nat.dvd_prime_pow hp).1
-        (by rw [← hk]; exact Subgroup.card_subgroup_dvd_card S')
+      have hdS' : Nat.card S' ∣ p ^ k := by
+        rw [← hk]
+        exact Subgroup.card_subgroup_dvd_card S'
+      obtain ⟨j', -, hj'⟩ := (Nat.dvd_prime_pow hp).1 hdS'
       have IH := ih j' hj'
       have hle : S' ≤ S := by rw [hS]; exact le_sup_right
       by_cases heq : S' = S
@@ -1081,10 +1320,11 @@ lemma br_conj_comm_mem {w : G} (hw : w ∈ lcs G 1) (y z : G) :
     simp only [commutatorElement_def]
     group
   rw [e, commElem_mul_right]
-  have h1 : ⁅w, ⁅y, z⁆⁆ ∈ lcs G 3 := commElem_mem_lcs_add hw (commElem_mem_lcs_one y z)
+  have h1 : ⁅w, ⁅y, z⁆⁆ ∈ lcs G 3 :=
+    commElem_mem_lcs_add (a := 1) (b := 1) hw (commElem_mem_lcs_one y z)
   have h2 : ⁅⁅y, z⁆, ⁅w, z⁆⁆ ∈ lcs G 3 :=
-    lcs_antitone (by norm_num) (commElem_mem_lcs_add (commElem_mem_lcs_one y z)
-      (commElem_mem_lcs_succ hw z))
+    lcs_antitone (show 3 ≤ 1 + 2 + 1 by norm_num) (commElem_mem_lcs_add (a := 1) (b := 2)
+      (commElem_mem_lcs_one y z) (commElem_mem_lcs_succ hw z))
   have e2 : ⁅w, z⁆ * (⁅w, ⁅y, z⁆⁆ * ⁅⁅y, z⁆, ⁅w, z⁆⁆ * ⁅w, z⁆)⁻¹ =
       ⁅⁅y, z⁆, ⁅w, z⁆⁆⁻¹ * ⁅w, ⁅y, z⁆⁆⁻¹ := by group
   rw [e2]
@@ -1196,5 +1436,6 @@ end BrGroup
 #print axioms br_prop42_crude
 #print axioms brB_jacobi
 #print axioms br_rem44_lift
+#print axioms br_eq53
 
 end OMA.SimsLite
