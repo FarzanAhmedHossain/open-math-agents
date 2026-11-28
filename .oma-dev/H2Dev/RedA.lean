@@ -272,7 +272,28 @@ lemma pw_le : ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ,
       (r3 - 1) * (m3 - r3) : ℕ) : ℝ) ≤
       (r1 : ℝ) * m2 + (r1 : ℝ) * ((s1 - r1 : ℕ) : ℝ) + (r2 : ℝ) * m3 +
         (r2 : ℝ) * ((m2 - m3 - r2 : ℕ) : ℝ) - ((m2 - m3 - r2 : ℕ) : ℝ) + ((m3 : ℝ) - 1) ^ 2 / 4 := by
-  sorry
+  intro m r1 r2 s s1 m2 m3 r3 b2 hc _ _ hm3 _
+  obtain ⟨_, h2, _, h4, _, _, _, _⟩ := hc
+  generalize hp : r1 - 1 = p
+  generalize hd : s1 - r1 = d
+  generalize he : m2 - m3 - r2 = e
+  generalize hq : r2 - 1 = q
+  generalize ha : r3 - 1 = a
+  generalize hb : m3 - r3 = b
+  have hpd : p * d ≤ r1 * d := Nat.mul_le_mul_right _ (by omega)
+  have hqr : (q : ℝ) + 1 = r2 := by exact_mod_cast (show q + 1 = r2 by omega)
+  have hab : a = 0 ∨ b = 0 ∨ a + b + 1 = m3 := by omega
+  have hpd' : (p : ℝ) * d ≤ r1 * d := by exact_mod_cast hpd
+  have hab' : (a : ℝ) * b ≤ ((m3 : ℝ) - 1) ^ 2 / 4 := by
+    rcases hab with h | h | h
+    · rw [h, Nat.cast_zero, zero_mul]; positivity
+    · rw [h, Nat.cast_zero, mul_zero]; positivity
+    · have h' : (a : ℝ) + b + 1 = m3 := by exact_mod_cast h
+      rw [← h']
+      nlinarith [sq_nonneg ((a : ℝ) - b)]
+  have hqe : (q : ℝ) * e = r2 * e - e := by rw [← hqr]; ring
+  push_cast
+  linarith
 
 /-- L3, the nonsaturated cubic (class-three analogue of (129)-(130)): for `0 ≤ h ≤ r` and
 `h ≤ m - r`, `(r^2/2)(m - r - h) + h (m - r)^2 / 4 + h m^2 / 20 ≤ (2/27) m^3`.  Identity:
@@ -280,7 +301,16 @@ lemma pw_le : ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ,
 admissible `h/m` is about `0.0529 m^3 > m^3/20 ·(h/m)`. -/
 lemma ns_cubic (m r h : ℝ) (h0 : 0 ≤ h) (hr : h ≤ r) (hm : h ≤ m - r) :
     r ^ 2 / 2 * (m - r - h) + h * (m - r) ^ 2 / 4 + h * m ^ 2 / 20 ≤ 2 / 27 * m ^ 3 := by
-  sorry
+  have ha : 0 ≤ r - h := by linarith
+  have hb : 0 ≤ m - r - h := by linarith
+  nlinarith [mul_nonneg ha (sq_nonneg ((r - h) - 2 * (m - r - h) - 11 / 4 * h)),
+    mul_nonneg ha (sq_nonneg ((r - h) - 2 * (m - r - h) + 2 * h)),
+    mul_nonneg ha (sq_nonneg ((r - h) - 2 * (m - r - h) + 11 / 4 * h)),
+    mul_nonneg hb (sq_nonneg ((r - h) - 2 * (m - r - h) + 5 / 4 * h)),
+    mul_nonneg h0 (sq_nonneg ((r - h) + (m - r - h) / 4)),
+    mul_nonneg h0 (sq_nonneg ((r - h) + (m - r - h) / 2)),
+    mul_nonneg h0 (sq_nonneg ((r - h) - 2 * (m - r - h) + 3 / 2 * h)),
+    mul_nonneg h0 (sq_nonneg ((r - h) - 2 * (m - r - h) + 7 / 4 * h))]
 
 /-- L4, nonsaturated assembly (class-three form of Theorem 11.3 (pp.69-71)): with
 `N_2 ≤ (r2 - s + 1) C(r1, 2) + Cn (r1^2 + r2^2)` (`H3`),
@@ -330,7 +360,11 @@ lemma psi_bound (r1 m2 : ℝ) (h1 : 0 ≤ r1) (h2 : 0 ≤ m2) :
         2 / 27 * (r1 + m2) ^ 3 - 2 / 9 * (r1 + m2) ^ 2 + (r1 + m2) / 24 ∧
       r1 ^ 2 * m2 / 2 + r1 * m2 / 2 - m2 ^ 2 - r1 ^ 2 / 2 - r1 ^ 2 ≤
         2 / 27 * (r1 + m2) ^ 3 - 2 / 3 * (r1 + m2) ^ 2 + 4 * (r1 + m2) := by
-  sorry
+  constructor
+  · nlinarith [sq_nonneg (r1 - 2 * m2), mul_nonneg h1 (sq_nonneg (r1 - 2 * m2 + 3 / 4)),
+      mul_nonneg h2 (sq_nonneg (r1 - 2 * m2 - 3 / 2))]
+  · nlinarith [sq_nonneg (r1 - 2 * m2), mul_nonneg h1 (sq_nonneg (r1 - 2 * m2 + 9 / 2)),
+      mul_nonneg h2 (sq_nonneg (r1 - 2 * m2 + 9 / 2))]
 
 /-- L7, closing for `δ ≥ 1` (`m^3 - n^3 = λ (m^2 + m n + n^2)`; split `λ < 32`, where
 `e ≤ 465`, from `λ ≥ 32`, where `2 m2 e ≤ 2 m^2`). -/
@@ -338,7 +372,29 @@ lemma lam_close (m lam r1 m2 e : ℝ) (hl : 1 ≤ lam) (hn : r1 + m2 = m - lam) 
     (h2 : 0 ≤ m2) (he0 : 0 ≤ e) (he : e ≤ lam * (lam - 1) / 2) (hem : e ≤ m2) :
     2 / 27 * (m - lam) ^ 3 - 2 / 9 * (m - lam) ^ 2 + (m - lam) / 24 + 2 * m2 * e + r1 * lam ≤
       2 / 27 * m ^ 3 - 4 / 9 * m ^ 2 + 40 * m := by
-  sorry
+  have hm : m = r1 + m2 + lam := by linarith
+  subst hm
+  have hl0 : (0 : ℝ) ≤ lam := by linarith
+  have hK : 0 ≤ lam * (2 / 27 * lam ^ 2 - 4 / 9 * lam + 40) :=
+    mul_nonneg hl0 (by nlinarith [sq_nonneg (lam - 3)])
+  rcases le_total lam 10 with hl10 | hl10
+  · have hE : 0 ≤ lam * (lam - 1) / 2 - e := by linarith
+    have hq : 0 ≤ 2 / 9 * lam ^ 2 - 17 / 9 * lam + 40 - 1 / 24 := by
+      nlinarith [sq_nonneg (lam - 17 / 4)]
+    have hp : 0 ≤ lam ^ 3 / 9 - lam ^ 2 + 2 / 9 * lam + 959 / 24 := by
+      nlinarith [mul_nonneg hl0 (sq_nonneg (lam - 6)), sq_nonneg (lam - 17 / 3)]
+    nlinarith [mul_nonneg (mul_nonneg (by linarith : (0 : ℝ) ≤ lam - 1) h2)
+        (by linarith : (0 : ℝ) ≤ m2 - e),
+      mul_nonneg (mul_nonneg (by linarith : (0 : ℝ) ≤ 10 - lam) h2) hE,
+      mul_nonneg (mul_nonneg (by linarith : (0 : ℝ) ≤ lam - 1) h1)
+        (by linarith : (0 : ℝ) ≤ r1 + 2 * m2),
+      mul_nonneg h2 hp, mul_nonneg h1 hq]
+  · have hq : 0 ≤ 2 / 9 * lam ^ 2 - 17 / 9 * lam + 39 := by
+      nlinarith [sq_nonneg (lam - 17 / 4)]
+    nlinarith [mul_nonneg (by linarith : (0 : ℝ) ≤ lam - 10) (sq_nonneg (r1 + m2)),
+      mul_nonneg h1 (by linarith : (0 : ℝ) ≤ r1 + 2 * m2),
+      mul_nonneg h2 (by linarith : (0 : ℝ) ≤ m2 - e),
+      mul_nonneg (by linarith : (0 : ℝ) ≤ r1 + m2) hq, mul_nonneg hl0 h2]
 
 /-- L8, the multiplicity saving at `δ = 0` (Li-Qiao (156)-(158)): if `2 r1 ≤ s r2` and
 `0 ≤ k ≤ r1 - s` then `-(r1 - s)^2 + k (2 r1 - s - k - s r2) ≤ -r1^2 + 2 r1 s`. -/
@@ -367,19 +423,61 @@ lemma small_core : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, m0 ≤ m �
 /-- L10 (a): `C(s-1, 2) ≤ r2 ≤ m` gives `s^2 ≤ 8 m` (for `m ≥ 2`). -/
 lemma sq_le_of_sat (m s r2 : ℕ) (hm : 2 ≤ m) (h : (s - 1).choose 2 ≤ r2) (hr : r2 ≤ m) :
     s ^ 2 ≤ 8 * m := by
-  sorry
+  rcases Nat.lt_or_ge s 4 with hs | hs
+  · have h9 : s ^ 2 ≤ 9 := by interval_cases s <;> norm_num
+    omega
+  · obtain ⟨t, rfl⟩ : ∃ t, s = t + 4 := ⟨s - 4, by omega⟩
+    have e1 : t + 4 - 1 = t + 3 := by omega
+    rw [e1, Nat.choose_two_right] at h
+    have e2 : t + 3 - 1 = t + 2 := by omega
+    rw [e2] at h
+    generalize hx : (t + 3) * (t + 2) = x at h
+    have hx2 : x ≤ 2 * m + 1 := by omega
+    nlinarith [Nat.zero_le (t * t)]
 
 /-- L10 (b): `C(s-1, 2) ≤ r2`, `s r2 < 2 r1 ≤ 2 m` give `(s - 2)^3 < 4 m`, hence `12 s^2 ≤ m`
 for large `m`. -/
 lemma small_core_size : ∃ m0 : ℕ, ∀ m s r1 r2 : ℕ, m0 ≤ m → (s - 1).choose 2 ≤ r2 →
     s * r2 < 2 * r1 → r1 ≤ m → 12 * s ^ 2 ≤ m := by
-  sorry
+  refine ⟨31212, fun m s r1 r2 hm hc hsr hr1 => ?_⟩
+  by_contra hlt
+  push_neg at hlt
+  have hs : 52 ≤ s := by
+    by_contra h
+    push_neg at h
+    have h51 : s ^ 2 ≤ 2601 :=
+      calc s ^ 2 ≤ 51 ^ 2 := Nat.pow_le_pow_left (by omega) 2
+        _ = 2601 := by norm_num
+    omega
+  obtain ⟨t, rfl⟩ : ∃ t, s = t + 2 := ⟨s - 2, by omega⟩
+  have e1 : t + 2 - 1 = t + 1 := by omega
+  rw [e1, Nat.choose_two_right] at hc
+  have e2 : t + 1 - 1 = t := by omega
+  rw [e2] at hc
+  generalize hx : (t + 1) * t = x at hc
+  have hx2 : x + 1 ≤ (r2 + 1) * 2 := by omega
+  have A := Nat.mul_le_mul_left (t + 2) hx2
+  have ht : 50 ≤ t := by omega
+  have B : 48 * t + 98 ≤ (t + 1) * t := by nlinarith [Nat.mul_le_mul_left t ht]
+  have C := Nat.mul_le_mul_left (t + 2) B
+  rw [hx] at C
+  nlinarith
 
 /-- L10 (c): bounded Sims rank forces a small core: `s ≤ H`, `r2 ≤ C(s, 2)`, `m < 7 r1` and
 `7 H^3 < 4 m` give `s r2 < 2 r1`. -/
 lemma core_small_of_le (H m s r1 r2 : ℕ) (hs : s ≤ H) (hr : r2 ≤ s.choose 2) (h7 : m < 7 * r1)
     (hH : 7 * H ^ 3 < 4 * m) : s * r2 < 2 * r1 := by
-  sorry
+  rw [Nat.choose_two_right] at hr
+  generalize hx : s * (s - 1) = x at hr
+  have h1 : r2 * 2 ≤ x := by omega
+  have h2 : s * (s - 1) ≤ s * s := Nat.mul_le_mul_left _ (Nat.sub_le _ _)
+  have h3 : s * s * s ≤ H * H * H := Nat.mul_le_mul (Nat.mul_le_mul hs hs) hs
+  have h4 : s * (r2 * 2) ≤ s * (s * s) :=
+    Nat.mul_le_mul_left _ (h1.trans (by rw [← hx]; exact h2))
+  have h5 : H ^ 3 = H * H * H := by ring
+  have h6 : s * (s * s) = s * s * s := by ring
+  have h8 : s * (r2 * 2) = 2 * (s * r2) := by ring
+  omega
 
 /-! ### Regime bounds -/
 
