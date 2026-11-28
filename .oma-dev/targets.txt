@@ -9,3 +9,4 @@ H2Dev.Breadth
 H2Dev.Alt2
 H2Dev.Bridge
 H2Dev.Alt2Bridge
+H2Dev.Isotropic
