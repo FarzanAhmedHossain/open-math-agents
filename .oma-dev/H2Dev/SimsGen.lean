@@ -23,7 +23,24 @@ The relation arrays:
   recorded on the index ranges of Proposition 2.4: weight-1 pairs `t < k`; weight-2 `t` against
   core `k` with `k ≤ (df t).2` (the condition `d_{k-1} < j`); weight `≥ 3` against all core `k`.
 
-Commutators are Mathlib's `⁅x, y⁆ = x * y * x⁻¹ * y⁻¹`. -/
+Commutator convention: Mathlib's `⁅x, y⁆ = x * y * x⁻¹ * y⁻¹`, as in `CommForm.lean` and the rest
+of the Sims-lite library. The paper uses `[x, y] = x⁻¹ y⁻¹ x y`, so the generators `g_{i,j}` for
+`i ≥ 2` and the commutator coefficients `c` here differ from the paper's by this change of
+convention; rigidity and all counts are unaffected, and downstream modules must use the same
+convention.
+
+Main results:
+* `prop_2_4` (Proposition 2.4) and `sims_rigidity`;
+* `exists_sims_gen` (Section 2.1): the paper's Sims generating set. The core comes from
+  `CoreFlag.core_flag` (strict flag, BNV Prop 5.2); layer 1 is the core completed greedily to a
+  basis modulo `Φ(G)`; each later layer is selected greedily, as a minimum generating set
+  modulo `γ_{i+1} γ_i^p`, from the commutators of the previous layer with the core (weight 2 in
+  blocks sorted by the second index). The properties are collected in `SimsGen`: `r_i` entries
+  in weight `i`, with `p ^ r_i |γ_{i+1} γ_i^p| = |γ_i|` and `r_1 = d(G)`; relative orders `≥ 1` and
+  `n ≤ m`; the block structure `(d_k)`, `f` of weight 2; unique normal forms (26).
+Not formalised: the weight-3 index restriction `a > d_{b-1}` on the candidates of layer 3 (BNV
+5.4, a Jacobi reduction); the construction here selects layer 3 from all `[g_{2,a}, g_{1,b}]`,
+`b ≤ s`. Proposition 2.4 only records `c(2, j, k, ·)` for `k ≤ (df j).2`, as in the paper. -/
 
 namespace OMA.SimsLite
 
@@ -754,7 +771,9 @@ lemma SimsRealizes.of_rec {p : ℕ} (d : SimsData) (c' : Fin d.n → Fin d.n →
 generating sets `X`, `X'` sharing the integers `p, c, s, (r_i), (d_k)` and the recorded
 generator definitions (all encoded in `d`), the relative order array `a`, the power word array
 `b`, and the commutator coefficient array on the index ranges of Proposition 2.4 (`d.c` and `c'`
-agree wherever `d.Rec` holds). Then `G ≅ G'`. -/
+agree wherever `d.Rec` holds). Then `G ≅ G'`. The generator definitions `d.df` (the function
+`f` and the higher index pairs) are part of the input data, as in the recorded Sims presentation
+data of the paper; `Bounded` is not needed. -/
 theorem prop_2_4 {p : ℕ} (hp : p.Prime) [Finite G] [Finite G'] (d : SimsData) (hd : d.Valid)
     (c' : Fin d.n → Fin d.n → Fin d.n → ℕ) (hc : ∀ t k u, d.Rec t k → c' t k u = d.c t k u)
     (X : Fin d.n → G) (X' : Fin d.n → G') (h : SimsRealizes p d X)
@@ -1728,7 +1747,7 @@ lemma sLay_span_one (hs : 0 < s) (hx0 : ∀ a < s, L0.x a = u a) {k : ℕ} (hk :
       slot_div has, hx0 a has]
   rw [← hv, sLay_one]
   refine (sup_le_sup_right (Subgroup.closure_mono ?_) _)
-    (gLay_span _ _ _ _ _ hJ hj)
+    (gLay_span (cVal s u 0 L0) (layK p G 1) (cN s 0 L0) (cPar s 0) (cCor s 0) hJ hj)
   rintro _ ⟨i, ⟨hi, hik⟩, rfl⟩
   refine ⟨i, ⟨hi, ?_⟩, rfl⟩
   show cCor s 0 (genum _ i) < k
@@ -1778,5 +1797,976 @@ theorem sLay_lcs [Finite G] {m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) (
     exact commElem_mem_symm (mem_zn.mp (hle hy1))
 
 end Layers2
+
+section Layer0
+
+/-- An enumeration of all elements of `G` (junk `1` beyond `|G|`). -/
+noncomputable def allElt (G : Type u) [Group G] [Finite G] (j : ℕ) : G :=
+  if h : j < Nat.card G then (Finite.equivFin G).symm ⟨j, h⟩ else 1
+
+variable {G : Type u} [Group G] [Finite G]
+
+lemma allElt_surj (g : G) : ∃ j < Nat.card G, allElt G j = g := by
+  refine ⟨(Finite.equivFin G g).val, (Finite.equivFin G g).isLt, ?_⟩
+  unfold allElt
+  rw [dif_pos (Finite.equivFin G g).isLt]
+  simp
+
+/-- The greedy completion of the core to a basis modulo `Φ(G)`. -/
+noncomputable abbrev lay0E (p s : ℕ) (u : ℕ → G) : SLay G :=
+  gLay (allElt G) (Subgroup.closure (u '' Set.Iio s) ⊔ pPhi p G) (Nat.card G) id id
+
+/-- Layer `0` (weight 1): the core `u_0, ..., u_{s-1}` followed by its greedy completion. -/
+noncomputable def lay0 (p s : ℕ) (u : ℕ → G) : SLay G where
+  r := s + (lay0E p s u).r
+  x := fun i => if i < s then u i else (lay0E p s u).x (i - s)
+  par := id
+  cor := id
+
+variable (p s : ℕ) (u : ℕ → G)
+
+lemma lay0_x_lt {i : ℕ} (h : i < s) : (lay0 p s u).x i = u i := if_pos h
+
+lemma lay0_x_ge {i : ℕ} (h : ¬ i < s) : (lay0 p s u).x i = (lay0E p s u).x (i - s) := if_neg h
+
+lemma lay0_indep (hu : ∀ k < s, u k ∉ Subgroup.closure (u '' Set.Iio k) ⊔ pPhi p G) {i : ℕ}
+    (hi : i < (lay0 p s u).r) :
+    (lay0 p s u).x i ∉ Subgroup.closure ((lay0 p s u).x '' Set.Iio i) ⊔ pPhi p G := by
+  by_cases his : i < s
+  · rw [lay0_x_lt p s u his]
+    intro hmem
+    apply hu i his
+    refine (sup_le_sup_right (Subgroup.closure_mono ?_) _) hmem
+    rintro _ ⟨i', hi', rfl⟩
+    have hi'' : i' < i := hi'
+    exact ⟨i', hi', (lay0_x_lt p s u (lt_trans hi'' his)).symm⟩
+  · rw [lay0_x_ge p s u his]
+    intro hmem
+    have hi' : i - s < (lay0E p s u).r := by
+      have h1 : i < s + (lay0E p s u).r := hi
+      omega
+    apply gLay_indep _ _ _ _ _ hi'
+    refine (sup_le ?_ ?_) hmem
+    · rw [Subgroup.closure_le]
+      rintro _ ⟨i', hi'', rfl⟩
+      have hi''' : i' < i := hi''
+      by_cases h' : i' < s
+      · rw [lay0_x_lt p s u h']
+        exact Subgroup.mem_sup_right
+          (Subgroup.mem_sup_left (Subgroup.subset_closure ⟨i', h', rfl⟩))
+      · rw [lay0_x_ge p s u h']
+        exact Subgroup.mem_sup_left
+          (Subgroup.subset_closure ⟨i' - s, show i' - s < i - s by omega, rfl⟩)
+    · exact le_sup_right.trans le_sup_right
+
+lemma lay0_span (g : G) :
+    g ∈ Subgroup.closure ((lay0 p s u).x '' Set.Iio (lay0 p s u).r) ⊔ pPhi p G := by
+  obtain ⟨j, hj, rfl⟩ := allElt_surj g
+  have h1 := gLay_span (allElt G) (Subgroup.closure (u '' Set.Iio s) ⊔ pPhi p G) (Nat.card G)
+    id id le_rfl hj
+  refine (sup_le ?_ ?_) h1
+  · rw [Subgroup.closure_le]
+    rintro _ ⟨i, ⟨hi, -⟩, rfl⟩
+    have hi' : i < (lay0E p s u).r := hi
+    refine Subgroup.mem_sup_left (Subgroup.subset_closure ⟨s + i, ?_, ?_⟩)
+    · show s + i < s + (lay0E p s u).r
+      omega
+    · rw [lay0_x_ge p s u (by omega), show s + i - s = i by omega]
+  · refine sup_le ?_ le_sup_right
+    refine (Subgroup.closure_mono ?_).trans le_sup_left
+    rintro _ ⟨k, hk, rfl⟩
+    have hk' : k < s := hk
+    exact ⟨k, show k < s + (lay0E p s u).r by omega, lay0_x_lt p s u hk'⟩
+
+end Layer0
+
+section Flat
+
+/-! Flattening the layers into a tuple `X : Fin n → G`: layer `w` occupies the positions
+`fOff r w, ..., fOff r w + r w - 1`. -/
+
+variable {G : Type u} [Group G]
+
+/-- Offsets of the layers. -/
+def fOff (ℓ : ℕ → ℕ) : ℕ → ℕ
+  | 0 => 0
+  | w + 1 => fOff ℓ w + ℓ w
+
+lemma fOff_succ (ℓ : ℕ → ℕ) (w : ℕ) : fOff ℓ (w + 1) = fOff ℓ w + ℓ w := rfl
+
+lemma fOff_mono (ℓ : ℕ → ℕ) {a b : ℕ} (h : a ≤ b) : fOff ℓ a ≤ fOff ℓ b := by
+  induction b with
+  | zero =>
+    obtain rfl : a = 0 := by omega
+    exact le_rfl
+  | succ b ih =>
+    rcases Nat.lt_or_ge a (b + 1) with h' | h'
+    · rw [fOff_succ]
+      exact le_trans (ih (by omega)) (Nat.le_add_right _ _)
+    · obtain rfl : a = b + 1 := by omega
+      exact le_rfl
+
+/-- The layer of position `t`. -/
+def fLv (ℓ : ℕ → ℕ) (L t : ℕ) : ℕ := Nat.findGreatest (fun w => fOff ℓ w ≤ t) L
+
+lemma fLv_eq {ℓ : ℕ → ℕ} {L t w : ℕ} (hw : w ≤ L) (h1 : fOff ℓ w ≤ t) (h2 : t < fOff ℓ (w + 1)) :
+    fLv ℓ L t = w := by
+  unfold fLv
+  have hle := Nat.le_findGreatest (P := fun w => fOff ℓ w ≤ t) hw h1
+  have hspec : fOff ℓ (Nat.findGreatest (fun w => fOff ℓ w ≤ t) L) ≤ t :=
+    Nat.findGreatest_spec (P := fun w => fOff ℓ w ≤ t) hw h1
+  by_contra hne
+  have hgt : w + 1 ≤ Nat.findGreatest (fun w => fOff ℓ w ≤ t) L := by omega
+  have := fOff_mono ℓ hgt
+  omega
+
+lemma fLv_spec {ℓ : ℕ → ℕ} {L t : ℕ} (ht : t < fOff ℓ (L + 1)) :
+    fOff ℓ (fLv ℓ L t) ≤ t ∧ t < fOff ℓ (fLv ℓ L t + 1) ∧ fLv ℓ L t ≤ L := by
+  have h1 : fOff ℓ (fLv ℓ L t) ≤ t :=
+    Nat.findGreatest_spec (P := fun w => fOff ℓ w ≤ t) (Nat.zero_le L) (Nat.zero_le t)
+  have h3 : fLv ℓ L t ≤ L := Nat.findGreatest_le L
+  refine ⟨h1, ?_, h3⟩
+  by_cases hL : fLv ℓ L t = L
+  · rw [hL]
+    exact ht
+  · have h4 := Nat.findGreatest_is_greatest (P := fun w => fOff ℓ w ≤ t)
+      (n := L) (k := fLv ℓ L t + 1) (by unfold fLv; omega) (by omega)
+    exact not_le.mp h4
+
+lemma fLv_mono {ℓ : ℕ → ℕ} {L t t' : ℕ} (ht' : t' < fOff ℓ (L + 1)) (h : t ≤ t') :
+    fLv ℓ L t ≤ fLv ℓ L t' := by
+  have ht : t < fOff ℓ (L + 1) := lt_of_le_of_lt h ht'
+  obtain ⟨h1, -, -⟩ := fLv_spec ht
+  obtain ⟨-, h2', -⟩ := fLv_spec ht'
+  by_contra hc
+  have := fOff_mono ℓ (show fLv ℓ L t' + 1 ≤ fLv ℓ L t by omega)
+  omega
+
+/-- `k` as an element of `Fin n` (junk `dflt` out of range). -/
+def bFin (n k : ℕ) (dflt : Fin n) : Fin n := if h : k < n then ⟨k, h⟩ else dflt
+
+lemma bFin_val {n k : ℕ} (dflt : Fin n) (h : k < n) : (bFin n k dflt).val = k := by
+  unfold bFin
+  rw [dif_pos h]
+
+/-- The layer lengths, truncated after layer `L`. -/
+def fLen (L : ℕ) (r : ℕ → ℕ) (w : ℕ) : ℕ := if w ≤ L then r w else 0
+
+lemma fLen_of_le {L : ℕ} {r : ℕ → ℕ} {w : ℕ} (h : w ≤ L) : fLen L r w = r w := if_pos h
+
+lemma fLen_of_gt {L : ℕ} {r : ℕ → ℕ} {w : ℕ} (h : ¬ w ≤ L) : fLen L r w = 0 := if_neg h
+
+lemma fOff_one (L : ℕ) (r : ℕ → ℕ) : fOff (fLen L r) 1 = r 0 := by
+  show fOff (fLen L r) 0 + fLen L r 0 = r 0
+  rw [fLen_of_le (Nat.zero_le L)]
+  show 0 + r 0 = r 0
+  omega
+
+lemma fpos_lt {L : ℕ} {r : ℕ → ℕ} {w i : ℕ} (hw : w ≤ L) (hi : i < r w) :
+    fOff (fLen L r) w + i < fOff (fLen L r) (L + 1) := by
+  have h1 : fOff (fLen L r) (w + 1) = fOff (fLen L r) w + r w := by
+    rw [fOff_succ, fLen_of_le hw]
+  have h2 := fOff_mono (fLen L r) (show w + 1 ≤ L + 1 by omega)
+  omega
+
+lemma fpos_lv {L : ℕ} {r : ℕ → ℕ} {w i : ℕ} (hw : w ≤ L) (hi : i < r w) :
+    fLv (fLen L r) L (fOff (fLen L r) w + i) = w := by
+  apply fLv_eq hw (Nat.le_add_right _ _)
+  rw [fOff_succ, fLen_of_le hw]
+  omega
+
+lemma fLv_inv {L : ℕ} {r : ℕ → ℕ} {t : ℕ} (ht : t < fOff (fLen L r) (L + 1)) :
+    fLv (fLen L r) L t ≤ L ∧ fOff (fLen L r) (fLv (fLen L r) L t) ≤ t ∧
+      t - fOff (fLen L r) (fLv (fLen L r) L t) < r (fLv (fLen L r) L t) := by
+  obtain ⟨h1, h2, h3⟩ := fLv_spec ht
+  refine ⟨h3, h1, ?_⟩
+  rw [fOff_succ, fLen_of_le h3] at h2
+  omega
+
+/-- The commutator definitions of the flattened tuple. -/
+def fDf (L : ℕ) (r : ℕ → ℕ) (pa co : ℕ → ℕ → ℕ) (t : Fin (fOff (fLen L r) (L + 1))) :
+    Fin (fOff (fLen L r) (L + 1)) × Fin (fOff (fLen L r) (L + 1)) :=
+  match fLv (fLen L r) L t.val with
+  | 0 => (t, t)
+  | w + 1 => (bFin _ (fOff (fLen L r) w + pa (w + 1) (t.val - fOff (fLen L r) (w + 1))) t,
+      bFin _ (co (w + 1) (t.val - fOff (fLen L r) (w + 1))) t)
+
+lemma fDf_succ (L : ℕ) (r : ℕ → ℕ) (pa co : ℕ → ℕ → ℕ) (t : Fin (fOff (fLen L r) (L + 1)))
+    {w : ℕ} (h : fLv (fLen L r) L t.val = w + 1) :
+    fDf L r pa co t = (bFin _ (fOff (fLen L r) w + pa (w + 1) (t.val - fOff (fLen L r) (w + 1))) t,
+      bFin _ (co (w + 1) (t.val - fOff (fLen L r) (w + 1))) t) := by
+  unfold fDf
+  rw [h]
+
+/-- The flattened tuple. -/
+def fX (L : ℕ) (r : ℕ → ℕ) (xs : ℕ → ℕ → G) (t : Fin (fOff (fLen L r) (L + 1))) : G :=
+  xs (fLv (fLen L r) L t.val) (t.val - fOff (fLen L r) (fLv (fLen L r) L t.val))
+
+lemma fX_eq (L : ℕ) (r : ℕ → ℕ) (xs : ℕ → ℕ → G) (t : Fin (fOff (fLen L r) (L + 1))) {w : ℕ}
+    (h : fLv (fLen L r) L t.val = w) : fX L r xs t = xs w (t.val - fOff (fLen L r) w) := by
+  unfold fX
+  rw [h]
+
+lemma fX_pos {L : ℕ} {r : ℕ → ℕ} (xs : ℕ → ℕ → G) {w i : ℕ} (hw : w ≤ L) (hi : i < r w) :
+    fX L r xs ⟨fOff (fLen L r) w + i, fpos_lt hw hi⟩ = xs w i := by
+  rw [fX_eq L r xs ⟨fOff (fLen L r) w + i, fpos_lt hw hi⟩ (fpos_lv hw hi)]
+  show xs w (fOff (fLen L r) w + i - fOff (fLen L r) w) = xs w i
+  rw [Nat.add_sub_cancel_left]
+
+/-- The shape of the flattened tuple (the arrays are filled in by `exists_arrays`). -/
+def fData (s L : ℕ) (r : ℕ → ℕ) (pa co : ℕ → ℕ → ℕ) : SimsData where
+  n := fOff (fLen L r) (L + 1)
+  s := s
+  lv := fun t => fLv (fLen L r) L t.val
+  df := fDf L r pa co
+  a := fun _ => 0
+  b := fun _ _ => 0
+  c := fun _ _ _ => 0
+
+variable {s L : ℕ} {r : ℕ → ℕ} {xs : ℕ → ℕ → G} {pa co : ℕ → ℕ → ℕ}
+
+lemma fData_s_le (H0 : s ≤ r 0) : s ≤ fOff (fLen L r) (L + 1) := by
+  have h1 := fOff_one L r
+  have h2 := fOff_mono (fLen L r) (show 1 ≤ L + 1 by omega)
+  omega
+
+lemma fDf_vals (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (t : Fin (fOff (fLen L r) (L + 1))) {w : ℕ} (hw : fLv (fLen L r) L t.val = w + 1) :
+    w + 1 ≤ L ∧ t.val - fOff (fLen L r) (w + 1) < r (w + 1) ∧
+    ((fDf L r pa co t).1).val =
+      fOff (fLen L r) w + pa (w + 1) (t.val - fOff (fLen L r) (w + 1)) ∧
+    ((fDf L r pa co t).2).val = co (w + 1) (t.val - fOff (fLen L r) (w + 1)) := by
+  obtain ⟨hL, -, hi⟩ := fLv_inv (r := r) t.isLt
+  rw [hw] at hL hi
+  have hp := Hpa w _ hi
+  have hc := Hco w _ hi
+  refine ⟨hL, hi, ?_, ?_⟩
+  · rw [fDf_succ L r pa co t hw]
+    exact bFin_val t (fpos_lt (show w ≤ L by omega) hp)
+  · rw [fDf_succ L r pa co t hw]
+    exact bFin_val t (lt_of_lt_of_le hc (fData_s_le (L := L) H0))
+
+lemma fData_struct (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (H1 : ∀ i, i < r 1 → pa 1 i < co 1 i) : (fData s L r pa co).Struct := by
+  refine ⟨?_, fData_s_le H0, ?_, ?_, ?_, ?_⟩
+  · intro t v htv
+    exact fLv_mono v.isLt (Fin.le_def.mp htv)
+  · intro t ht
+    have ht' : t.val < fOff (fLen L r) (0 + 1) := by
+      have h1 : fOff (fLen L r) (0 + 1) = r 0 := fOff_one L r
+      have h2 : t.val < s := ht
+      omega
+    exact fLv_eq (Nat.zero_le L) (Nat.zero_le _) ht'
+  · intro t ht
+    obtain ⟨w, hw⟩ : ∃ w, fLv (fLen L r) L t.val = w + 1 :=
+      ⟨fLv (fLen L r) L t.val - 1, by have : 1 ≤ fLv (fLen L r) L t.val := ht; omega⟩
+    obtain ⟨hL, hi, h1, -⟩ := fDf_vals (pa := pa) (co := co) H0 Hpa Hco t hw
+    show fLv (fLen L r) L ((fDf L r pa co t).1).val + 1 = fLv (fLen L r) L t.val
+    rw [h1, hw, fpos_lv (show w ≤ L by omega) (Hpa w _ hi)]
+  · intro t ht
+    obtain ⟨w, hw⟩ : ∃ w, fLv (fLen L r) L t.val = w + 1 :=
+      ⟨fLv (fLen L r) L t.val - 1, by have : 1 ≤ fLv (fLen L r) L t.val := ht; omega⟩
+    obtain ⟨-, hi, -, h2⟩ := fDf_vals (pa := pa) (co := co) H0 Hpa Hco t hw
+    show ((fDf L r pa co t).2).val < s
+    rw [h2]
+    exact Hco w _ hi
+  · intro t ht
+    have hw : fLv (fLen L r) L t.val = 0 + 1 := ht
+    obtain ⟨-, hi, h1, h2⟩ := fDf_vals (pa := pa) (co := co) H0 Hpa Hco t hw
+    show (fDf L r pa co t).1 < (fDf L r pa co t).2
+    rw [Fin.lt_def, h1, h2]
+    have h3 : pa 1 (t.val - fOff (fLen L r) (0 + 1)) < co 1 (t.val - fOff (fLen L r) (0 + 1)) :=
+      H1 _ hi
+    show 0 + pa 1 (t.val - fOff (fLen L r) (0 + 1)) < co 1 (t.val - fOff (fLen L r) (0 + 1))
+    omega
+
+lemma fX_df (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (Hx : ∀ w i, i < r (w + 1) → xs (w + 1) i = ⁅xs w (pa (w + 1) i), xs 0 (co (w + 1) i)⁆)
+    (t : Fin (fOff (fLen L r) (L + 1))) (ht : 1 ≤ fLv (fLen L r) L t.val) :
+    fX L r xs t = ⁅fX L r xs (fDf L r pa co t).1, fX L r xs (fDf L r pa co t).2⁆ := by
+  obtain ⟨w, hw⟩ : ∃ w, fLv (fLen L r) L t.val = w + 1 := ⟨fLv (fLen L r) L t.val - 1, by omega⟩
+  obtain ⟨hL, hi, h1, h2⟩ := fDf_vals (pa := pa) (co := co) H0 Hpa Hco t hw
+  have hp := Hpa w _ hi
+  have hc := Hco w _ hi
+  have e1 : fLv (fLen L r) L ((fDf L r pa co t).1).val = w := by
+    rw [h1]
+    exact fpos_lv (show w ≤ L by omega) hp
+  have e2 : fLv (fLen L r) L ((fDf L r pa co t).2).val = 0 := by
+    rw [h2]
+    have h3 : fOff (fLen L r) (0 + 1) = r 0 := fOff_one L r
+    exact fLv_eq (Nat.zero_le L) (Nat.zero_le _) (by omega)
+  have e0 : fOff (fLen L r) 0 = 0 := rfl
+  rw [fX_eq L r xs t hw, fX_eq L r xs _ e1, fX_eq L r xs _ e2, Hx w _ hi, h1, h2,
+    Nat.add_sub_cancel_left, e0, Nat.sub_zero]
+
+lemma flat_gen (h0 : Subgroup.closure (xs 0 '' Set.Iio (r 0)) = ⊤) :
+    Subgroup.closure (Set.range (fX L r xs)) = ⊤ := by
+  rw [eq_top_iff, ← h0, Subgroup.closure_le]
+  rintro _ ⟨i, hi, rfl⟩
+  exact Subgroup.subset_closure ⟨⟨_, fpos_lt (Nat.zero_le L) hi⟩, fX_pos xs (Nat.zero_le L) hi⟩
+
+lemma flat_lev
+    (HU : ∀ w, w + 1 ≤ L → lcs G (w + 1) ≤
+      Subgroup.closure (xs (w + 1) '' Set.Iio (r (w + 1))) ⊔ lcs G (w + 2))
+    (HL : lcs G (L + 1) = ⊥) (w : ℕ) :
+    lcs G (w + 1) ≤ Subgroup.closure (levSet (fData s L r pa co) (fX L r xs) (w + 1)) ⊔
+      lcs G (w + 2) := by
+  by_cases hw : w + 1 ≤ L
+  · refine (HU w hw).trans (sup_le_sup_right (Subgroup.closure_mono ?_) _)
+    rintro _ ⟨i, hi, rfl⟩
+    exact ⟨⟨_, fpos_lt hw hi⟩, fpos_lv hw hi, fX_pos xs hw hi⟩
+  · exact ((lcs_antitone (D := G) (show L + 1 ≤ w + 1 by omega)).trans (le_of_eq HL)).trans
+      bot_le
+
+lemma flat_deep (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (H1 : ∀ i, i < r 1 → pa 1 i < co 1 i)
+    (Hx : ∀ w i, i < r (w + 1) → xs (w + 1) i = ⁅xs w (pa (w + 1) i), xs 0 (co (w + 1) i)⁆)
+    (h0 : Subgroup.closure (xs 0 '' Set.Iio (r 0)) = ⊤)
+    (HU : ∀ w, w + 1 ≤ L → lcs G (w + 1) ≤
+      Subgroup.closure (xs (w + 1) '' Set.Iio (r (w + 1))) ⊔ lcs G (w + 2))
+    (HL : lcs G (L + 1) = ⊥) :
+    ∀ w, 1 ≤ w → lcs G w ≤ Subgroup.closure (fX L r xs '' {v | w ≤ (fData s L r pa co).lv v}) := by
+  have hd := fData_struct (L := L) H0 Hpa Hco H1
+  have hdf : ∀ t, 1 ≤ (fData s L r pa co).lv t → fX L r xs t =
+      ⁅fX L r xs ((fData s L r pa co).df t).1, fX L r xs ((fData s L r pa co).df t).2⁆ :=
+    fun t ht => fX_df H0 Hpa Hco Hx t ht
+  have hlv := lv_mem_lcs (fData s L r pa co) hd (fX L r xs) hdf
+  refine sims_lcs_tail (fData s L r pa co) hd (fX L r xs) (flat_gen h0) ⟨L + 1, HL⟩ hdf ?_ ?_ ?_
+  · intro i k _ _
+    exact flat_lev HU HL 0 (commElem_mem_lcs_one _ _)
+  · intro t k ht _
+    have h1 := commElem_mem_lcs_succ (hlv t) (fX L r xs k)
+    rw [ht] at h1
+    exact flat_lev HU HL 1 h1
+  · intro t k _ _
+    exact flat_lev HU HL ((fData s L r pa co).lv t) (commElem_mem_lcs_succ (hlv t) _)
+
+lemma flat_indep (p : ℕ)
+    (Hind : ∀ w i, i < r w → xs w i ∉ Subgroup.closure (xs w '' Set.Iio i) ⊔ layK p G w)
+    (t : Fin (fOff (fLen L r) (L + 1))) :
+    fX L r xs t ∉ Subgroup.closure (fX L r xs '' {v | (fData s L r pa co).lv v =
+      (fData s L r pa co).lv t ∧ v < t}) ⊔ layK p G ((fData s L r pa co).lv t) := by
+  obtain ⟨-, -, hi⟩ := fLv_inv (r := r) t.isLt
+  intro hmem
+  apply Hind _ _ hi
+  rw [← fX_eq L r xs t rfl]
+  refine (sup_le_sup_right (Subgroup.closure_mono ?_) _) hmem
+  rintro _ ⟨v, ⟨hv1, hv2⟩, rfl⟩
+  have hv1' : fLv (fLen L r) L v.val = fLv (fLen L r) L t.val := hv1
+  obtain ⟨-, hv3, -⟩ := fLv_inv (r := r) v.isLt
+  rw [hv1'] at hv3
+  have hv2' : v.val < t.val := hv2
+  refine ⟨v.val - fOff (fLen L r) (fLv (fLen L r) L t.val), ?_, (fX_eq L r xs v hv1').symm⟩
+  show v.val - fOff (fLen L r) (fLv (fLen L r) L t.val) <
+    t.val - fOff (fLen L r) (fLv (fLen L r) L t.val)
+  omega
+
+lemma flat_core (u : ℕ → G) (H0 : s ≤ r 0) (Hc0 : ∀ i < s, xs 0 i = u i)
+    (t : Fin (fOff (fLen L r) (L + 1))) (ht : t.val < s) : fX L r xs t = u t.val := by
+  have h1 : fOff (fLen L r) (0 + 1) = r 0 := fOff_one L r
+  have h0 : fLv (fLen L r) L t.val = 0 :=
+    fLv_eq (Nat.zero_le L) (Nat.zero_le _) (by omega)
+  rw [fX_eq L r xs t h0]
+  show xs 0 (t.val - 0) = u t.val
+  rw [Nat.sub_zero]
+  exact Hc0 _ ht
+
+lemma flat_one (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (t : Fin (fOff (fLen L r) (L + 1))) (ht : fLv (fLen L r) L t.val = 1) :
+    1 ≤ L ∧ r 0 ≤ t.val ∧ t.val - r 0 < r 1 ∧
+      ((fDf L r pa co t).1).val = pa 1 (t.val - r 0) ∧
+      ((fDf L r pa co t).2).val = co 1 (t.val - r 0) := by
+  have hw : fLv (fLen L r) L t.val = 0 + 1 := ht
+  obtain ⟨hL, hi, h1, h2⟩ := fDf_vals (pa := pa) (co := co) H0 Hpa Hco t hw
+  obtain ⟨-, h3, -⟩ := fLv_inv (r := r) t.isLt
+  rw [hw] at h3
+  have e : fOff (fLen L r) (0 + 1) = r 0 := fOff_one L r
+  rw [e] at hi h1 h2 h3
+  refine ⟨hL, h3, hi, ?_, h2⟩
+  rw [h1]
+  show 0 + pa 1 (t.val - r 0) = pa 1 (t.val - r 0)
+  omega
+
+lemma flat_mono (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (Hmono : ∀ i i', i ≤ i' → i' < r 1 → co 1 i ≤ co 1 i')
+    (t t' : Fin (fOff (fLen L r) (L + 1))) (ht : fLv (fLen L r) L t.val = 1)
+    (ht' : fLv (fLen L r) L t'.val = 1) (htt : t ≤ t') :
+    (fDf L r pa co t).2 ≤ (fDf L r pa co t').2 := by
+  obtain ⟨-, h3, -, -, h2⟩ := flat_one (pa := pa) (co := co) H0 Hpa Hco t ht
+  obtain ⟨-, h3', hi', -, h2'⟩ := flat_one (pa := pa) (co := co) H0 Hpa Hco t' ht'
+  rw [Fin.le_def, h2, h2']
+  have h4 : t.val ≤ t'.val := Fin.le_def.mp htt
+  exact Hmono _ _ (by omega) hi'
+
+lemma flat_inj (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s)
+    (Hinj : ∀ i i', i < r 1 → i' < r 1 → pa 1 i = pa 1 i' → co 1 i = co 1 i' → i = i')
+    (t t' : Fin (fOff (fLen L r) (L + 1))) (ht : fLv (fLen L r) L t.val = 1)
+    (ht' : fLv (fLen L r) L t'.val = 1) (h1 : (fDf L r pa co t).1 = (fDf L r pa co t').1)
+    (h2 : (fDf L r pa co t).2 = (fDf L r pa co t').2) : t = t' := by
+  obtain ⟨-, h3, hi, e1, e2⟩ := flat_one (pa := pa) (co := co) H0 Hpa Hco t ht
+  obtain ⟨-, h3', hi', e1', e2'⟩ := flat_one (pa := pa) (co := co) H0 Hpa Hco t' ht'
+  have hp : pa 1 (t.val - r 0) = pa 1 (t'.val - r 0) := by rw [← e1, ← e1', h1]
+  have hc : co 1 (t.val - r 0) = co 1 (t'.val - r 0) := by rw [← e2, ← e2', h2]
+  have h4 := Hinj _ _ hi hi' hp hc
+  exact Fin.ext (by omega)
+
+lemma flat_Wk (p : ℕ) (u : ℕ → G) (H0 : s ≤ r 0)
+    (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s) (H1 : ∀ i, i < r 1 → pa 1 i < co 1 i)
+    (Hx : ∀ w i, i < r (w + 1) → xs (w + 1) i = ⁅xs w (pa (w + 1) i), xs 0 (co (w + 1) i)⁆)
+    (Hc0 : ∀ i < s, xs 0 i = u i) (hL1 : 1 ≤ L)
+    (HS1 : ∀ k ≤ s, ∀ a b, a < b → b < k →
+      ⁅u a, u b⁆ ∈ Subgroup.closure (xs 1 '' {i | i < r 1 ∧ co 1 i < k}) ⊔ pN p G)
+    {k : ℕ} (hk : k ≤ s) :
+    WkN (pN p G) u k = Subgroup.closure (fX L r xs '' {t | (fData s L r pa co).lv t = 1 ∧
+      ((fData s L r pa co).df t).2.val < k}) ⊔ pN p G := by
+  apply le_antisymm
+  · refine WkN_le (pN p G) le_sup_right ?_
+    intro a b hab hb
+    refine (sup_le_sup_right (Subgroup.closure_mono ?_) _) (HS1 k hk a b hab hb)
+    rintro _ ⟨i, ⟨hi, hik⟩, rfl⟩
+    have hpos := fpos_lt (L := L) hL1 hi
+    have hlv := fpos_lv (L := L) hL1 hi
+    refine ⟨⟨_, hpos⟩, ⟨hlv, ?_⟩, fX_pos xs hL1 hi⟩
+    obtain ⟨-, -, -, -, h2⟩ := flat_one (pa := pa) (co := co) H0 Hpa Hco ⟨_, hpos⟩ hlv
+    show ((fDf L r pa co ⟨_, hpos⟩).2).val < k
+    rw [h2]
+    show co 1 (fOff (fLen L r) 1 + i - r 0) < k
+    have e : fOff (fLen L r) 1 + i - r 0 = i := by
+      rw [fOff_one]
+      omega
+    rw [e]
+    exact hik
+  · refine sup_le ?_ (le_WkN _ u k)
+    rw [Subgroup.closure_le]
+    rintro _ ⟨t, ⟨ht1, htk⟩, rfl⟩
+    have ht1' : fLv (fLen L r) L t.val = 1 := ht1
+    have hd := fData_struct (L := L) H0 Hpa Hco H1
+    have hlt : ((fDf L r pa co t).1).val < ((fDf L r pa co t).2).val :=
+      Fin.lt_def.mp (hd.df_one t ht1)
+    have hcs : ((fDf L r pa co t).2).val < s :=
+      hd.df_core t (show 1 ≤ fLv (fLen L r) L t.val by omega)
+    rw [fX_df H0 Hpa Hco Hx t (by omega), flat_core u H0 Hc0 _ (lt_trans hlt hcs),
+      flat_core u H0 Hc0 _ hcs]
+    exact comm_mem_WkN _ u hlt htk
+
+lemma flat_blocks (p : ℕ) (u : ℕ → G) (hstrict : StrictChainN (pN p G) u s)
+    (hWk : ∀ k ≤ s, WkN (pN p G) u k = Subgroup.closure (fX L r xs '' {t |
+      (fData s L r pa co).lv t = 1 ∧ ((fData s L r pa co).df t).2.val < k}) ⊔ pN p G)
+    {k : ℕ} (hk1 : 1 ≤ k) (hks : k < s) :
+    ∃ t, (fData s L r pa co).lv t = 1 ∧ ((fData s L r pa co).df t).2.val = k := by
+  by_contra hno
+  push_neg at hno
+  have hset : {t : Fin (fOff (fLen L r) (L + 1)) | (fData s L r pa co).lv t = 1 ∧
+      ((fData s L r pa co).df t).2.val < k} = {t | (fData s L r pa co).lv t = 1 ∧
+      ((fData s L r pa co).df t).2.val < k + 1} := by
+    ext t
+    simp only [Set.mem_setOf_eq]
+    constructor
+    · rintro ⟨h1, h2⟩
+      exact ⟨h1, by omega⟩
+    · rintro ⟨h1, h2⟩
+      have h3 := hno t h1
+      exact ⟨h1, by omega⟩
+  apply hstrict (k + 1) (by omega) (by omega)
+  rw [Nat.add_sub_cancel, hWk k (by omega), hWk (k + 1) (by omega), hset]
+
+end Flat
+
+section NormalForm
+
+variable {G : Type u} [Group G]
+
+/-- Existence of Sims normal forms with `0 ≤ e < p ^ a` for the whole group. -/
+theorem nf_exists_of [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
+    (d : SimsData) (hd : d.Struct) (X : Fin d.n → G)
+    (hgen : Subgroup.closure (Set.range X) = ⊤) (hlv : ∀ t, X t ∈ lcs G (d.lv t))
+    (hdeep : ∀ w, 1 ≤ w → lcs G w ≤ Subgroup.closure (X '' {u | w ≤ d.lv u})) :
+    ∀ g : G, ∃ e : Fin d.n → ℕ, (∀ t, e t < p ^ relOrd p d X t) ∧ g = nfw X e := by
+  intro g
+  have hnf := nfp_all d X hp hG hd hlv hdeep 0 d.n
+  have hmem : g ∈ Subgroup.closure (X '' lset d 0 d.n) := by
+    have hle : Subgroup.closure (Set.range X) ≤ Subgroup.closure (X '' lset d 0 d.n) := by
+      apply Subgroup.closure_mono
+      rintro _ ⟨v, rfl⟩
+      refine ⟨v, ?_, rfl⟩
+      rw [mem_lset]
+      rcases Nat.eq_zero_or_pos (d.lv v) with h | h
+      · exact Or.inr ⟨h.symm, v.isLt⟩
+      · exact Or.inl h
+    rw [hgen] at hle
+    exact hle (Subgroup.mem_top g)
+  obtain ⟨e, -, he, rfl⟩ := hnf g hmem
+  exact ⟨e, he, rfl⟩
+
+/-- Uniqueness of Sims normal forms (26): a counting argument, since
+`|G| = p ^ (∑ a) = #{e : 0 ≤ e < p ^ a}`. -/
+theorem nfw_unique [Finite G] {p : ℕ} (d : SimsData) (X : Fin d.n → G)
+    (hcard : Nat.card G = p ^ (∑ t, d.a t))
+    (hex : ∀ g : G, ∃ e : Fin d.n → ℕ, (∀ t, e t < p ^ d.a t) ∧ g = nfw X e)
+    (e e' : Fin d.n → ℕ) (he : ∀ t, e t < p ^ d.a t) (he' : ∀ t, e' t < p ^ d.a t)
+    (h : nfw X e = nfw X e') : e = e' := by
+  have hsurj : Function.Surjective
+      (fun f : (t : Fin d.n) → Fin (p ^ d.a t) => nfw X (fun t => (f t : ℕ))) := by
+    intro g
+    obtain ⟨e0, he0, rfl⟩ := hex g
+    exact ⟨fun t => ⟨e0 t, he0 t⟩, rfl⟩
+  have hc : Nat.card ((t : Fin d.n) → Fin (p ^ d.a t)) = Nat.card G := by
+    rw [Nat.card_pi, hcard]
+    simp only [Nat.card_fin]
+    exact Finset.prod_pow_eq_pow_sum _ _ _
+  have hinj := (hsurj.bijective_of_nat_card_le (le_of_eq hc)).1
+  have h2 := @hinj (fun t => ⟨e t, he t⟩) (fun t => ⟨e' t, he' t⟩) h
+  funext t
+  exact congrArg (fun f : (t : Fin d.n) → Fin (p ^ d.a t) => ((f t : Fin _) : ℕ)) h2
+
+end NormalForm
+
+section SimsCore
+
+variable {G : Type u} [Group G]
+
+/-- The Sims rank (17)/(20): the least number of generators of a subgroup `H` with
+`γ₂ = [H, H] γ₃` (the inclusion `⊇` is automatic). -/
+noncomputable def simsRank (G : Type u) [Group G] : ℕ :=
+  sInf {k | ∃ u : Fin k → G,
+    lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔ lcs G 2}
+
+/-- A `Fin k`-tuple as a sequence (junk `1` beyond `k`). -/
+def extF {k : ℕ} (x : Fin k → G) (i : ℕ) : G := if h : i < k then x ⟨i, h⟩ else 1
+
+lemma extF_lt {k : ℕ} (x : Fin k → G) {i : ℕ} (h : i < k) : extF x i = x ⟨i, h⟩ := dif_pos h
+
+lemma range_extF {k : ℕ} (x : Fin k → G) : Set.range x = extF x '' Set.Iio k := by
+  ext y
+  constructor
+  · rintro ⟨i, rfl⟩
+    exact ⟨i.val, i.isLt, extF_lt x i.isLt⟩
+  · rintro ⟨i, hi, rfl⟩
+    exact ⟨⟨i, hi⟩, (extF_lt x hi).symm⟩
+
+/-- The characterisation (20) of the Sims rank: no `t < s(G)` elements generate `γ₂` modulo
+`γ₃ γ₂^p` by their commutators. -/
+lemma core_min [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) {t : ℕ}
+    (ht : t < simsRank G) (v : ℕ → G) :
+    ¬ lcs G 1 ≤ ⁅Subgroup.closure (v '' Set.Iio t), Subgroup.closure (v '' Set.Iio t)⁆ ⊔
+      pN p G := by
+  intro h
+  have hB : (⁅Subgroup.closure (v '' Set.Iio t), Subgroup.closure (v '' Set.Iio t)⁆ ⊔
+      lcs G 2).Normal := by
+    refine normal_of_sandwich (n := 1) le_sup_right (sup_le ?_ (lcs_antitone (by omega)))
+    exact Subgroup.commutator_le.mpr (fun x _ y _ => commElem_mem_lcs_one x y)
+  have h2 : lcs G 1 ≤ ⁅Subgroup.closure (v '' Set.Iio t), Subgroup.closure (v '' Set.Iio t)⁆ ⊔
+      lcs G 2 := by
+    refine frat_section hp hG (lcs G 1) _ ?_ ?_
+    · intro x hx y hy
+      exact Subgroup.mem_sup_right
+        (lcs_antitone (D := G) (show 2 ≤ 1 + 1 + 1 by omega) (commElem_mem_lcs_add hx hy))
+    · rw [sup_assoc]
+      exact h
+  have hle : simsRank G ≤ t := by
+    apply Nat.sInf_le
+    refine ⟨fun i => v i, ?_⟩
+    have e : Set.range (fun i : Fin t => v i) = v '' Set.Iio t := by
+      ext x
+      constructor
+      · rintro ⟨i, rfl⟩
+        exact ⟨i.val, i.isLt, rfl⟩
+      · rintro ⟨i, hi, rfl⟩
+        exact ⟨⟨i, hi⟩, rfl⟩
+    rw [e]
+    exact h2
+  omega
+
+/-- A core whose commutators span `γ₂` modulo `γ₃ γ₂^p` spans it modulo `γ₃`. -/
+lemma core_lieE [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) {s : ℕ}
+    {u : ℕ → G} (hW : WkN (pN p G) u s = lcs G 1) :
+    lcs G 1 ≤ Subgroup.closure (lieE s u 1) ⊔ lcs G 2 := by
+  apply frat_layer hp hG 0 (lieE s u 1) (lieE_sub s u 0)
+  refine (le_of_eq hW.symm).trans ?_
+  refine WkN_le (pN p G) le_sup_right ?_
+  intro a b hab hb
+  exact Subgroup.mem_sup_left (Subgroup.subset_closure ⟨(a, b), ⟨hab, hb⟩, rfl⟩)
+
+/-- A Sims core with the strict flag of BNV Prop 5.2 (via `CoreFlag.core_flag`, with
+`N = γ₃ γ₂^p` and `M = Φ(G)`). -/
+theorem exists_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
+    (hna : lcs G 1 ≠ ⊥) :
+    2 ≤ simsRank G ∧ ∃ u : ℕ → G, StrictChainN (pN p G) u (simsRank G) ∧
+      WkN (pN p G) u (simsRank G) = lcs G 1 ∧
+      (∀ k < simsRank G, u k ∉ Subgroup.closure (u '' Set.Iio k) ⊔ pPhi p G) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure (u '' Set.Iio (simsRank G)),
+        Subgroup.closure (u '' Set.Iio (simsRank G))⁆ ⊔ lcs G 2 := by
+  have : Fact p.Prime := ⟨hp⟩
+  have : Group.IsNilpotent G := (IsPGroup.of_card hG).isNilpotent
+  obtain ⟨N, hN⟩ : ∃ N, lcs G N = ⊥ := Subgroup.nilpotent_iff_lowerCentralSeries.mp inferInstance
+  let e : Fin (Nat.card G) → G := (Finite.equivFin G).symm
+  have he : Set.range e = Set.univ := Equiv.range_eq_univ _
+  have hne : {k | ∃ u : Fin k → G,
+      lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔
+        lcs G 2}.Nonempty := by
+    refine ⟨Nat.card G, e, ?_⟩
+    rw [he, Subgroup.closure_univ]
+    exact le_sup_left
+  obtain ⟨x, hx⟩ : ∃ x : Fin (simsRank G) → G,
+      lcs G 1 ≤ ⁅Subgroup.closure (Set.range x), Subgroup.closure (Set.range x)⁆ ⊔ lcs G 2 :=
+    Nat.sInf_mem hne
+  have hs : 2 ≤ simsRank G := by
+    by_contra hlt
+    have hk : simsRank G ≤ 1 := by omega
+    have hHH : ⁅Subgroup.closure (Set.range x), Subgroup.closure (Set.range x)⁆ ≤ ⊥ := by
+      refine commutator_closure_le ?_
+      rintro _ ⟨i, rfl⟩ _ ⟨j, rfl⟩
+      have hij : i = j := Fin.ext (by have := i.isLt; have := j.isLt; omega)
+      rw [hij, commutatorElement_self]
+      exact one_mem _
+    have h12 : lcs G 1 ≤ lcs G 2 := le_trans hx (sup_le (le_trans hHH bot_le) le_rfl)
+    have hall : ∀ n, lcs G 1 ≤ lcs G (n + 1) := by
+      intro n
+      induction n with
+      | zero => exact le_rfl
+      | succ n ih =>
+        refine le_trans h12 ?_
+        rw [lcs_succ 1, lcs_succ (n + 1)]
+        exact Subgroup.commutator_mono ih le_rfl
+    have hbot : lcs G 1 ≤ ⊥ := by
+      rw [← hN]
+      exact le_trans (hall N) (lcs_antitone (by omega))
+    exact hna (le_bot_iff.mp hbot)
+  have hcore0 : lcs G 1 ≤ ⁅Subgroup.closure (extF x '' Set.Iio (simsRank G)),
+      Subgroup.closure (extF x '' Set.Iio (simsRank G))⁆ ⊔ pN p G := by
+    rw [← range_extF]
+    exact hx.trans (sup_le_sup_left (lcs_two_le_pN p) _)
+  obtain ⟨u, -, hstrict, hW, hind, -, -⟩ := core_flag hp hG (pN p G) (pPhi p G)
+    (lcs_two_le_pN p) (pN_le_lcs_one p) (lcs_succ_le_layK p 0) (pow_mem_pPhi p)
+    (fun g m hm => commElem_mem_symm (commElem_pPhi_mem p hm g)) (simsRank G) (extF x) hcore0
+    (fun t ht v _ => core_min hp hG ht v)
+  have hcore := core_lieE hp hG hW
+  have hcomm : Subgroup.closure (lieE (simsRank G) u 1) ≤
+      ⁅Subgroup.closure (u '' Set.Iio (simsRank G)),
+        Subgroup.closure (u '' Set.Iio (simsRank G))⁆ := by
+    rw [Subgroup.closure_le]
+    rintro _ ⟨ab, hab, rfl⟩
+    exact Subgroup.commutator_mem_commutator
+      (Subgroup.subset_closure ⟨ab.1, lt_trans hab.1 hab.2, rfl⟩)
+      (Subgroup.subset_closure ⟨ab.2, hab.2, rfl⟩)
+  exact ⟨hs, u, hstrict, hW, hind, hcore.trans (sup_le_sup_right hcomm _)⟩
+
+end SimsCore
+
+section SimsGenSet
+
+variable {G : Type u} [Group G]
+
+/-- The properties of the paper's Sims generating set `X` (Section 2.1), with flattened Sims
+data `d`, core sequence `u` and layer lengths `r` (`r w = r_{w+1}` of the paper):
+* the first `s` entries are the core, `d` is valid, bounded and realised by `X`, every relative
+  order is `≥ 1` (so `n ≤ m`);
+* the positions of weight `w + 1` are the interval `[fOff r w, fOff r w + r w)`, and
+  `p ^ r_w |γ_{w+2} γ_{w+1}^p| = |γ_{w+1}|` (for `w = 0`: `|Φ(G)|`), i.e.
+  `r_{w+1} = dim L_{w+1} / p L_{w+1} = d(G_{w+1}/G_{w+2})`;
+* each layer is independent modulo its Frattini subgroup (so a minimum generating set of
+  `G_i / G_{i+1}`) and generates `G_i` modulo `G_{i+1}`;
+* weight 2 (`lv = 1`): `g_{2,j} = [g_{1,f(j)}, g_{1,k}]` with blocks sorted by `k`
+  (`block_mono`), `f` injective on each block (`block_inj`), the flag
+  `W_k = ⟨[u_a, u_b] : a < b < k⟩ γ₃ γ₂^p` spanned by the blocks `< k` (`flag`), and every block
+  `k = 1, ..., s - 1` (0-based) nonempty (`block_ne`, the strictness `d_{k-1} < d_k`);
+* unique Sims normal forms (26). -/
+structure SimsGen (p : ℕ) (u : ℕ → G) (d : SimsData) (X : Fin d.n → G) (r : ℕ → ℕ) : Prop where
+  core : ∀ t : Fin d.n, t.val < d.s → X t = u t.val
+  valid : d.Valid
+  bounded : d.Bounded p
+  realizes : SimsRealizes p d X
+  a_pos : ∀ t, 1 ≤ d.a t
+  n_le_sum : d.n ≤ ∑ t, d.a t
+  layer_iff : ∀ (t : Fin d.n) (w : ℕ), d.lv t = w ↔ fOff r w ≤ t.val ∧ t.val < fOff r w + r w
+  layer_card : ∀ w, p ^ r w * Nat.card (layK p G w) = Nat.card (lcs G w)
+  layer_indep : ∀ t, X t ∉ Subgroup.closure (X '' {v | d.lv v = d.lv t ∧ v < t}) ⊔
+    layK p G (d.lv t)
+  layer_gen : ∀ w, lcs G w ≤ Subgroup.closure (X '' {t | d.lv t = w}) ⊔ lcs G (w + 1)
+  block_mono : ∀ t t', d.lv t = 1 → d.lv t' = 1 → t ≤ t' → (d.df t).2 ≤ (d.df t').2
+  block_inj : ∀ t t', d.lv t = 1 → d.lv t' = 1 → (d.df t).1 = (d.df t').1 →
+    (d.df t).2 = (d.df t').2 → t = t'
+  flag : ∀ k ≤ d.s, WkN (pN p G) u k =
+    Subgroup.closure (X '' {t | d.lv t = 1 ∧ (d.df t).2.val < k}) ⊔ pN p G
+  block_ne : ∀ k, 1 ≤ k → k < d.s → ∃ t, d.lv t = 1 ∧ (d.df t).2.val = k
+  nf_exists : ∀ g : G, ∃ e : Fin d.n → ℕ, (∀ t, e t < p ^ d.a t) ∧ g = nfw X e
+  nf_unique : ∀ e e' : Fin d.n → ℕ, (∀ t, e t < p ^ d.a t) → (∀ t, e' t < p ^ d.a t) →
+    nfw X e = nfw X e' → e = e'
+
+/-- Assembly: the flattened layers form a Sims generating set. -/
+theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) {s L : ℕ}
+    {r : ℕ → ℕ} {xs : ℕ → ℕ → G} {pa co : ℕ → ℕ → ℕ} (u : ℕ → G)
+    (H0 : s ≤ r 0) (Hpa : ∀ w i, i < r (w + 1) → pa (w + 1) i < r w)
+    (Hco : ∀ w i, i < r (w + 1) → co (w + 1) i < s) (H1 : ∀ i, i < r 1 → pa 1 i < co 1 i)
+    (Hx : ∀ w i, i < r (w + 1) → xs (w + 1) i = ⁅xs w (pa (w + 1) i), xs 0 (co (w + 1) i)⁆)
+    (Hc0 : ∀ i < s, xs 0 i = u i) (h0 : Subgroup.closure (xs 0 '' Set.Iio (r 0)) = ⊤)
+    (HU : ∀ w, w + 1 ≤ L → lcs G (w + 1) ≤
+      Subgroup.closure (xs (w + 1) '' Set.Iio (r (w + 1))) ⊔ lcs G (w + 2))
+    (HL : lcs G (L + 1) = ⊥) (hL1 : 1 ≤ L)
+    (Hind : ∀ w i, i < r w → xs w i ∉ Subgroup.closure (xs w '' Set.Iio i) ⊔ layK p G w)
+    (Hcard : ∀ w ≤ L, p ^ r w * Nat.card (layK p G w) = Nat.card (lcs G w))
+    (HS1 : ∀ k ≤ s, ∀ a b, a < b → b < k →
+      ⁅u a, u b⁆ ∈ Subgroup.closure (xs 1 '' {i | i < r 1 ∧ co 1 i < k}) ⊔ pN p G)
+    (Hmono : ∀ i i', i ≤ i' → i' < r 1 → co 1 i ≤ co 1 i')
+    (Hinj : ∀ i i', i < r 1 → i' < r 1 → pa 1 i = pa 1 i' → co 1 i = co 1 i' → i = i')
+    (hstrict : StrictChainN (pN p G) u s) :
+    ∃ (d : SimsData) (X : Fin d.n → G), d.s = s ∧ SimsGen p u d X (fLen L r) := by
+  have hd := fData_struct (s := s) (L := L) H0 Hpa Hco H1
+  have hdf : ∀ t, 1 ≤ (fData s L r pa co).lv t → fX L r xs t =
+      ⁅fX L r xs ((fData s L r pa co).df t).1, fX L r xs ((fData s L r pa co).df t).2⁆ :=
+    fun t ht => fX_df H0 Hpa Hco Hx t ht
+  have hgen := flat_gen (L := L) h0
+  have hdeep := flat_deep (s := s) (pa := pa) (co := co) H0 Hpa Hco H1 Hx h0 HU HL
+  have hlv := lv_mem_lcs (fData s L r pa co) hd (fX L r xs) hdf
+  obtain ⟨b, c, hv, hb, hr⟩ :=
+    exists_arrays (fData s L r pa co) (fX L r xs) hp hG hd hgen hdf hdeep
+  have hind := flat_indep (s := s) (pa := pa) (co := co) p Hind
+  have ha1 : ∀ t, 1 ≤ relOrd p (fData s L r pa co) (fX L r xs) t := by
+    intro t
+    by_contra h0'
+    have hz : relOrd p (fData s L r pa co) (fX L r xs) t = 0 := by omega
+    have hmem := relOrd_spec (fData s L r pa co) (fX L r xs) hG t
+    rw [hz, pow_zero, pow_one] at hmem
+    apply hind t
+    refine (Subgroup.closure_le _).mpr ?_ hmem
+    rintro _ ⟨v, hv', rfl⟩
+    rcases (mem_lset (fData s L r pa co)).mp hv' with h | ⟨h1, h2⟩
+    · exact Subgroup.mem_sup_right (lcs_succ_le_layK p _
+        (lcs_antitone (D := G) (show (fData s L r pa co).lv t + 1 ≤ (fData s L r pa co).lv v
+          from h) (hlv v)))
+    · exact Subgroup.mem_sup_left (Subgroup.subset_closure ⟨v, ⟨h1.symm, Fin.lt_def.mpr h2⟩, rfl⟩)
+  have hWk : ∀ k ≤ s, WkN (pN p G) u k = Subgroup.closure (fX L r xs '' {t |
+      (fData s L r pa co).lv t = 1 ∧ ((fData s L r pa co).df t).2.val < k}) ⊔ pN p G :=
+    fun k hk => flat_Wk p u H0 Hpa Hco H1 Hx Hc0 hL1 HS1 hk
+  have hex := nf_exists_of hp hG (fData s L r pa co) hd (fX L r xs) hgen hlv hdeep
+  refine ⟨{ fData s L r pa co with a := relOrd p (fData s L r pa co) (fX L r xs), b := b,
+    c := c }, fX L r xs, rfl, ?_⟩
+  refine
+    { core := fun t ht => flat_core u H0 Hc0 t ht
+      valid := hv
+      bounded := hb
+      realizes := hr
+      a_pos := ha1
+      n_le_sum := ?_
+      layer_iff := ?_
+      layer_card := ?_
+      layer_indep := hind
+      layer_gen := ?_
+      block_mono := fun t t' ht ht' htt => flat_mono H0 Hpa Hco Hmono t t' ht ht' htt
+      block_inj := fun t t' ht ht' h1 h2 => flat_inj H0 Hpa Hco Hinj t t' ht ht' h1 h2
+      flag := hWk
+      block_ne := fun k hk1 hks => flat_blocks p u hstrict hWk hk1 hks
+      nf_exists := hex
+      nf_unique := fun e e' he he' h => nfw_unique _ (fX L r xs) hr.card hex e e' he he' h }
+  · calc fOff (fLen L r) (L + 1) = ∑ _t : Fin (fOff (fLen L r) (L + 1)), 1 := by simp
+      _ ≤ ∑ t, relOrd p (fData s L r pa co) (fX L r xs) t :=
+        Finset.sum_le_sum (fun t _ => ha1 t)
+  · intro t w
+    constructor
+    · intro h
+      have h' : fLv (fLen L r) L t.val = w := h
+      obtain ⟨h1, h2, -⟩ := fLv_spec (ℓ := fLen L r) t.isLt
+      rw [h'] at h1 h2
+      rw [fOff_succ] at h2
+      exact ⟨h1, h2⟩
+    · rintro ⟨h1, h2⟩
+      by_cases hw : w ≤ L
+      · exact fLv_eq hw h1 (by rw [fOff_succ]; exact h2)
+      · exfalso
+        have h3 := fOff_mono (fLen L r) (show L + 1 ≤ w by omega)
+        have h4 := t.isLt
+        omega
+  · intro w
+    by_cases hw : w ≤ L
+    · rw [fLen_of_le hw]
+      exact Hcard w hw
+    · rw [fLen_of_gt hw, pow_zero, one_mul]
+      obtain ⟨w', rfl⟩ : ∃ w', w = w' + 1 := ⟨w - 1, by omega⟩
+      have h1 : lcs G (w' + 1) = ⊥ := le_bot_iff.mp
+        ((lcs_antitone (D := G) (show L + 1 ≤ w' + 1 by omega)).trans (le_of_eq HL))
+      have h2 : layK p G (w' + 1) = ⊥ := le_bot_iff.mp ((layK_le_lcs p w').trans (le_of_eq h1))
+      rw [h1, h2]
+  · intro w
+    rcases w with _ | w
+    · rw [lcs_zero, ← h0]
+      refine le_sup_of_le_left (Subgroup.closure_mono ?_)
+      rintro _ ⟨i, hi, rfl⟩
+      exact ⟨⟨_, fpos_lt (Nat.zero_le L) hi⟩, fpos_lv (Nat.zero_le L) hi,
+        fX_pos xs (Nat.zero_le L) hi⟩
+    · exact flat_lev (s := s) (pa := pa) (co := co) HU HL w
+
+/-- The layer data of the construction. -/
+noncomputable def gR [Finite G] (p s : ℕ) (u : ℕ → G) (w : ℕ) : ℕ :=
+  (sLay p s u (lay0 p s u) w).r
+
+/-- The entries of the layers. -/
+noncomputable def gXs [Finite G] (p s : ℕ) (u : ℕ → G) (w i : ℕ) : G :=
+  (sLay p s u (lay0 p s u) w).x i
+
+/-- The parent indices of the layers. -/
+noncomputable def gPa [Finite G] (p s : ℕ) (u : ℕ → G) (w i : ℕ) : ℕ :=
+  (sLay p s u (lay0 p s u) w).par i
+
+/-- The core indices of the layers. -/
+noncomputable def gCo [Finite G] (p s : ℕ) (u : ℕ → G) (w i : ℕ) : ℕ :=
+  (sLay p s u (lay0 p s u) w).cor i
+
+lemma sLay_one_cor (p s : ℕ) (u : ℕ → G) (L0 : SLay G) (i : ℕ) :
+    (sLay p s u L0 1).cor i = genum (gsel (cVal s u 0 L0) (layK p G 1) (cN s 0 L0)) i / s := by
+  rw [sLay_one]
+  exact cCor_zero
+
+lemma sLay_one_par (p s : ℕ) (u : ℕ → G) (L0 : SLay G) (i : ℕ) :
+    (sLay p s u L0 1).par i = genum (gsel (cVal s u 0 L0) (layK p G 1) (cN s 0 L0)) i % s := by
+  rw [sLay_one]
+  exact cPar_zero
+
+lemma sLay_one_cor_mono (p s : ℕ) (u : ℕ → G) (L0 : SLay G) {i i' : ℕ} (h : i ≤ i')
+    (hi' : i' < (sLay p s u L0 1).r) : (sLay p s u L0 1).cor i ≤ (sLay p s u L0 1).cor i' := by
+  rw [sLay_one_cor, sLay_one_cor]
+  have h1 : i' < (gsel (cVal s u 0 L0) (layK p G 1) (cN s 0 L0)).card := hi'
+  exact Nat.div_le_div_right (genum_le _ h h1)
+
+lemma sLay_one_inj (p s : ℕ) (u : ℕ → G) (L0 : SLay G) {i i' : ℕ}
+    (hi : i < (sLay p s u L0 1).r) (hi' : i' < (sLay p s u L0 1).r)
+    (hp : (sLay p s u L0 1).par i = (sLay p s u L0 1).par i')
+    (hc : (sLay p s u L0 1).cor i = (sLay p s u L0 1).cor i') : i = i' := by
+  rw [sLay_one_par, sLay_one_par] at hp
+  rw [sLay_one_cor, sLay_one_cor] at hc
+  have h1 := Nat.div_add_mod (genum (gsel (cVal s u 0 L0) (layK p G 1) (cN s 0 L0)) i) s
+  have h2 := Nat.div_add_mod (genum (gsel (cVal s u 0 L0) (layK p G 1) (cN s 0 L0)) i') s
+  rw [hp, hc] at h1
+  exact genum_inj _ hi hi' (h1.symm.trans h2)
+
+/-- The construction from a core with the strict flag. -/
+theorem sims_gen_of_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) {s : ℕ}
+    (hs : 2 ≤ s) (u : ℕ → G) (hstrict : StrictChainN (pN p G) u s)
+    (hW : WkN (pN p G) u s = lcs G 1)
+    (hind : ∀ k < s, u k ∉ Subgroup.closure (u '' Set.Iio k) ⊔ pPhi p G) :
+    ∃ (d : SimsData) (X : Fin d.n → G) (r : ℕ → ℕ), d.s = s ∧ d.n ≤ m ∧
+      r 0 = Group.rank G ∧ SimsGen p u d X r := by
+  have : Fact p.Prime := ⟨hp⟩
+  have hpg : IsPGroup p G := IsPGroup.of_card hG
+  have : Group.IsNilpotent G := hpg.isNilpotent
+  have hs0 : 0 < s := by omega
+  have hx0 : ∀ a < s, (lay0 p s u).x a = u a := fun a ha => lay0_x_lt p s u ha
+  have hr0 : s ≤ (lay0 p s u).r := Nat.le_add_right s _
+  have hgen0 : Subgroup.closure ((lay0 p s u).x '' Set.Iio (lay0 p s u).r) = ⊤ := by
+    apply closure_eq_top_of_sup_frattini
+    rw [frattini_eq_pPhi hpg, eq_top_iff]
+    intro g _
+    exact lay0_span p s u g
+  have hcore := core_lieE hp hG hW
+  have hU := sLay_lcs p s u (lay0 p s u) hp hG hs0 hx0 (by rw [hgen0, top_sup_eq]) hcore
+  obtain ⟨N, hN⟩ : ∃ N, lcs G N = ⊥ := Subgroup.nilpotent_iff_lowerCentralSeries.mp inferInstance
+  have hL : lcs G (N + 1 + 1) = ⊥ :=
+    le_bot_iff.mp (hN ▸ lcs_antitone (D := G) (show N ≤ N + 1 + 1 by omega))
+  have Hind : ∀ w i, i < gR p s u w →
+      gXs p s u w i ∉ Subgroup.closure (gXs p s u w '' Set.Iio i) ⊔ layK p G w := by
+    intro w i hi
+    rcases w with _ | w
+    · exact lay0_indep p s u hind hi
+    · exact sLay_indep p s u (lay0 p s u) w hi
+  have Heq : ∀ w, Subgroup.closure (gXs p s u w '' Set.Iio (gR p s u w)) ⊔ layK p G w =
+      lcs G w := by
+    intro w
+    rcases w with _ | w
+    · show Subgroup.closure ((lay0 p s u).x '' Set.Iio (lay0 p s u).r) ⊔ pPhi p G = lcs G 0
+      rw [hgen0, top_sup_eq, lcs_zero]
+    · apply le_antisymm
+      · refine sup_le ?_ (layK_le_lcs p w)
+        rw [Subgroup.closure_le]
+        rintro _ ⟨i, -, rfl⟩
+        exact sLay_mem p s u (lay0 p s u) (w + 1) i
+      · exact (hU w).trans (sup_le_sup_left (lcs_succ_le_layK p (w + 1)) _)
+  have Hcard : ∀ w, p ^ gR p s u w * Nat.card (layK p G w) = Nat.card (lcs G w) := by
+    intro w
+    have hmem : ∀ i, gXs p s u w i ∈ lcs G w := fun i => sLay_mem p s u (lay0 p s u) w i
+    have hN' : ∀ j, (Subgroup.closure (gXs p s u w '' Set.Iio j) ⊔ layK p G w).Normal :=
+      fun j => layK_normal_sup p w _ (by rintro _ ⟨i, -, rfl⟩; exact hmem i)
+    have h1 := card_growth hp hG (layK p G w) (v := gXs p s u w) (gR p s u w)
+      (fun k hk => Hind w k hk)
+    have h2 := card_closure_sup_le_of hp.pos (layK p G w) (gXs p s u w) hN'
+      (fun j => pow_mem_layK p w _ (hmem j)) (gR p s u w)
+    rw [Heq w] at h1 h2
+    exact le_antisymm h1 h2
+  have Hrank : gR p s u 0 = Group.rank G := by
+    have h1 : p ^ gR p s u 0 * Nat.card (pPhi p G) = Nat.card (lcs G 0) := Hcard 0
+    have h2 := Subgroup.card_eq_card_quotient_mul_card_subgroup (frattini G)
+    rw [card_quot_frattini hpg, frattini_eq_pPhi hpg] at h2
+    have h3 : Nat.card (lcs G 0) = Nat.card G := by rw [lcs_zero, Subgroup.card_top]
+    have h4 : 0 < Nat.card (pPhi p G) := Nat.card_pos
+    have h6 : p ^ gR p s u 0 * Nat.card (pPhi p G) = p ^ Group.rank G * Nat.card (pPhi p G) := by
+      rw [← h2, ← h3, h1]
+    exact Nat.pow_right_injective hp.two_le (Nat.eq_of_mul_eq_mul_right h4 h6)
+  have Hpa : ∀ w i, i < gR p s u (w + 1) → gPa p s u (w + 1) i < gR p s u w :=
+    fun w i hi => (sLay_gen p s u (lay0 p s u) hs0 hr0 w hi).1
+  have Hco : ∀ w i, i < gR p s u (w + 1) → gCo p s u (w + 1) i < s :=
+    fun w i hi => (sLay_gen p s u (lay0 p s u) hs0 hr0 w hi).2.1
+  have H1 : ∀ i, i < gR p s u 1 → gPa p s u 1 i < gCo p s u 1 i :=
+    fun i hi => (sLay_gen p s u (lay0 p s u) hs0 hr0 0 hi).2.2.1 rfl
+  have Hx : ∀ w i, i < gR p s u (w + 1) → gXs p s u (w + 1) i =
+      ⁅gXs p s u w (gPa p s u (w + 1) i), gXs p s u 0 (gCo p s u (w + 1) i)⁆ := by
+    intro w i hi
+    obtain ⟨-, hc, -, he⟩ := sLay_gen p s u (lay0 p s u) hs0 hr0 w hi
+    have e0 : gXs p s u 0 (gCo p s u (w + 1) i) = u (gCo p s u (w + 1) i) := lay0_x_lt p s u hc
+    rw [e0]
+    exact he
+  have HS1 : ∀ k ≤ s, ∀ a b, a < b → b < k → ⁅u a, u b⁆ ∈
+      Subgroup.closure (gXs p s u 1 '' {i | i < gR p s u 1 ∧ gCo p s u 1 i < k}) ⊔ pN p G :=
+    fun k hk a b hab hb => sLay_span_one p s u (lay0 p s u) hs0 hx0 hk hab hb
+  have Hmono : ∀ i i', i ≤ i' → i' < gR p s u 1 → gCo p s u 1 i ≤ gCo p s u 1 i' :=
+    fun i i' h hi' => sLay_one_cor_mono p s u (lay0 p s u) h hi'
+  have Hinj : ∀ i i', i < gR p s u 1 → i' < gR p s u 1 → gPa p s u 1 i = gPa p s u 1 i' →
+      gCo p s u 1 i = gCo p s u 1 i' → i = i' :=
+    fun i i' hi hi' hp' hc => sLay_one_inj p s u (lay0 p s u) hi hi' hp' hc
+  obtain ⟨d, X, hds, hspec⟩ := flat_final (L := N + 1) (r := gR p s u) (xs := gXs p s u)
+    (pa := gPa p s u) (co := gCo p s u) hp hG u hr0 Hpa Hco H1 Hx hx0 hgen0 (fun w _ => hU w) hL
+    (by omega) Hind (fun w _ => Hcard w) HS1 Hmono Hinj hstrict
+  refine ⟨d, X, fLen (N + 1) (gR p s u), hds, ?_, ?_, hspec⟩
+  · have h1 := hspec.realizes.card
+    rw [hG] at h1
+    have h2 := Nat.pow_right_injective hp.two_le h1
+    rw [h2]
+    exact hspec.n_le_sum
+  · rw [fLen_of_le (Nat.zero_le _)]
+    exact Hrank
+
+/-- Section 2.1 (existence of the Sims generating set). Every nonabelian group `G` of order
+`p ^ m` has a Sims core `u_0, ..., u_{s-1}` (`s = s(G) ≥ 2`) carrying the strict flag of BNV
+Prop 5.2, and an ordered generating tuple `X` with flattened Sims data `d` and layer lengths
+`r` (`r 0 = r_1 = d(G)`) satisfying all the properties of `SimsGen`: minimum generating sets
+of the layers, the block structure `(d_k, f)` of weight 2, relative orders `≥ 1` (so `n ≤ m`),
+valid bounded relation arrays realised by `X`, and unique normal forms. -/
+theorem exists_sims_gen [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
+    (hna : lcs G 1 ≠ ⊥) :
+    ∃ (u : ℕ → G) (d : SimsData) (X : Fin d.n → G) (r : ℕ → ℕ),
+      2 ≤ simsRank G ∧ d.s = simsRank G ∧
+      lcs G 1 ≤ ⁅Subgroup.closure (u '' Set.Iio d.s), Subgroup.closure (u '' Set.Iio d.s)⁆ ⊔
+        lcs G 2 ∧
+      StrictChainN (pN p G) u d.s ∧ WkN (pN p G) u d.s = lcs G 1 ∧
+      (∀ k < d.s, u k ∉ Subgroup.closure (u '' Set.Iio k) ⊔ pPhi p G) ∧
+      d.n ≤ m ∧ r 0 = Group.rank G ∧ SimsGen p u d X r := by
+  obtain ⟨hs2, u, hstrict, hW, hind, hcore⟩ := exists_core hp hG hna
+  obtain ⟨d, X, r, hds, hnm, hrank, hspec⟩ := sims_gen_of_core hp hG hs2 u hstrict hW hind
+  refine ⟨u, d, X, r, hs2, hds, ?_, ?_, ?_, ?_, hnm, hrank, hspec⟩
+  · rw [hds]
+    exact hcore
+  · rw [hds]
+    exact hstrict
+  · rw [hds]
+    exact hW
+  · rw [hds]
+    exact hind
+
+end SimsGenSet
 
 end OMA.SimsLite
