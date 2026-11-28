@@ -955,5 +955,539 @@ theorem isoLocus_eq_empty {A : Matrix (Fin R) (Fin R) F} {h : ℕ}
 
 end Lemma81
 
+section SimsBounds
+
+variable {F : Type*} [Field F] {R M : ℕ}
+
+/-- The value map `(x, y) ↦ β(x, y) = (x ⬝ β_k y)_k`, bilinear. -/
+def valL (β : Fin M → Matrix (Fin R) (Fin R) F) :
+    (Fin R → F) →ₗ[F] (Fin R → F) →ₗ[F] (Fin M → F) :=
+  LinearMap.mk₂ F (fun x y k => bfL x y (β k))
+    (fun x x' y => by funext k; simp [bfL_apply, add_dotProduct])
+    (fun c x y => by funext k; simp [bfL_apply, smul_dotProduct])
+    (fun x y y' => by funext k; simp [bfL_apply, Matrix.mulVec_add, dotProduct_add])
+    (fun c x y => by funext k; simp [bfL_apply, Matrix.mulVec_smul, dotProduct_smul])
+
+lemma valL_apply (β : Fin M → Matrix (Fin R) (Fin R) F) (x y : Fin R → F) :
+    valL β x y = fun k => bfL x y (β k) := rfl
+
+lemma valL_mem_vals (β : Fin M → Matrix (Fin R) (Fin R) F) {U : Submodule F (Fin R → F)}
+    {x y : Fin R → F} (hx : x ∈ U) (hy : y ∈ U) : valL β x y ∈ vals β U :=
+  ⟨x, hx, y, hy, rfl⟩
+
+lemma valL_self (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ k, IsAltMat (β k))
+    (x : Fin R → F) : valL β x x = 0 := by
+  funext k
+  exact bfL_self_eq_zero (hA k) x
+
+lemma valL_swap (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ k, IsAltMat (β k))
+    (x y : Fin R → F) : valL β y x = -valL β x y := by
+  funext k
+  exact bfL_swap (hA k) y x
+
+/-- On `U = span (range v)`, the values of an alternating `β` lie in the span of the
+`β(v_i, v_j)` with `i < j`. -/
+lemma vals_subset_span_pairs (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ k, IsAltMat (β k))
+    {s : ℕ} (v : Fin s → (Fin R → F)) :
+    vals β (Submodule.span F (Set.range v)) ⊆
+      Submodule.span F (Set.range (fun q : TPairs s => valL β (v q.1.1) (v q.1.2))) := by
+  set S := Submodule.span F (Set.range (fun q : TPairs s => valL β (v q.1.1) (v q.1.2)))
+  have h1 : ∀ i j, valL β (v i) (v j) ∈ S := by
+    intro i j
+    rcases lt_trichotomy i j with h | h | h
+    · exact Submodule.subset_span ⟨⟨(i, j), h⟩, rfl⟩
+    · rw [h, valL_self β hA]
+      exact S.zero_mem
+    · rw [valL_swap β hA]
+      exact S.neg_mem (Submodule.subset_span ⟨⟨(j, i), h⟩, rfl⟩)
+  have h2 : ∀ j, ∀ x ∈ Submodule.span F (Set.range v), valL β x (v j) ∈ S := by
+    intro j x hx
+    have hle : Submodule.span F (Set.range v) ≤ S.comap ((valL β).flip (v j)) := by
+      rw [Submodule.span_le]
+      rintro _ ⟨i, rfl⟩
+      exact h1 i j
+    exact hle hx
+  rintro w ⟨x, hx, y, hy, rfl⟩
+  have hle : Submodule.span F (Set.range v) ≤ S.comap (valL β x) := by
+    rw [Submodule.span_le]
+    rintro _ ⟨j, rfl⟩
+    exact h2 j x hx
+  exact hle hy
+
+/-- Lemma 2.3 / BNV 5.2, upper half: `dim W ≤ C(s(β), 2)` for a surjective alternating `β`. -/
+theorem card_le_choose_simsRk (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ k, IsAltMat (β k))
+    (hg : GensOn β ⊤) : M ≤ (simsRk β).choose 2 := by
+  obtain ⟨U, hU, hgU⟩ := exists_gens_of_simsRk β hg
+  obtain ⟨v, hv⟩ := grass_subset_range (F := F) R (simsRk β) hU
+  have hv' : Submodule.span F (Set.range v) = U := hv
+  have hsub := vals_subset_span_pairs β hA v
+  rw [hv'] at hsub
+  have htop : Submodule.span F
+      (Set.range (fun q : TPairs (simsRk β) => valL β (v q.1.1) (v q.1.2))) = ⊤ := by
+    apply top_unique
+    unfold GensOn at hgU
+    rw [← hgU]
+    exact Submodule.span_le.2 hsub
+  have h1 : finrank F (Submodule.span F
+      (Set.range (fun q : TPairs (simsRk β) => valL β (v q.1.1) (v q.1.2)))) ≤
+      Fintype.card (TPairs (simsRk β)) :=
+    finrank_range_le_card (fun q : TPairs (simsRk β) => valL β (v q.1.1) (v q.1.2))
+  rw [htop, finrank_top, Module.finrank_fin_fun, card_TPairs] at h1
+  exact h1
+
+/-! Strict flags (BNV Prop 5.2, linear-algebra form of `CoreFlag`). -/
+
+/-- `W_k(u) = span {β(u_a, u_b) : a < b < k}`. -/
+def chainW (β : Fin M → Matrix (Fin R) (Fin R) F) (u : ℕ → (Fin R → F)) (k : ℕ) :
+    Submodule F (Fin M → F) :=
+  Submodule.span F {w | ∃ a b, a < b ∧ b < k ∧ w = valL β (u a) (u b)}
+
+/-- `u` is strict of length `t`: `W_k < W_{k+1}` for `1 ≤ k < t`. -/
+def IsStrictChainV (β : Fin M → Matrix (Fin R) (Fin R) F) (u : ℕ → (Fin R → F)) (t : ℕ) :
+    Prop :=
+  ∀ k, 1 ≤ k → k < t → chainW β u k ≠ chainW β u (k + 1)
+
+lemma mem_chainW (β : Fin M → Matrix (Fin R) (Fin R) F) (u : ℕ → (Fin R → F)) {a b k : ℕ}
+    (hab : a < b) (hbk : b < k) : valL β (u a) (u b) ∈ chainW β u k :=
+  Submodule.subset_span ⟨a, b, hab, hbk, rfl⟩
+
+lemma chainW_mono (β : Fin M → Matrix (Fin R) (Fin R) F) (u : ℕ → (Fin R → F)) {k l : ℕ}
+    (hkl : k ≤ l) : chainW β u k ≤ chainW β u l := by
+  apply Submodule.span_mono
+  rintro _ ⟨a, b, hab, hbk, rfl⟩
+  exact ⟨a, b, hab, by omega, rfl⟩
+
+lemma chainW_le (β : Fin M → Matrix (Fin R) (Fin R) F) {u : ℕ → (Fin R → F)} {k : ℕ}
+    {S : Submodule F (Fin M → F)} (h : ∀ a b, a < b → b < k → valL β (u a) (u b) ∈ S) :
+    chainW β u k ≤ S := by
+  rw [chainW, Submodule.span_le]
+  rintro _ ⟨a, b, hab, hbk, rfl⟩
+  exact h a b hab hbk
+
+lemma chainW_congr (β : Fin M → Matrix (Fin R) (Fin R) F) {u u' : ℕ → (Fin R → F)} {k : ℕ}
+    (h : ∀ i < k, u i = u' i) : chainW β u k = chainW β u' k := by
+  apply le_antisymm
+  · refine chainW_le β fun a b hab hbk => ?_
+    rw [h a (by omega), h b hbk]
+    exact mem_chainW β u' hab hbk
+  · refine chainW_le β fun a b hab hbk => ?_
+    rw [← h a (by omega), ← h b hbk]
+    exact mem_chainW β u hab hbk
+
+lemma chainW_one (β : Fin M → Matrix (Fin R) (Fin R) F) (u : ℕ → (Fin R → F)) :
+    chainW β u 1 = ⊥ := by
+  refine le_antisymm ?_ bot_le
+  refine chainW_le β fun a b hab hb => ?_
+  exact absurd hab (by omega)
+
+/-- If `W_s ≠ W_{s+1}` then some `β(u_a, u_s)`, `a < s`, is not in `W_s`. -/
+lemma exists_not_mem_chainW (β : Fin M → Matrix (Fin R) (Fin R) F) {u : ℕ → (Fin R → F)}
+    {s : ℕ} (h : chainW β u s ≠ chainW β u (s + 1)) :
+    ∃ a < s, valL β (u a) (u s) ∉ chainW β u s := by
+  by_contra hc
+  push_neg at hc
+  apply h
+  apply le_antisymm (chainW_mono β u (Nat.le_succ s))
+  refine chainW_le β fun a b hab hb => ?_
+  by_cases hbs : b < s
+  · exact mem_chainW β u hab hbs
+  · rw [show b = s by omega]
+    exact hc a (by omega)
+
+/-- `dim W_k ≥ k - 1` along a strict chain. -/
+lemma finrank_chainW_ge (β : Fin M → Matrix (Fin R) (Fin R) F) {u : ℕ → (Fin R → F)} {t : ℕ}
+    (hu : IsStrictChainV β u t) : ∀ k, 1 ≤ k → k ≤ t → k - 1 ≤ finrank F (chainW β u k) := by
+  intro k
+  induction k with
+  | zero => intro h; exact absurd h (by norm_num)
+  | succ k ih =>
+    intro _ hkt
+    rcases Nat.eq_zero_or_pos k with hk | hk
+    · subst hk
+      simp
+    · have h1 := ih hk (by omega)
+      have hlt : chainW β u k < chainW β u (k + 1) :=
+        lt_of_le_of_ne (chainW_mono β u (Nat.le_succ k)) (hu k hk (by omega))
+      have h2 := Submodule.finrank_lt_finrank_of_lt hlt
+      omega
+
+/-- A strict chain has length at most `dim W + 1`. -/
+lemma strict_length_le (β : Fin M → Matrix (Fin R) (Fin R) F) {u : ℕ → (Fin R → F)} {t : ℕ}
+    (hu : IsStrictChainV β u t) (ht : 1 ≤ t) : t ≤ M + 1 := by
+  have h1 := finrank_chainW_ge β hu t ht le_rfl
+  have h2 := Submodule.finrank_le (chainW β u t)
+  rw [Module.finrank_fin_fun] at h2
+  omega
+
+/-- Extension of a strict chain (append, or the exchange `(u_0, ..., u_{s-1}, w, y)`). -/
+lemma strictV_extend (β : Fin M → Matrix (Fin R) (Fin R) F) {u : ℕ → (Fin R → F)} {t : ℕ}
+    (ht : 2 ≤ t) (hu : IsStrictChainV β u t) {x y : Fin R → F}
+    (hxy : valL β x y ∉ chainW β u t) : ∃ u' : ℕ → (Fin R → F), IsStrictChainV β u' (t + 1) := by
+  by_cases hc : ∃ a < t, ∃ v, valL β (u a) v ∉ chainW β u t
+  · obtain ⟨a, ha, v, hv⟩ := hc
+    set u' : ℕ → (Fin R → F) := fun i => if i < t then u i else v with hu'
+    have hW : ∀ k ≤ t, chainW β u' k = chainW β u k := fun k hk =>
+      chainW_congr β fun i hi => (if_pos (show i < t by omega) : u' i = u i)
+    refine ⟨u', fun k hk1 hkt => ?_⟩
+    rcases Nat.lt_or_ge k t with hk | hk
+    · rw [hW k hk.le, hW (k + 1) (by omega)]
+      exact hu k hk1 hk
+    · rw [show k = t by omega, hW t le_rfl]
+      intro heq
+      apply hv
+      have hm := mem_chainW β u' ha (show t < t + 1 by omega)
+      have e1 : u' a = u a := if_pos ha
+      have e2 : u' t = v := if_neg (lt_irrefl t)
+      rw [e1, e2, ← heq] at hm
+      exact hm
+  · have hc' : ∀ a < t, ∀ v, valL β (u a) v ∈ chainW β u t := fun a ha v => by
+      by_contra hn
+      exact hc ⟨a, ha, v, hn⟩
+    obtain ⟨s, rfl⟩ : ∃ s, t = s + 1 := ⟨t - 1, by omega⟩
+    obtain ⟨a0, ha0, hna0⟩ := exists_not_mem_chainW β (hu s (by omega) (by omega))
+    have hw : ∃ w, (∃ a < s, valL β (u a) w ∉ chainW β u s) ∧
+        valL β w y ∉ chainW β u (s + 1) := by
+      by_cases hx' : ∃ a < s, valL β (u a) x ∉ chainW β u s
+      · exact ⟨x, hx', hxy⟩
+      · push_neg at hx'
+        refine ⟨u s + x, ⟨a0, ha0, ?_⟩, ?_⟩
+        · rw [map_add, Submodule.add_mem_iff_left _ (hx' a0 ha0)]
+          exact hna0
+        · rw [map_add, LinearMap.add_apply,
+            Submodule.add_mem_iff_right _ (hc' s (by omega) y)]
+          exact hxy
+    obtain ⟨w, hw1, hw2⟩ := hw
+    set u' : ℕ → (Fin R → F) := fun i => if i < s then u i else if i = s then w else y with hu'
+    have e1 : ∀ i < s, u' i = u i := fun i hi => if_pos hi
+    have e2 : u' s = w := by
+      show (if s < s then u s else if s = s then w else y) = w
+      rw [if_neg (lt_irrefl s), if_pos rfl]
+    have e3 : u' (s + 1) = y := by
+      show (if s + 1 < s then u (s + 1) else if s + 1 = s then w else y) = y
+      rw [if_neg (show ¬ (s + 1 < s) by omega), if_neg (show ¬ (s + 1 = s) by omega)]
+    have hW : ∀ k ≤ s, chainW β u' k = chainW β u k := fun k hk =>
+      chainW_congr β fun i hi => e1 i (by omega)
+    have hle : chainW β u' (s + 1) ≤ chainW β u (s + 1) := by
+      refine chainW_le β fun a b hab hb => ?_
+      by_cases hbs : b < s
+      · rw [e1 a (by omega), e1 b hbs]
+        exact mem_chainW β u hab (by omega)
+      · rw [show b = s by omega, e1 a (by omega), e2]
+        exact hc' a (by omega) w
+    refine ⟨u', fun k hk1 hkt => ?_⟩
+    by_cases hks : k < s
+    · rw [hW k (by omega), hW (k + 1) (by omega)]
+      exact hu k hk1 (by omega)
+    · by_cases hk' : k = s
+      · rw [hk', hW s le_rfl]
+        obtain ⟨a, ha, hna⟩ := hw1
+        intro heq
+        apply hna
+        have hm := mem_chainW β u' ha (show s < s + 1 by omega)
+        rw [e1 a ha, e2, ← heq] at hm
+        exact hm
+      · rw [show k = s + 1 by omega]
+        intro heq
+        apply hw2
+        have hm := mem_chainW β u' (show s < s + 1 by omega) (show s + 1 < s + 1 + 1 by omega)
+        rw [e2, e3, ← heq] at hm
+        exact hle hm
+
+/-- If the values of `β` span `W` but `S ≠ W`, some value `β(x, y)` lies outside `S`. -/
+lemma exists_val_not_mem (β : Fin M → Matrix (Fin R) (Fin R) F) (hg : GensOn β ⊤)
+    {S : Submodule F (Fin M → F)} (hS : S ≠ ⊤) : ∃ x y, valL β x y ∉ S := by
+  by_contra hc
+  push_neg at hc
+  apply hS
+  apply top_unique
+  unfold GensOn at hg
+  rw [← hg, Submodule.span_le]
+  rintro _ ⟨x, -, y, -, rfl⟩
+  exact hc x y
+
+/-- BNV Prop 5.2 (linear form): a surjective alternating `β` onto `W ≠ 0` has a strict chain
+`u_0, ..., u_{t-1}` with `W_t = W`. -/
+theorem exists_strict_top (β : Fin M → Matrix (Fin R) (Fin R) F) (hg : GensOn β ⊤)
+    (hM : 1 ≤ M) : ∃ u : ℕ → (Fin R → F), ∃ t, IsStrictChainV β u t ∧ 2 ≤ t ∧
+      chainW β u t = ⊤ := by
+  have hne : (⊥ : Submodule F (Fin M → F)) ≠ ⊤ := by
+    intro h
+    have hmem : (Pi.single (⟨0, hM⟩ : Fin M) (1 : F) : Fin M → F) ∈
+        (⊥ : Submodule F (Fin M → F)) := by
+      rw [h]
+      exact Submodule.mem_top
+    rw [Submodule.mem_bot] at hmem
+    have := congrFun hmem ⟨0, hM⟩
+    simp at this
+  obtain ⟨x0, y0, h0⟩ := exists_val_not_mem β hg hne
+  have step : ∀ j, ∃ u : ℕ → (Fin R → F), ∃ t, IsStrictChainV β u t ∧ 2 ≤ t ∧
+      (chainW β u t = ⊤ ∨ j + 2 ≤ t) := by
+    intro j
+    induction j with
+    | zero =>
+      set u : ℕ → (Fin R → F) := fun i => if i = 0 then x0 else y0 with hu
+      refine ⟨u, 2, fun k hk1 hk2 => ?_, le_rfl, Or.inr (by norm_num)⟩
+      rw [show k = 1 by omega, chainW_one]
+      intro heq
+      apply h0
+      have hm := mem_chainW β u (show 0 < 1 by norm_num) (show 1 < 1 + 1 by norm_num)
+      have e0 : u 0 = x0 := if_pos rfl
+      have e1 : u 1 = y0 := if_neg (by norm_num)
+      rw [e0, e1, ← heq] at hm
+      exact hm
+    | succ j ih =>
+      obtain ⟨u, t, hu, ht, hor⟩ := ih
+      by_cases htop : chainW β u t = ⊤
+      · exact ⟨u, t, hu, ht, Or.inl htop⟩
+      · have hj : j + 2 ≤ t := hor.resolve_left htop
+        obtain ⟨x, y, hxy⟩ := exists_val_not_mem β hg htop
+        obtain ⟨u', hu'⟩ := strictV_extend β ht hu hxy
+        exact ⟨u', t + 1, hu', by omega, Or.inr (by omega)⟩
+  obtain ⟨u, t, hu, ht, hor⟩ := step M
+  rcases hor with h | h
+  · exact ⟨u, t, hu, ht, h⟩
+  · have := strict_length_le β hu (by omega)
+    omega
+
+/-- Lemma 9.1 / BNV Prop 5.2: `s(β) ≤ dim W + 1` for a surjective alternating `β`. -/
+theorem simsRk_le_succ (β : Fin M → Matrix (Fin R) (Fin R) F) (hg : GensOn β ⊤) :
+    simsRk β ≤ M + 1 := by
+  rcases Nat.eq_zero_or_pos M with hM | hM
+  · subst hM
+    have hbot : GensOn β ⊥ := by
+      unfold GensOn
+      apply eq_top_iff.2
+      intro w _
+      rw [Subsingleton.elim w 0]
+      exact Submodule.zero_mem _
+    have := simsRk_le_of β (U := ⊥) (d := 0) (by simp) hbot
+    omega
+  · obtain ⟨u, t, hu, ht, htop⟩ := exists_strict_top β hg hM
+    set U : Submodule F (Fin R → F) := Submodule.span F (Set.range (fun i : Fin t => u i))
+    have hmemU : ∀ i < t, u i ∈ U := fun i hi =>
+      Submodule.subset_span ⟨⟨i, hi⟩, rfl⟩
+    have hgU : GensOn β U := by
+      unfold GensOn
+      apply top_unique
+      rw [← htop]
+      refine chainW_le β fun a b hab hb => ?_
+      exact Submodule.subset_span (valL_mem_vals β (hmemU a (by omega)) (hmemU b hb))
+    have h1 := simsRk_le_of β rfl hgU
+    have h2 : finrank F U ≤ Fintype.card (Fin t) :=
+      finrank_range_le_card (fun i : Fin t => u i)
+    have h3 := strict_length_le β hu (by omega)
+    rw [Fintype.card_fin] at h2
+    omega
+
+/-- The parameter constraints of CNT3 for `N_2` (Lemma 2.3 / 9.1, BNV 5.2):
+`N_2(r1, r2, s) ≠ 0` forces `s - 1 ≤ r2 ≤ C(s, 2)` (and `2 ≤ s ≤ r1` when `r2 ≥ 1`). -/
+theorem N2_support_sims {r1 r2 s : ℕ} (h : 0 < N2 r1 r2 s) :
+    s ≤ r2 + 1 ∧ r2 ≤ s.choose 2 ∧ s ≤ r1 ∧ (1 ≤ r2 → 2 ≤ s) := by
+  classical
+  have hsup := N2_support h
+  unfold N2 at h
+  obtain ⟨β, hβ⟩ := Finset.card_pos.1 h
+  obtain ⟨-, hA, hg, hs⟩ := Finset.mem_filter.1 hβ
+  refine ⟨?_, ?_, hsup.1, hsup.2.2⟩
+  · rw [← hs]
+    exact simsRk_le_succ β hg
+  · rw [← hs]
+    exact card_le_choose_simsRk β hA hg
+
+end SimsBounds
+
+section GrassLower
+
+variable {F : Type*} [Field F] {n k : ℕ}
+
+/-- The graph map `c ↦ (c, c f)` from `F^k` to `F^n = F^k × F^(n-k)`. -/
+def graphL (f : Fin k → Fin (n - k) → F) : (Fin k → F) →ₗ[F] (Fin n → F) where
+  toFun c m := if h : (m : ℕ) < k then c ⟨m, h⟩ else
+    ∑ i, c i * f i ⟨(m : ℕ) - k, by have := m.2; omega⟩
+  map_add' c d := by
+    funext m
+    simp only [Pi.add_apply]
+    split_ifs with h
+    · rfl
+    · rw [← Finset.sum_add_distrib]
+      exact Finset.sum_congr rfl (fun i _ => add_mul _ _ _)
+  map_smul' a c := by
+    funext m
+    simp only [Pi.smul_apply, smul_eq_mul, RingHom.id_apply]
+    split_ifs with h
+    · rfl
+    · rw [Finset.mul_sum]
+      exact Finset.sum_congr rfl (fun i _ => mul_assoc _ _ _)
+
+lemma graphL_lt (f : Fin k → Fin (n - k) → F) (c : Fin k → F) (m : Fin n) (h : (m : ℕ) < k) :
+    graphL f c m = c ⟨m, h⟩ := by
+  simp only [graphL, LinearMap.coe_mk, AddHom.coe_mk]
+  rw [dif_pos h]
+
+lemma graphL_ge (f : Fin k → Fin (n - k) → F) (c : Fin k → F) (j : Fin (n - k))
+    (hj : k + (j : ℕ) < n) : graphL f c ⟨k + j, hj⟩ = ∑ i, c i * f i j := by
+  simp only [graphL, LinearMap.coe_mk, AddHom.coe_mk]
+  split_ifs with h
+  · exact absurd h (by first | omega | simp)
+  · exact Finset.sum_congr rfl (fun i _ => congrArg (fun z => c i * f i z) (Fin.ext (by simp)))
+
+lemma graphL_injective (hk : k ≤ n) (f : Fin k → Fin (n - k) → F) :
+    Function.Injective (graphL f) := by
+  intro c d h
+  funext i
+  have := congrFun h ⟨i, lt_of_lt_of_le i.2 hk⟩
+  rwa [graphL_lt f c ⟨i, lt_of_lt_of_le i.2 hk⟩ i.2,
+    graphL_lt f d ⟨i, lt_of_lt_of_le i.2 hk⟩ i.2] at this
+
+/-- Lemma 2.7 (i), lower bound: `q^(k(n-k)) ≤ [n, k]_q` (graphs of maps `F^k → F^(n-k)`). -/
+theorem pow_le_ncard_grass [Finite F] (hk : k ≤ n) :
+    Nat.card F ^ (k * (n - k)) ≤ {U : Submodule F (Fin n → F) | finrank F U = k}.ncard := by
+  let code : (Fin k → Fin (n - k) → F) → {U : Submodule F (Fin n → F) // finrank F U = k} :=
+    fun f => ⟨LinearMap.range (graphL f), by
+      rw [LinearMap.finrank_range_of_inj (graphL_injective hk f), Module.finrank_fin_fun]⟩
+  have hc : Function.Injective code := by
+    intro f g hfg
+    have hr : LinearMap.range (graphL f) = LinearMap.range (graphL g) :=
+      congrArg Subtype.val hfg
+    funext i j
+    have hmem : graphL f (Pi.single i 1) ∈ LinearMap.range (graphL g) := by
+      rw [← hr]
+      exact LinearMap.mem_range_self _ _
+    obtain ⟨c, hc⟩ := hmem
+    have hci : c = Pi.single i 1 := by
+      funext l
+      have := congrFun hc ⟨l, lt_of_lt_of_le l.2 hk⟩
+      rwa [graphL_lt g c ⟨l, lt_of_lt_of_le l.2 hk⟩ l.2,
+        graphL_lt f _ ⟨l, lt_of_lt_of_le l.2 hk⟩ l.2] at this
+    have hj : k + (j : ℕ) < n := by have := j.2; omega
+    have := congrFun hc ⟨k + j, hj⟩
+    rw [graphL_ge g c j hj, graphL_ge f _ j hj, hci] at this
+    simpa [Pi.single_apply] using this.symm
+  rw [← Nat.card_coe_set_eq]
+  calc Nat.card F ^ (k * (n - k)) = Nat.card (Fin k → Fin (n - k) → F) := by
+        rw [Nat.card_fun, Nat.card_fun, Nat.card_fin, Nat.card_fin, ← pow_mul]
+    _ ≤ Nat.card {U : Submodule F (Fin n → F) // finrank F U = k} :=
+        Nat.card_le_card_of_injective code hc
+    _ = Nat.card {U : Submodule F (Fin n → F) | finrank F U = k} := rfl
+
+end GrassLower
+
+section SubgroupCount
+
+variable {G : Type*} [Group G]
+
+/-- In a group of order `p ^ e`, a proper inclusion of subgroups multiplies the order by `p`. -/
+lemma pmul_card_le [Finite G] {p e : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ e) {K L : Subgroup G}
+    (hle : K ≤ L) (hne : K ≠ L) : p * Nat.card K ≤ Nat.card L := by
+  have h2 : Nat.card L ∣ p ^ e := by
+    rw [← hG]
+    exact Subgroup.card_subgroup_dvd_card L
+  have h1 : Nat.card K ∣ Nat.card L := Subgroup.card_dvd_of_le hle
+  obtain ⟨b, -, hb⟩ := (Nat.dvd_prime_pow hp).mp h2
+  obtain ⟨a, -, ha⟩ := (Nat.dvd_prime_pow hp).mp (h1.trans h2)
+  have hab : a ≤ b := by
+    rw [ha, hb] at h1
+    exact (Nat.pow_dvd_pow_iff_le_right hp.one_lt).mp h1
+  have hab' : a ≠ b := by
+    rintro rfl
+    exact hne (Subgroup.eq_of_le_of_card_ge hle (by rw [ha, hb]))
+  rw [ha, hb, ← pow_succ']
+  exact Nat.pow_le_pow_right hp.pos (by omega)
+
+/-- A subgroup of order `p ^ b` of a group of order `p ^ e` is generated by `b` elements. -/
+theorem exists_closure_eq_of_card [Finite G] {p e b : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ e)
+    (K : Subgroup G) (hK : Nat.card K = p ^ b) :
+    ∃ v : Fin b → G, Subgroup.closure (Set.range v) = K := by
+  have step : ∀ j, ∃ v : ℕ → G, (∀ i, v i ∈ K) ∧
+      (Subgroup.closure (v '' Set.Iio j) = K ∨
+        p ^ j ≤ Nat.card (Subgroup.closure (v '' Set.Iio j))) := by
+    intro j
+    induction j with
+    | zero => exact ⟨fun _ => 1, fun _ => K.one_mem, Or.inr (by rw [pow_zero]; exact Nat.card_pos)⟩
+    | succ j ih =>
+      obtain ⟨v, hvK, hor⟩ := ih
+      have hle : ∀ w : ℕ → G, (∀ i, w i ∈ K) → ∀ l,
+          Subgroup.closure (w '' Set.Iio l) ≤ K := by
+        intro w hw l
+        rw [Subgroup.closure_le]
+        rintro _ ⟨i, -, rfl⟩
+        exact hw i
+      have hmono : ∀ w : ℕ → G, ∀ l, Subgroup.closure (w '' Set.Iio l) ≤
+          Subgroup.closure (w '' Set.Iio (l + 1)) := fun w l =>
+        Subgroup.closure_mono (Set.image_mono (Set.Iio_subset_Iio (Nat.le_succ l)))
+      by_cases hc : Subgroup.closure (v '' Set.Iio j) = K
+      · exact ⟨v, hvK, Or.inl (le_antisymm (hle v hvK (j + 1)) (by rw [← hc]; exact hmono v j))⟩
+      · have hlt : Subgroup.closure (v '' Set.Iio j) < K :=
+          lt_of_le_of_ne (hle v hvK j) hc
+        obtain ⟨x, hxK, hx⟩ := SetLike.exists_of_lt hlt
+        set w : ℕ → G := fun i => if i < j then v i else x with hw
+        have hwK : ∀ i, w i ∈ K := fun i => by
+          show (if i < j then v i else x) ∈ K
+          split_ifs
+          · exact hvK i
+          · exact hxK
+        have himg : w '' Set.Iio j = v '' Set.Iio j := by
+          apply Set.image_congr
+          intro i hi
+          exact if_pos (Set.mem_Iio.mp hi)
+        have hle' : Subgroup.closure (v '' Set.Iio j) ≤ Subgroup.closure (w '' Set.Iio (j + 1)) := by
+          rw [← himg]
+          exact hmono w j
+        have hxmem : x ∈ Subgroup.closure (w '' Set.Iio (j + 1)) := by
+          apply Subgroup.subset_closure
+          exact ⟨j, Set.mem_Iio.mpr (show j < j + 1 by omega), if_neg (lt_irrefl j)⟩
+        have hne : Subgroup.closure (v '' Set.Iio j) ≠ Subgroup.closure (w '' Set.Iio (j + 1)) := by
+          intro h
+          rw [← h] at hxmem
+          exact hx hxmem
+        have h1 := pmul_card_le hp hG hle' hne
+        have h0 : p ^ j ≤ Nat.card (Subgroup.closure (v '' Set.Iio j)) := hor.resolve_left hc
+        refine ⟨w, hwK, Or.inr ?_⟩
+        rw [pow_succ']
+        exact (Nat.mul_le_mul le_rfl h0).trans h1
+  obtain ⟨v, hvK, hor⟩ := step b
+  have hle : Subgroup.closure (v '' Set.Iio b) ≤ K := by
+    rw [Subgroup.closure_le]
+    rintro _ ⟨i, -, rfl⟩
+    exact hvK i
+  have heq : Subgroup.closure (v '' Set.Iio b) = K := by
+    rcases hor with h | h
+    · exact h
+    · exact Subgroup.eq_of_le_of_card_ge hle (by rw [hK]; exact h)
+  refine ⟨fun i => v i, ?_⟩
+  rw [← heq]
+  congr 1
+  ext g
+  constructor
+  · rintro ⟨i, rfl⟩
+    exact ⟨i, Set.mem_Iio.mpr i.2, rfl⟩
+  · rintro ⟨i, hi, rfl⟩
+    exact ⟨⟨i, Set.mem_Iio.mp hi⟩, rfl⟩
+
+/-- Lemma 2.7 (iii), crude form (BNV 20.15 up to the exponent): a group of order `p ^ e` has at
+most `p ^ (e b)` subgroups of order `p ^ b`. -/
+theorem ncard_subgroups_le [Finite G] {p e b : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ e) :
+    {K : Subgroup G | Nat.card K = p ^ b}.ncard ≤ p ^ (e * b) := by
+  have hsub : {K : Subgroup G | Nat.card K = p ^ b} ⊆
+      Set.range (fun v : Fin b → G => Subgroup.closure (Set.range v)) := by
+    intro K hK
+    obtain ⟨v, hv⟩ := exists_closure_eq_of_card hp hG K hK
+    exact ⟨v, hv⟩
+  calc {K : Subgroup G | Nat.card K = p ^ b}.ncard
+      ≤ (Set.range (fun v : Fin b → G => Subgroup.closure (Set.range v))).ncard :=
+        Set.ncard_le_ncard hsub (Set.finite_range _)
+    _ ≤ (Set.univ : Set (Fin b → G)).ncard := by
+        rw [← Set.image_univ]
+        exact Set.ncard_image_le (Set.toFinite _)
+    _ = p ^ (e * b) := by
+        rw [Set.ncard_univ, Nat.card_fun, Nat.card_fin, hG, ← pow_mul]
+
+/-- Every subgroup of order `p ^ c ≤ p ^ b` (with `p ^ b ∣ |G|`) lies in one of order `p ^ b`. -/
+theorem exists_le_card_pow [Finite G] {p b c : ℕ} [Fact p.Prime] (hdvd : p ^ b ∣ Nat.card G)
+    (H : Subgroup G) (hH : Nat.card H = p ^ c) (hcb : c ≤ b) :
+    ∃ K : Subgroup G, Nat.card K = p ^ b ∧ H ≤ K :=
+  Sylow.exists_subgroup_card_pow_prime_le p hdvd H hH hcb
+
+end SubgroupCount
 
 end OMA.SimsLite.Alt2
