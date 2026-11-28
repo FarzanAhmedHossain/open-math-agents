@@ -38,9 +38,11 @@ Main results:
   blocks sorted by the second index). The properties are collected in `SimsGen`: `r_i` entries
   in weight `i`, with `p ^ r_i |γ_{i+1} γ_i^p| = |γ_i|` and `r_1 = d(G)`; relative orders `≥ 1` and
   `n ≤ m`; the block structure `(d_k)`, `f` of weight 2; unique normal forms (26).
-Not formalised: the weight-3 index restriction `a > d_{b-1}` on the candidates of layer 3 (BNV
-5.4, a Jacobi reduction); the construction here selects layer 3 from all `[g_{2,a}, g_{1,b}]`,
-`b ≤ s`. Proposition 2.4 only records `c(2, j, k, ·)` for `k ≤ (df j).2`, as in the paper. -/
+The weight-3 index restriction `a > d_{b-1}` (BNV 5.4) is enforced: layer 3 is selected only
+from the `[g_{2,a}, g_{1,b}]` with `b ≤ co(a)` (`cVal`), these still span `γ_3` modulo
+`γ_4 γ_3^p` by a Jacobi reduction (`sLay_span_two`), and the restriction is recorded as the field
+`SimsGen.w3`. Proposition 2.4 only records `c(2, j, k, ·)` for `k ≤ (df j).2`, as in the
+paper. -/
 
 namespace OMA.SimsLite
 
@@ -1576,9 +1578,11 @@ def cPar (s w j : ℕ) : ℕ := if w = 0 then j % s else j / s
 def cCor (s w j : ℕ) : ℕ := if w = 0 then j / s else j % s
 
 /-- Candidate `j` of layer `w + 1` built from layer `w` (junk `1` for the pairs `a ≥ b` of
-layer 1). -/
+layer 1, and for the pairs `(a, b)` of layer 2 with `co(a) < b`, i.e. `a ≤ d_{b-1}` in the
+paper's 1-based indexing: the weight-3 candidates are `[g_{2,a}, g_{1,b}]` with `d_{b-1} < a`). -/
 def cVal (s : ℕ) (u : ℕ → G) (w : ℕ) (L : SLay G) (j : ℕ) : G :=
-  if w = 0 ∧ ¬ cPar s w j < cCor s w j then 1 else ⁅L.x (cPar s w j), u (cCor s w j)⁆
+  if (w = 0 ∧ ¬ cPar s w j < cCor s w j) ∨ (w = 1 ∧ L.cor (cPar s w j) < cCor s w j) then 1
+  else ⁅L.x (cPar s w j), u (cCor s w j)⁆
 
 /-- Number of candidates of layer `w + 1`. -/
 def cN (s w : ℕ) (L : SLay G) : ℕ := if w = 0 then s * s else L.r * s
@@ -1590,18 +1594,28 @@ lemma cPar_ne {s w j : ℕ} (hw : w ≠ 0) : cPar s w j = j / s := if_neg hw
 lemma cCor_ne {s w j : ℕ} (hw : w ≠ 0) : cCor s w j = j % s := if_neg hw
 lemma cN_ne {s w : ℕ} {L : SLay G} (hw : w ≠ 0) : cN s w L = L.r * s := if_neg hw
 
-lemma cVal_succ (s : ℕ) (u : ℕ → G) (w : ℕ) (L : SLay G) (j : ℕ) :
+lemma cVal_succ (s : ℕ) (u : ℕ → G) (w : ℕ) (L : SLay G) (j : ℕ)
+    (h : ¬ (w = 0 ∧ L.cor (j / s) < j % s)) :
     cVal s u (w + 1) L j = ⁅L.x (j / s), u (j % s)⁆ := by
   unfold cVal
-  rw [if_neg (show ¬ (w + 1 = 0 ∧ ¬ cPar s (w + 1) j < cCor s (w + 1) j) from
-    fun h => absurd h.1 (by omega)), cPar_ne (show w + 1 ≠ 0 by omega),
-    cCor_ne (show w + 1 ≠ 0 by omega)]
+  have hn : ¬ ((w + 1 = 0 ∧ ¬ cPar s (w + 1) j < cCor s (w + 1) j) ∨
+      (w + 1 = 1 ∧ L.cor (cPar s (w + 1) j) < cCor s (w + 1) j)) := by
+    rintro (h' | h')
+    · exact absurd h'.1 (by omega)
+    · rw [cPar_ne (show w + 1 ≠ 0 by omega), cCor_ne (show w + 1 ≠ 0 by omega)] at h'
+      obtain ⟨h1', h2'⟩ := h'
+      exact h ⟨by omega, h2'⟩
+  rw [if_neg hn, cPar_ne (show w + 1 ≠ 0 by omega), cCor_ne (show w + 1 ≠ 0 by omega)]
 
 lemma cVal_zero_of_lt (s : ℕ) (u : ℕ → G) (L : SLay G) {j : ℕ} (h : j % s < j / s) :
     cVal s u 0 L j = ⁅L.x (j % s), u (j / s)⁆ := by
   unfold cVal
-  rw [if_neg (show ¬ ((0 : ℕ) = 0 ∧ ¬ cPar s 0 j < cCor s 0 j) from
-    fun h' => h'.2 (by rw [cPar_zero, cCor_zero]; exact h)), cPar_zero, cCor_zero]
+  have hn : ¬ (((0 : ℕ) = 0 ∧ ¬ cPar s 0 j < cCor s 0 j) ∨
+      ((0 : ℕ) = 1 ∧ L.cor (cPar s 0 j) < cCor s 0 j)) := by
+    rintro (h' | h')
+    · exact h'.2 (by rw [cPar_zero, cCor_zero]; exact h)
+    · exact Nat.zero_ne_one h'.1
+  rw [if_neg hn, cPar_zero, cCor_zero]
 
 lemma slot_lt {s A a b : ℕ} (ha : a < A) (hb : b < s) : a * s + b < A * s :=
   lt_of_lt_of_le (Nat.add_lt_add_left hb _)
@@ -1639,14 +1653,16 @@ lemma gLay_cVal_gen (s : ℕ) (u : ℕ → G) (hs : 0 < s) (w : ℕ) (L : SLay G
       cCor s w (genum (gsel (cVal s u w L) K (cN s w L)) i) := rfl
   rw [e1, e2, hx]
   generalize genum (gsel (cVal s u w L) K (cN s w L)) i = j at hj hne ⊢
-  have hcv : ¬ (w = 0 ∧ ¬ cPar s w j < cCor s w j) := by
+  have hcv2 : ¬ ((w = 0 ∧ ¬ cPar s w j < cCor s w j) ∨
+      (w = 1 ∧ L.cor (cPar s w j) < cCor s w j)) := by
     intro hc
     apply hne
     unfold cVal
     rw [if_pos hc]
+  have hcv : ¬ (w = 0 ∧ ¬ cPar s w j < cCor s w j) := fun hc => hcv2 (Or.inl hc)
   have hval : cVal s u w L j = ⁅L.x (cPar s w j), u (cCor s w j)⁆ := by
     unfold cVal
-    rw [if_neg hcv]
+    rw [if_neg hcv2]
   refine ⟨?_, ?_, ?_, hval⟩
   · by_cases hw : w = 0
     · subst hw
@@ -1667,6 +1683,63 @@ lemma gLay_cVal_gen (s : ℕ) (u : ℕ → G) (hs : 0 < s) (w : ℕ) (L : SLay G
   · intro hw
     by_contra hc
     exact hcv ⟨hw, hc⟩
+
+/-- The weight-3 index restriction of a candidate-built greedy layer from layer `1`. -/
+lemma gLay_cVal_w3 (s : ℕ) (u : ℕ → G) (L : SLay G) (K : Subgroup G) {i : ℕ}
+    (hi : i < (gLay (cVal s u 1 L) K (cN s 1 L) (cPar s 1) (cCor s 1)).r) :
+    ¬ L.cor ((gLay (cVal s u 1 L) K (cN s 1 L) (cPar s 1) (cCor s 1)).par i) <
+      (gLay (cVal s u 1 L) K (cN s 1 L) (cPar s 1) (cCor s 1)).cor i := by
+  have hind := gLay_indep (cVal s u 1 L) K (cN s 1 L) (cPar s 1) (cCor s 1) hi
+  have hi' : i < (gsel (cVal s u 1 L) K (cN s 1 L)).card := hi
+  have hx := gLay_x (cVal s u 1 L) K (cN s 1 L) (cPar s 1) (cCor s 1) hi'
+  intro hlt
+  apply hind
+  rw [hx]
+  have hc : ((1 : ℕ) = 0 ∧ ¬ cPar s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i) <
+      cCor s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i)) ∨
+      ((1 : ℕ) = 1 ∧ L.cor (cPar s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i)) <
+        cCor s 1 (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i)) := Or.inr ⟨rfl, hlt⟩
+  have h1 : cVal s u 1 L (genum (gsel (cVal s u 1 L) K (cN s 1 L)) i) = 1 := if_pos hc
+  rw [h1]
+  exact one_mem _
+
+/-- Modulo `γ_4`, `⁅g ^ n, y⁆ = ⁅g, y⁆ ^ n` for `g ∈ γ_2`. -/
+lemma commElem_pow_left_mem3 (g y : G) (hg : g ∈ lcs G 1) (n : ℕ) :
+    ⁅g ^ n, y⁆ * (⁅g, y⁆ ^ n)⁻¹ ∈ lcs G 3 := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have hc : ⁅g, ⁅g ^ n, y⁆⁆ ∈ lcs G 3 :=
+      lcs_antitone (show 3 ≤ 1 + (1 + 1) + 1 by omega)
+        (commElem_mem_lcs_add hg (commElem_mem_lcs_succ (pow_mem hg n) y))
+    have e : ⁅g ^ (n + 1), y⁆ * (⁅g, y⁆ ^ (n + 1))⁻¹ =
+        ⁅g, ⁅g ^ n, y⁆⁆ * (⁅g ^ n, y⁆ * (⁅g, y⁆ ^ n)⁻¹) := by
+      rw [pow_succ' g n, commElem_mul_left, pow_succ]
+      group
+    rw [e]
+    exact Subgroup.mul_mem _ hc ih
+
+/-- `⁅K_1, G⁆ ≤ K_2` for the Frattini subgroups `K_1 = γ_3 γ_2^p`, `K_2 = γ_4 γ_3^p`. -/
+lemma comm_layK_one (p : ℕ) (z : G) (hz : z ∈ layK p G 1) (g : G) : ⁅z, g⁆ ∈ layK p G 2 := by
+  haveI : (layK p G 2).Normal :=
+    normal_of_sandwich (n := 2) (lcs_succ_le_layK p 2) (layK_le_lcs p 1)
+  have hle : layK p G 1 ≤ zn (layK p G 2) g := by
+    show lcs G 2 ⊔ Subgroup.closure (Set.range (fun y : lcs G 1 => (y : G) ^ p)) ≤ _
+    refine sup_le ?_ ?_
+    · intro x hx
+      exact mem_zn.mpr (lcs_succ_le_layK p 2 (commElem_mem_lcs_succ' g hx))
+    · rw [Subgroup.closure_le]
+      rintro _ ⟨y, rfl⟩
+      apply mem_zn.mpr
+      apply commElem_mem_symm
+      have h1 := commElem_pow_left_mem3 (y : G) g y.2 p
+      have h2 : ⁅(y : G), g⁆ ^ p ∈ layK p G 2 :=
+        pow_mem_layK p 2 _ (commElem_mem_lcs_succ y.2 g)
+      have e : ⁅(y : G) ^ p, g⁆ = ⁅(y : G) ^ p, g⁆ * (⁅(y : G), g⁆ ^ p)⁻¹ * ⁅(y : G), g⁆ ^ p := by
+        group
+      rw [e]
+      exact Subgroup.mul_mem _ (lcs_succ_le_layK p 2 h1) h2
+  exact commElem_mem_symm (mem_zn.mp (hle hz))
 
 /-- The layers after layer `0`. -/
 noncomputable def sLay (p s : ℕ) (u : ℕ → G) (L0 : SLay G) : ℕ → SLay G
@@ -1718,7 +1791,7 @@ lemma sLay_gen (hs : 0 < s) (hr0 : s ≤ L0.r) (w : ℕ) {i : ℕ}
 
 /-- Spanning for the layers of weight `≥ 3`. -/
 lemma sLay_span_succ (hs : 0 < s) (w : ℕ) {a b : ℕ} (ha : a < (sLay p s u L0 (w + 1)).r)
-    (hb : b < s) :
+    (hb : b < s) (hw : ¬ (w = 0 ∧ (sLay p s u L0 (w + 1)).cor a < b)) :
     ⁅(sLay p s u L0 (w + 1)).x a, u b⁆ ∈ Subgroup.closure ((sLay p s u L0 (w + 1 + 1)).x ''
       Set.Iio (sLay p s u L0 (w + 1 + 1)).r) ⊔ layK p G (w + 1 + 1) := by
   have hj : a * s + b < cN s (w + 1) (sLay p s u L0 (w + 1)) := by
@@ -1726,9 +1799,17 @@ lemma sLay_span_succ (hs : 0 < s) (w : ℕ) {a b : ℕ} (ha : a < (sLay p s u L0
     exact slot_lt ha hb
   have hv : cVal s u (w + 1) (sLay p s u L0 (w + 1)) (a * s + b) =
       ⁅(sLay p s u L0 (w + 1)).x a, u b⁆ := by
-    rw [cVal_succ, slot_div hb, slot_mod hb]
+    have hw' : ¬ (w = 0 ∧ (sLay p s u L0 (w + 1)).cor ((a * s + b) / s) < (a * s + b) % s) := by
+      rw [slot_div hb, slot_mod hb]
+      exact hw
+    rw [cVal_succ s u w _ _ hw', slot_div hb, slot_mod hb]
   rw [← hv, sLay_succ p s u L0 (w + 1)]
   exact gLay_span_all _ _ _ _ _ hj
+
+/-- The weight-3 restriction of layer `2`. -/
+lemma sLay_w3 {i : ℕ} (hi : i < (sLay p s u L0 2).r) :
+    (sLay p s u L0 2).cor i ≤ (sLay p s u L0 1).cor ((sLay p s u L0 2).par i) :=
+  not_lt.mp (gLay_cVal_w3 s u (sLay p s u L0 1) (layK p G 2) (i := i) hi)
 
 /-- Prefix spanning for layer `1` (the subspaces `W_k` of BNV Prop 5.2). -/
 lemma sLay_span_one (hs : 0 < s) (hx0 : ∀ a < s, L0.x a = u a) {k : ℕ} (hk : k ≤ s)
@@ -1754,11 +1835,57 @@ lemma sLay_span_one (hs : 0 < s) (hx0 : ∀ a < s, L0.x a = u a) {k : ℕ} (hk :
   rw [cCor_zero]
   exact (Nat.div_lt_iff_lt_mul hs).mpr hik
 
+/-- Weight-3 reduction (BNV Section 5.4, a Jacobi argument): every `[g_{2,a}, g_{1,b}]` lies in
+the span of the restricted weight-3 candidates modulo `γ_4 γ_3^p`. By strong induction on `b`:
+for `co(a) = k < b` and `g_{2,a} = [u_f, u_k]` (`f < k`), the three subgroup lemma reduces
+`[[u_f, u_k], u_b]` to commutators of `[u_k, u_b], [u_f, u_b] ∈ W_{b+1}` with `u_f`, `u_k`. -/
+lemma sLay_span_two (hs : 0 < s) (hr0 : s ≤ L0.r) (hx0 : ∀ a < s, L0.x a = u a) :
+    ∀ b, b < s → ∀ a, a < (sLay p s u L0 1).r → ⁅(sLay p s u L0 1).x a, u b⁆ ∈
+      Subgroup.closure ((sLay p s u L0 2).x '' Set.Iio (sLay p s u L0 2).r) ⊔ layK p G 2 := by
+  intro b
+  induction b using Nat.strong_induction_on with
+  | _ b ih =>
+    intro hb a ha
+    have hN : (Subgroup.closure ((sLay p s u L0 2).x '' Set.Iio (sLay p s u L0 2).r) ⊔
+        layK p G 2).Normal :=
+      layK_normal_sup p 2 _ (by rintro _ ⟨i, -, rfl⟩; exact sLay_mem p s u L0 2 i)
+    by_cases hab : (sLay p s u L0 1).cor a < b
+    · have hg := sLay_gen p s u L0 hs hr0 0 ha
+      have hk : (sLay p s u L0 1).cor a < s := hg.2.1
+      have hfk : (sLay p s u L0 1).par a < (sLay p s u L0 1).cor a := hg.2.2.1 rfl
+      have hxa : (sLay p s u L0 1).x a =
+          ⁅L0.x ((sLay p s u L0 1).par a), u ((sLay p s u L0 1).cor a)⁆ := hg.2.2.2
+      rw [hx0 ((sLay p s u L0 1).par a) (by omega)] at hxa
+      rw [hxa]
+      have hKn : (Subgroup.closure ((sLay p s u L0 1).x '' {i | i < (sLay p s u L0 1).r ∧
+          (sLay p s u L0 1).cor i < b + 1}) ⊔ layK p G 1).Normal :=
+        layK_normal_sup p 1 _ (by rintro _ ⟨i, -, rfl⟩; exact sLay_mem p s u L0 1 i)
+      have hKM : ∀ c, c < b → ∀ z ∈ Subgroup.closure ((sLay p s u L0 1).x '' {i |
+          i < (sLay p s u L0 1).r ∧ (sLay p s u L0 1).cor i < b + 1}) ⊔ layK p G 1,
+          ⁅z, u c⁆ ∈ Subgroup.closure ((sLay p s u L0 2).x '' Set.Iio (sLay p s u L0 2).r) ⊔
+            layK p G 2 := by
+        intro c hc
+        haveI := hN
+        refine lie_sup_comm ?_ ?_
+        · rintro _ ⟨i, ⟨hi, -⟩, rfl⟩
+          exact ih c hc (by omega) i hi
+        · intro z hz
+          exact Subgroup.mem_sup_right (comm_layK_one p z hz (u c))
+      haveI := hN
+      haveI := hKn
+      exact lie_three _ _ _
+        (sLay_span_one p s u L0 hs hx0 (show b + 1 ≤ s by omega) hab (Nat.lt_succ_self b))
+        (hKM _ (by omega))
+        (commElem_mem_symm (sLay_span_one p s u L0 hs hx0 (show b + 1 ≤ s by omega)
+          (show (sLay p s u L0 1).par a < b by omega) (Nat.lt_succ_self b)))
+        (hKM _ hab)
+    · exact sLay_span_succ p s u L0 hs 0 ha hb (fun h => hab h.2)
+
 /-- The layers generate the lower central series: `γ_{w+2} ≤ ⟨layer w + 1⟩ γ_{w+3}`. -/
 theorem sLay_lcs [Finite G] {m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) (hs : 0 < s)
     (hx0 : ∀ a < s, L0.x a = u a)
     (hL0 : Subgroup.closure (L0.x '' Set.Iio L0.r) ⊔ lcs G 1 = ⊤)
-    (hcore : lcs G 1 ≤ Subgroup.closure (lieE s u 1) ⊔ lcs G 2) :
+    (hcore : lcs G 1 ≤ Subgroup.closure (lieE s u 1) ⊔ lcs G 2) (hr0 : s ≤ L0.r) :
     ∀ w, lcs G (w + 1) ≤ Subgroup.closure ((sLay p s u L0 (w + 1)).x ''
       Set.Iio (sLay p s u L0 (w + 1)).r) ⊔ lcs G (w + 2) := by
   have hT := theoremL s u (L0.x '' Set.Iio L0.r) hL0 hcore
@@ -1790,7 +1917,14 @@ theorem sLay_lcs [Finite G] {m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) (
       refine sup_le ?_ ?_
       · rw [Subgroup.closure_le]
         rintro _ ⟨a, ha, rfl⟩
-        exact mem_zn.mpr (commElem_mem_symm (sLay_span_succ p s u L0 hs w ha hb))
+        have hspan : ⁅(sLay p s u L0 (w + 1)).x a, u b⁆ ∈ Subgroup.closure
+            ((sLay p s u L0 (w + 1 + 1)).x '' Set.Iio (sLay p s u L0 (w + 1 + 1)).r) ⊔
+              layK p G (w + 1 + 1) := by
+          rcases Nat.eq_zero_or_pos w with hw | hw
+          · subst hw
+            exact sLay_span_two p s u L0 hs hr0 hx0 b hb a ha
+          · exact sLay_span_succ p s u L0 hs w ha hb (fun h => by omega)
+        exact mem_zn.mpr (commElem_mem_symm hspan)
       · intro g hg
         exact mem_zn.mpr (Subgroup.mem_sup_right
           ((lcs_succ_le_layK p (w + 1 + 1)) (commElem_mem_lcs_succ' (u b) hg)))
@@ -2481,7 +2615,14 @@ data `d`, core sequence `u` and layer lengths `r` (`r w = r_{w+1}` of the paper)
   (`block_mono`), `f` injective on each block (`block_inj`), the flag
   `W_k = ⟨[u_a, u_b] : a < b < k⟩ γ₃ γ₂^p` spanned by the blocks `< k` (`flag`), and every block
   `k = 1, ..., s - 1` (0-based) nonempty (`block_ne`, the strictness `d_{k-1} < d_k`);
-* unique Sims normal forms (26). -/
+* unique Sims normal forms (26);
+* `deep`: each `γ_{w+1}`, `w ≥ 1`, is generated by the generators of weight `≥ w + 1`;
+  `nf_sub`: every element of a tail subgroup `⟨X u : u ∈ lset d w j⟩` has a bounded normal form
+  supported on `lset d w j`; `n_eq`: the positions are exactly the layers `0, ..., c - 1` for
+  some `c`;
+* `w3`: the weight-3 index restriction of Section 2.1: a weight-3 generator
+  `[g_{2,a}, g_{1,b}]` (0-based `a = (df t).1`, `b = (df t).2`) has `b ≤ co(a)`, the core index
+  of `g_{2,a}`; in the paper's 1-based indexing this is `d_{b-1} < a ≤ r_2`. -/
 structure SimsGen (p : ℕ) (u : ℕ → G) (d : SimsData) (X : Fin d.n → G) (r : ℕ → ℕ) : Prop where
   core : ∀ t : Fin d.n, t.val < d.s → X t = u t.val
   valid : d.Valid
@@ -2503,6 +2644,11 @@ structure SimsGen (p : ℕ) (u : ℕ → G) (d : SimsData) (X : Fin d.n → G) (
   nf_exists : ∀ g : G, ∃ e : Fin d.n → ℕ, (∀ t, e t < p ^ d.a t) ∧ g = nfw X e
   nf_unique : ∀ e e' : Fin d.n → ℕ, (∀ t, e t < p ^ d.a t) → (∀ t, e' t < p ^ d.a t) →
     nfw X e = nfw X e' → e = e'
+  deep : ∀ w, 1 ≤ w → lcs G w ≤ Subgroup.closure (X '' {t | w ≤ d.lv t})
+  nf_sub : ∀ (w j : ℕ), ∀ z ∈ Subgroup.closure (X '' lset d w j), ∃ e : Fin d.n → ℕ,
+    (∀ t, e t ≠ 0 → t ∈ lset d w j) ∧ (∀ t, e t < p ^ d.a t) ∧ z = nfw X e
+  n_eq : ∃ c, d.n = fOff r c
+  w3 : ∀ t, d.lv t = 2 → (d.df t).2.val ≤ (d.df (d.df t).1).2.val
 
 /-- Assembly: the flattened layers form a Sims generating set. -/
 theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) {s L : ℕ}
@@ -2520,7 +2666,7 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
       ⁅u a, u b⁆ ∈ Subgroup.closure (xs 1 '' {i | i < r 1 ∧ co 1 i < k}) ⊔ pN p G)
     (Hmono : ∀ i i', i ≤ i' → i' < r 1 → co 1 i ≤ co 1 i')
     (Hinj : ∀ i i', i < r 1 → i' < r 1 → pa 1 i = pa 1 i' → co 1 i = co 1 i' → i = i')
-    (hstrict : StrictChainN (pN p G) u s) :
+    (hstrict : StrictChainN (pN p G) u s) (Hw3 : ∀ i, i < r 2 → co 2 i ≤ co 1 (pa 2 i)) :
     ∃ (d : SimsData) (X : Fin d.n → G), d.s = s ∧ SimsGen p u d X (fLen L r) := by
   have hd := fData_struct (s := s) (L := L) H0 Hpa Hco H1
   have hdf : ∀ t, 1 ≤ (fData s L r pa co).lv t → fX L r xs t =
@@ -2550,6 +2696,26 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
       (fData s L r pa co).lv t = 1 ∧ ((fData s L r pa co).df t).2.val < k}) ⊔ pN p G :=
     fun k hk => flat_Wk p u H0 Hpa Hco H1 Hx Hc0 hL1 HS1 hk
   have hex := nf_exists_of hp hG (fData s L r pa co) hd (fX L r xs) hgen hlv hdeep
+  have hnfp := nfp_all (fData s L r pa co) (fX L r xs) hp hG hd hlv hdeep
+  have hw3 : ∀ t : Fin (fData s L r pa co).n, (fData s L r pa co).lv t = 2 →
+      ((fData s L r pa co).df t).2.val ≤
+        ((fData s L r pa co).df ((fData s L r pa co).df t).1).2.val := by
+    intro t ht
+    have ht' : fLv (fLen L r) L t.val = 1 + 1 := ht
+    obtain ⟨-, hi, h1, h2⟩ := fDf_vals (L := L) (pa := pa) (co := co) H0 Hpa Hco t ht'
+    have hl1 : (fData s L r pa co).lv ((fData s L r pa co).df t).1 + 1 =
+        (fData s L r pa co).lv t := hd.df_lv t (by omega)
+    have ht1 : fLv (fLen L r) L ((fDf L r pa co t).1).val = 0 + 1 := by
+      have e : (fData s L r pa co).lv ((fData s L r pa co).df t).1 = 1 := by omega
+      exact e
+    obtain ⟨-, -, -, h4⟩ := fDf_vals (L := L) (pa := pa) (co := co) H0 Hpa Hco _ ht1
+    have h5 : ((fDf L r pa co t).1).val - fOff (fLen L r) (0 + 1) =
+        pa (1 + 1) (t.val - fOff (fLen L r) (1 + 1)) := by
+      rw [h1]
+      exact Nat.add_sub_cancel_left _ _
+    show ((fDf L r pa co t).2).val ≤ ((fDf L r pa co (fDf L r pa co t).1).2).val
+    rw [h4, h2, h5]
+    exact Hw3 _ hi
   refine ⟨⟨(fData s L r pa co).n, (fData s L r pa co).s, (fData s L r pa co).lv,
     (fData s L r pa co).df, relOrd p (fData s L r pa co) (fX L r xs), b, c⟩, fX L r xs, rfl, ?_⟩
   refine
@@ -2568,7 +2734,11 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
       flag := hWk
       block_ne := fun k hk1 hks => flat_blocks p u hstrict hWk hk1 hks
       nf_exists := hex
-      nf_unique := fun e e' he he' h => nfw_unique _ (fX L r xs) hr.card hex e e' he he' h }
+      nf_unique := fun e e' he he' h => nfw_unique _ (fX L r xs) hr.card hex e e' he he' h
+      deep := hdeep
+      nf_sub := fun w j => hnfp w j
+      n_eq := ⟨L + 1, rfl⟩
+      w3 := hw3 }
   · calc fOff (fLen L r) (L + 1) = ∑ _t : Fin (fOff (fLen L r) (L + 1)), 1 := by simp
       _ ≤ ∑ t, relOrd p (fData s L r pa co) (fX L r xs) t :=
         Finset.sum_le_sum (fun t _ => ha1 t)
@@ -2668,7 +2838,7 @@ theorem sims_gen_of_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G 
     intro g _
     exact lay0_span p s u g
   have hcore := core_lieE hp hG hW
-  have hU := sLay_lcs p s u (lay0 p s u) hp hG hs0 hx0 (by rw [hgen0, top_sup_eq]) hcore
+  have hU := sLay_lcs p s u (lay0 p s u) hp hG hs0 hx0 (by rw [hgen0, top_sup_eq]) hcore hr0
   obtain ⟨N, hN⟩ : ∃ N, lcs G N = ⊥ := Subgroup.nilpotent_iff_lowerCentralSeries.mp inferInstance
   have hL : lcs G (N + 1 + 1) = ⊥ :=
     le_bot_iff.mp (hN ▸ lcs_antitone (D := G) (show N ≤ N + 1 + 1 by omega))
@@ -2731,9 +2901,11 @@ theorem sims_gen_of_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G 
   have Hinj : ∀ i i', i < gR p s u 1 → i' < gR p s u 1 → gPa p s u 1 i = gPa p s u 1 i' →
       gCo p s u 1 i = gCo p s u 1 i' → i = i' :=
     fun i i' hi hi' hp' hc => sLay_one_inj p s u (lay0 p s u) hi hi' hp' hc
+  have Hw3 : ∀ i, i < gR p s u 2 → gCo p s u 2 i ≤ gCo p s u 1 (gPa p s u 2 i) :=
+    fun i hi => sLay_w3 p s u (lay0 p s u) hi
   obtain ⟨d, X, hds, hspec⟩ := flat_final (L := N + 1) (r := gR p s u) (xs := gXs p s u)
     (pa := gPa p s u) (co := gCo p s u) hp hG u hr0 Hpa Hco H1 Hx hx0 hgen0 (fun w _ => hU w) hL
-    (by omega) Hind (fun w _ => Hcard w) HS1 Hmono Hinj hstrict
+    (by omega) Hind (fun w _ => Hcard w) HS1 Hmono Hinj hstrict Hw3
   refine ⟨d, X, fLen (N + 1) (gR p s u), hds, ?_, ?_, hspec⟩
   · have h1 := hspec.realizes.card
     rw [hG] at h1
