@@ -29,7 +29,11 @@ Section 2.3:
 * `core_L3_closure` : `L_3 = Σ_k [L_2, ḡ_{1,k}]` (34) for `i = 2`, via Jacobi;
 * `grOf_block`, `grBr_block` (35)/(39)/(41), `grOf_power_block` (37), and
   `SimsGenSet.layer_power` : `p ^ a(i,j) ḡ_{i,j} = Σ_v b(i,j,i,v) ḡ_{i,v}` for the power word array
-  of a Sims generating set (`PowerWords`).
+  of a Sims generating set (`PowerWords`), `SimsGenSet.layer_power_tri` (the triangular form,
+  sum over `v < j`, via `SimsGenSet.powerWords_same_layer_eq_zero`);
+* `SimsGenSet.layer_closure` : the classes `ḡ_{i,v}` generate `GrL (lcs G) i` (bridge from
+  `LayerQ` via `le_closure_sup_of_layerQ_gen`). The Sims lift (36) and the recovery of the
+  `L_2 × C_core` bracket from the coefficients `c(2,j,k,3,v)` belong to the Lemma 4.1 module.
 Breadth (48)-(51):
 * `imLog p f = log_p |im f|`, `breadthOf p ad S = max_{u ∈ S} log_p |im ad(u)|`;
 * `adHom hF i u = ad(u) : L_i → L_{i+1}`, `grBreadth p hF i C` (48), `layerLog p F i = log_p |L_i|`;
@@ -684,6 +688,65 @@ theorem SimsGenSet.layer_power {p c : ℕ} {r : Fin c → ℕ} {a : SimsIdx c r 
     (fun v => (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val) (fun v => S.mem ⟨i, v⟩)
     (deeper_mem g S.mem (fun h => (S.powerWords ⟨i, j⟩ h).val) i) (S.powerData.pow i j)
 
+/-- The same-layer entries `b(i,j,i,v)` with `v ≥ j` of the power word array vanish. -/
+theorem SimsGenSet.powerWords_same_layer_eq_zero {p c : ℕ} {r : Fin c → ℕ}
+    {a : SimsIdx c r → ℕ} {g : SimsIdx c r → G} (S : SimsGenSet p a g) (i : Fin c)
+    (j v : Fin (r i)) (h : j.val ≤ v.val) : (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val = 0 :=
+  S.powerData.supp ⟨i, j⟩ ⟨i, v⟩ (lt_irrefl _) (fun h' => (not_lt.mpr h) h'.2)
+
+/-- (37) in the paper's triangular form: `p ^ a(i,j) ḡ_{i,j} = Σ_{v < j} b(i,j,i,v) ḡ_{i,v}`. -/
+theorem SimsGenSet.layer_power_tri {p c : ℕ} {r : Fin c → ℕ} {a : SimsIdx c r → ℕ}
+    {g : SimsIdx c r → G} (S : SimsGenSet p a g) (i : Fin c) (j : Fin (r i)) :
+    (p ^ a ⟨i, j⟩) • grOf (lcs G) (i : ℕ) (g ⟨i, j⟩) =
+      ∑ v ∈ Finset.univ.filter (fun v : Fin (r i) => v.val < j.val),
+        (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val • grOf (lcs G) (i : ℕ) (g ⟨i, v⟩) := by
+  rw [S.layer_power i j, Finset.sum_filter]
+  refine Finset.sum_congr rfl fun v _ => ?_
+  split_ifs with hv
+  · rfl
+  · rw [S.powerWords_same_layer_eq_zero i j v (not_lt.mp hv), zero_nsmul]
+
+/-- Generation of `LayerQ G i = γ_{i+1} / γ_{i+2}` (`PowerWords`) by the classes of `X` gives
+`γ_{i+1} ≤ ⟨X⟩ γ_{i+2}`. -/
+theorem le_closure_sup_of_layerQ_gen {i n : ℕ} (X : Fin n → G) (hX : ∀ v, X v ∈ lcs G i)
+    (hgen : Subgroup.closure (Set.range fun v =>
+      (QuotientGroup.mk (⟨X v, hX v⟩ : lcs G i) : LayerQ G i)) = ⊤) :
+    lcs G i ≤ Subgroup.closure (Set.range X) ⊔ lcs G (i + 1) := by
+  intro x hx
+  have hmap : (Subgroup.closure (Set.range fun v => (⟨X v, hX v⟩ : lcs G i))).map
+      (QuotientGroup.mk' ((lcs G (i + 1)).subgroupOf (lcs G i))) = ⊤ := by
+    rw [MonoidHom.map_closure, ← Set.range_comp]
+    exact hgen
+  have hmem : QuotientGroup.mk' ((lcs G (i + 1)).subgroupOf (lcs G i)) (⟨x, hx⟩ : lcs G i) ∈
+      (Subgroup.closure (Set.range fun v => (⟨X v, hX v⟩ : lcs G i))).map
+        (QuotientGroup.mk' ((lcs G (i + 1)).subgroupOf (lcs G i))) := by
+    rw [hmap]
+    exact Subgroup.mem_top _
+  obtain ⟨y, hy, hyx⟩ := Subgroup.mem_map.mp hmem
+  rw [QuotientGroup.mk'_apply, QuotientGroup.mk'_apply, QuotientGroup.eq,
+    Subgroup.mem_subgroupOf] at hyx
+  have hle : (Subgroup.closure (Set.range fun v => (⟨X v, hX v⟩ : lcs G i))).map
+      (lcs G i).subtype ≤ Subgroup.closure (Set.range X) := by
+    rw [MonoidHom.map_closure, Subgroup.closure_le]
+    rintro _ ⟨_, ⟨v, rfl⟩, rfl⟩
+    exact Subgroup.subset_closure ⟨v, rfl⟩
+  have hyc : (y : G) ∈ Subgroup.closure (Set.range X) := hle ⟨y, hy, rfl⟩
+  have e : x = (y : G) * ((y⁻¹ * ⟨x, hx⟩ : lcs G i) : G) := by simp
+  rw [e]
+  exact Subgroup.mul_mem_sup hyc hyx
+
+/-- Bridge `LayerQ` / `GrL`: the classes `ḡ_{i,v}` of a Sims generating set generate the layer
+`GrL (lcs G) i = L_{i+1}`. -/
+theorem SimsGenSet.layer_closure {p c : ℕ} {r : Fin c → ℕ} {a : SimsIdx c r → ℕ}
+    {g : SimsIdx c r → G} (S : SimsGenSet p a g) (i : Fin c) :
+    AddSubgroup.closure (Set.range fun v : Fin (r i) => grOf (lcs G) (i : ℕ) (g ⟨i, v⟩)) = ⊤ := by
+  have h := closure_grOf_eq_top nseries_lcs (i := (i : ℕ))
+    (X := Set.range fun v : Fin (r i) => g ⟨i, v⟩) (by rintro _ ⟨v, rfl⟩; exact S.mem ⟨i, v⟩)
+    (le_closure_sup_of_layerQ_gen (fun v : Fin (r i) => g ⟨i, v⟩) (fun v => S.mem ⟨i, v⟩)
+      (S.gen i))
+  rw [← Set.range_comp] at h
+  exact h
+
 end NSer
 
 /-! Breadth (48)-(51), abstractly. -/
@@ -885,13 +948,13 @@ theorem lcs_two_le_comm : lcs G 2 ≤ ⁅lcs G 1, lcs G 0⁆ ⊔ lcs G 3 := by
   exact le_sup_left
 
 /-- Class 3 breadth bounds: for a finite p-group with `γ_4 = 1`, `|γ_2| = p ^ m_2`,
-`|γ_3| = p ^ m_3` and a Sims core `g_{1,1}, ..., g_{1,s}` (`γ_2 = [H, H] γ_3`):
+`|γ_3| = p ^ m_3` and a Sims core `g_{1,1}, ..., g_{1,s}` (`γ_2 ≤ [H, H] γ_3`, the form given by `exists_sims_gen`):
 `m_3 ≤ s b_2`, `b_2 ≤ m_3`, `b_2 ≤ m_2 - m_3`, and a maximiser `h*` with
 `|ker ad(h*)| = p ^ (m_2 - m_3 - b_2)` ((48)-(51) at `c = 3`). -/
 theorem breadth_two_class3 [Finite G] {p m m2 m3 s : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
     (h2 : Nat.card (lcs G 1) = p ^ m2) (h3 : Nat.card (lcs G 2) = p ^ m3) (h4 : lcs G 3 = ⊥)
     {u : ℕ → G}
-    (hcore : lcs G 1 = ⁅Subgroup.closure (u '' Set.Iio s), Subgroup.closure (u '' Set.Iio s)⁆ ⊔
+    (hcore : lcs G 1 ≤ ⁅Subgroup.closure (u '' Set.Iio s), Subgroup.closure (u '' Set.Iio s)⁆ ⊔
       lcs G 2) :
     m3 ≤ s * breadthTwo p G s u ∧ breadthTwo p G s u ≤ m3 ∧ breadthTwo p G s u ≤ m2 - m3 ∧
       ∃ h ∈ coreC (lcs G) s u, imLog p (adHom nseries_lcs 1 h) = breadthTwo p G s u ∧
@@ -910,7 +973,7 @@ theorem breadth_two_class3 [Finite G] {p m m2 m3 s : ℕ} (hp : p.Prime) (hG : N
   have hb2 : breadthTwo p G s u ≤ layerLog p (lcs G) 2 := hb2'
   have h51 : layerLog p (lcs G) 2 ≤ s * breadthTwo p G s u := layerLog_le_mul_grBreadth hp hG (nseries_lcs (G := G)) 1 (coreC (lcs G) s u) u
     (fun k hk => AddSubgroup.subset_closure ⟨k, hk, rfl⟩)
-    (core_L3_closure nseries_lcs hu hcore.le lcs_two_le_comm)
+    (core_L3_closure nseries_lcs hu hcore lcs_two_le_comm)
   rw [hL3] at h51 hb2
   rw [hL2] at hb1 e2
   exact ⟨h51, hb2, hb1, h, hh, e1, e2⟩
