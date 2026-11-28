@@ -95,7 +95,7 @@ theorem layerQ_closure_eq_top (i : ℕ) {N : ℕ} (x : Fin N → G) (hx : ∀ v,
     · intro z hz
       have hz' : z ∈ lcs G i := lcs_antitone (Nat.le_succ i) hz
       refine ⟨⟨z, hz'⟩, ?_, rfl⟩
-      rw [Subgroup.mem_comap]
+      show QuotientGroup.mk' ((lcs G (i + 1)).subgroupOf (lcs G i)) ⟨z, hz'⟩ ∈ Y
       have h1 : QuotientGroup.mk' ((lcs G (i + 1)).subgroupOf (lcs G i)) ⟨z, hz'⟩ = 1 :=
         (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_subgroupOf.mpr hz)
       rw [h1]
@@ -127,10 +127,11 @@ theorem layer_le_of_closure_eq_top (i : ℕ) {N : ℕ} (x : Fin N → lcs G i)
     hle (Subgroup.mem_top (QuotientGroup.mk (⟨z, hz⟩ : lcs G i) : LayerQ G i))
   have hzz' : (QuotientGroup.mk z' : LayerQ G i) = QuotientGroup.mk ⟨z, hz⟩ := hzz
   have h2 : z'⁻¹ * ⟨z, hz⟩ ∈ (lcs G (i + 1)).subgroupOf (lcs G i) := QuotientGroup.eq.mp hzz'
-  rw [Subgroup.mem_subgroupOf] at h2 hz'
+  have h2' : ((z'⁻¹ * ⟨z, hz⟩ : lcs G i) : G) ∈ lcs G (i + 1) := Subgroup.mem_subgroupOf.mp h2
+  have hz'' : (z' : G) ∈ M := Subgroup.mem_subgroupOf.mp hz'
   have h3 : z = (z' : G) * ((z'⁻¹ * ⟨z, hz⟩ : lcs G i) : G) := by simp
   rw [h3]
-  exact M.mul_mem hz' (Subgroup.mem_sup_right h2)
+  exact M.mul_mem hz'' (Subgroup.mem_sup_right h2')
 
 /-- A generating family of the layer quotient has at least `R` elements, where
 `p ^ R |K| = |γ_{i+1}|` for the Frattini subgroup `K = layK p G i` of the layer. -/
@@ -414,6 +415,899 @@ theorem sims_powerWords_counted {G : Type} [Group G] [Finite G] {p m : ℕ} [hp 
 
 end Reindex
 
+
+section NatLemmas
+
+lemma le_fOff (r : ℕ → ℕ) : ∀ c, (∀ w < c, 1 ≤ r w) → c ≤ fOff r c
+  | 0, _ => Nat.zero_le _
+  | c + 1, h => by
+    have h1 := le_fOff r c (fun w hw => h w (by omega))
+    have h2 := h c (by omega)
+    rw [fOff_succ]
+    omega
+
+lemma fOff_congr {r r' : ℕ → ℕ} {c : ℕ} (h : ∀ w < c, r w = r' w) :
+    ∀ w ≤ c, fOff r w = fOff r' w
+  | 0, _ => rfl
+  | w + 1, hw => by
+    rw [fOff_succ, fOff_succ, fOff_congr h w (by omega), h w (by omega)]
+
+lemma sum_fin_eq_fOff (r : ℕ → ℕ) : ∀ c, ∑ i : Fin c, r i.val = fOff r c
+  | 0 => by
+    rw [Fin.sum_univ_zero]
+    rfl
+  | c + 1 => by
+    rw [Fin.sum_univ_castSucc]
+    simp only [Fin.coe_castSucc, Fin.val_last]
+    rw [sum_fin_eq_fOff r c, fOff_succ]
+
+lemma sum_ite_ge_fOff (r : ℕ → ℕ) (k : ℕ) : ∀ c, k ≤ c →
+    ∑ i : Fin c, (if k ≤ i.val then r i.val else 0) = fOff r c - fOff r k
+  | 0, hk => by
+    rw [Fin.sum_univ_zero]
+    have hk0 : k = 0 := by omega
+    subst hk0
+    rfl
+  | c + 1, hk => by
+    rcases Nat.lt_or_ge k (c + 1) with hlt | hge
+    · rw [Fin.sum_univ_castSucc]
+      simp only [Fin.coe_castSucc, Fin.val_last]
+      rw [sum_ite_ge_fOff r k c (by omega), if_pos (show k ≤ c by omega), fOff_succ]
+      have := fOff_mono r (show k ≤ c by omega)
+      omega
+    · have hk' : k = c + 1 := by omega
+      subst hk'
+      have hz : ∀ i : Fin (c + 1), (if c + 1 ≤ i.val then r i.val else 0) = 0 :=
+        fun i => if_neg (by have := i.isLt; omega)
+      rw [Finset.sum_eq_zero (fun i _ => hz i), Nat.sub_self]
+
+/-- In a monotone sequence on `[0, R)`, the positions with value `< k` form an initial
+segment. -/
+lemma lt_iff_lt_card_filter (f : ℕ → ℕ) (R : ℕ) (hf : ∀ i j, i ≤ j → j < R → f i ≤ f j)
+    (k j : ℕ) (hj : j < R) :
+    f j < k ↔ j < ((Finset.range R).filter (fun i => f i < k)).card := by
+  constructor
+  · intro h
+    have hsub : Finset.range (j + 1) ⊆ (Finset.range R).filter (fun i => f i < k) := by
+      intro i hi
+      rw [Finset.mem_range] at hi
+      rw [Finset.mem_filter, Finset.mem_range]
+      exact ⟨by omega, lt_of_le_of_lt (hf i j (by omega) hj) h⟩
+    have h1 := Finset.card_le_card hsub
+    rw [Finset.card_range] at h1
+    omega
+  · intro h
+    by_contra hk
+    have hk' : k ≤ f j := not_lt.mp hk
+    have hsub : (Finset.range R).filter (fun i => f i < k) ⊆ Finset.range j := by
+      intro i hi
+      rw [Finset.mem_filter, Finset.mem_range] at hi
+      rw [Finset.mem_range]
+      by_contra hij
+      have h2 := hf j i (by omega) hi.1
+      omega
+    have h1 := Finset.card_le_card hsub
+    rw [Finset.card_range] at h1
+    omega
+
+lemma card_filter_lt_eq_sum (f : ℕ → ℕ) (R k : ℕ) :
+    ((Finset.range R).filter (fun i => f i < k)).card =
+      ∑ b ∈ Finset.range k, ((Finset.range R).filter (fun i => f i = b)).card := by
+  have hmaps : ∀ i ∈ (Finset.range R).filter (fun i => f i < k), f i ∈ Finset.range k := by
+    intro i hi
+    rw [Finset.mem_filter] at hi
+    exact Finset.mem_range.mpr hi.2
+  rw [Finset.card_eq_sum_card_fiberwise hmaps]
+  refine Finset.sum_congr rfl fun b hb => ?_
+  rw [Finset.filter_filter]
+  congr 1
+  apply Finset.filter_congr
+  intro i _
+  rw [Finset.mem_range] at hb
+  constructor
+  · rintro ⟨-, h⟩
+    exact h
+  · intro h
+    exact ⟨by omega, h⟩
+
+/-- Two monotone sequences on `[0, R)` with the same fibre cardinalities agree. -/
+lemma eq_of_mono_fiber (f g : ℕ → ℕ) (R : ℕ) (hf : ∀ i j, i ≤ j → j < R → f i ≤ f j)
+    (hg : ∀ i j, i ≤ j → j < R → g i ≤ g j)
+    (hfib : ∀ k, ((Finset.range R).filter (fun i => f i = k)).card =
+      ((Finset.range R).filter (fun i => g i = k)).card)
+    (j : ℕ) (hj : j < R) : f j = g j := by
+  have hA : ∀ k, ((Finset.range R).filter (fun i => f i < k)).card =
+      ((Finset.range R).filter (fun i => g i < k)).card := by
+    intro k
+    rw [card_filter_lt_eq_sum, card_filter_lt_eq_sum]
+    exact Finset.sum_congr rfl fun b _ => hfib b
+  have h1 := (lt_iff_lt_card_filter f R hf (f j + 1) j hj).mp (Nat.lt_succ_self _)
+  rw [hA] at h1
+  have h1' := (lt_iff_lt_card_filter g R hg (f j + 1) j hj).mpr h1
+  have h2 := (lt_iff_lt_card_filter g R hg (g j + 1) j hj).mp (Nat.lt_succ_self _)
+  rw [← hA] at h2
+  have h2' := (lt_iff_lt_card_filter f R hf (g j + 1) j hj).mpr h2
+  omega
+
+end NatLemmas
+
+/-! ### Part 2: the class of `G` is determined by its Sims data, which lies in a finite set
+
+`FullData p m` is the recorded Sims presentation data `RecData m` of Proposition 2.5
+(`DataCount`) together with a power word array and a commutator coefficient array, flattened
+along the `r.tot` generators, with entries `< p ^ m`. `SimsGen.enc` encodes the Sims generating
+set of `SimsGen` with the exact conventions of `DataCount`:
+* `c` is the number `nL` of layers (the least `c` with `fOff r c = n`; every layer below it is
+  nonempty, `nL_pos`), `s = d.s`, and the `RankVec` is `i ↦ r i`;
+* the increments of `(d_k)` are the block sizes `#{j < r_2 : co(j) = k + 1}` (`brFib`), where
+  `co(j)` is the core index of the `j`-th weight-2 generator (0-based, so block `0` is empty
+  and the blocks `1, ..., s - 1` are the paper's `d_{k+1} - d_k`);
+* `f(j)` is the first index of the `j`-th weight-2 generator (`brPa`), and the index pair of the
+  `j`-th generator of weight `≥ 3` is the pair of flattened positions of its two factors
+  (`brPr`), both `< n ≤ m`;
+* the relative order array, the power word array and the commutator coefficients on the index
+  ranges `SimsData.Rec` of Proposition 2.4 (`0` outside) are read off the flattened arrays.
+`SimsGen.normalize_eq_of_enc` shows that equal codes give equal normalised data
+(`SimsData.normalize`: the junk definitions at weight 1 and the coefficients outside the recorded
+ranges are reset), and Proposition 2.4 (`sims_rigidity`) then gives an isomorphism. With INF-1
+(`ncard_classes_le_fintype_card`) the number of isomorphism classes of nonabelian groups of
+order `p ^ m` is at most `Fintype.card (FullData p m)`, which is at most the Proposition 2.5
+count `Fintype.card (RecData m)` times `(p ^ m) ^ (m m) (p ^ m) ^ (m m m)` (the trivial bound for
+the arrays). The recorded data alone do not determine the class; the arrays are counted
+trivially here, and the sharper counts of the paper (Theorem 3.1 for the power words) refine
+this factor. -/
+
+section DataBridge
+
+instance instDecidableSimsDataRec (d : SimsData) (t k : Fin d.n) : Decidable (d.Rec t k) := by
+  unfold SimsData.Rec
+  infer_instance
+
+/-- Normalised Sims data. -/
+def SimsData.normalize (d : SimsData) : SimsData where
+  n := d.n
+  s := d.s
+  lv := d.lv
+  df := fun t => if 1 ≤ d.lv t then d.df t else (t, t)
+  a := d.a
+  b := d.b
+  c := fun t k v => if d.Rec t k then d.c t k v else 0
+
+lemma SimsData.normalize_valid {d : SimsData} (hd : d.Valid) : d.normalize.Valid where
+  mono := hd.mono
+  s_le := hd.s_le
+  core := hd.core
+  df_lv := fun t ht => by
+    have e : d.normalize.df t = d.df t := if_pos ht
+    rw [e]
+    exact hd.df_lv t ht
+  df_core := fun t ht => by
+    have e : d.normalize.df t = d.df t := if_pos ht
+    rw [e]
+    exact hd.df_core t ht
+  df_one := fun t ht => by
+    have ht' : d.lv t = 1 := ht
+    have e : d.normalize.df t = d.df t := if_pos (show 1 ≤ d.lv t by omega)
+    rw [e]
+    exact hd.df_one t ht
+  b_supp := hd.b_supp
+  c_supp := fun t k v h => by
+    have h' : (if d.Rec t k then d.c t k v else 0) ≠ 0 := h
+    split_ifs at h' with hr
+    · exact hd.c_supp t k v h'
+    · exact absurd rfl h'
+
+lemma SimsData.normalize_realizes {G : Type u} [Group G] {p : ℕ} {d : SimsData}
+    {X : Fin d.n → G} (h : SimsRealizes p d X) : SimsRealizes p d.normalize X where
+  card := h.card
+  gen := h.gen
+  dfeq := fun t ht => by
+    have e : d.normalize.df t = d.df t := if_pos ht
+    rw [e]
+    exact h.dfeq t ht
+  pow := h.pow
+  comm0 := fun t k ht hk htk => by
+    have hrec : d.Rec t k := Or.inl ⟨ht, hk, htk⟩
+    have e2 : d.normalize.c t k = d.c t k := funext fun v => if_pos hrec
+    rw [e2]
+    exact h.comm0 t k ht hk htk
+  comm1 := fun t k ht hk => by
+    have ht' : d.lv t = 1 := ht
+    have e : d.normalize.df t = d.df t := if_pos (show 1 ≤ d.lv t by omega)
+    rw [e] at hk
+    have hrec : d.Rec t k := Or.inr (Or.inl ⟨ht, hk⟩)
+    have e2 : d.normalize.c t k = d.c t k := funext fun v => if_pos hrec
+    rw [e2]
+    exact h.comm1 t k ht hk
+  comm2 := fun t k ht hk => by
+    have hrec : d.Rec t k := Or.inr (Or.inr ⟨ht, hk⟩)
+    have e2 : d.normalize.c t k = d.c t k := funext fun v => if_pos hrec
+    rw [e2]
+    exact h.comm2 t k ht hk
+
+/-- Equal normalised data from the pointwise agreement of the flattened arrays. -/
+theorem SimsData.normalize_eq {d1 d2 : SimsData} (hn : d1.n = d2.n) (hs : d1.s = d2.s)
+    (hlv : ∀ i (h1 : i < d1.n) (h2 : i < d2.n), d1.lv ⟨i, h1⟩ = d2.lv ⟨i, h2⟩)
+    (hdf : ∀ i (h1 : i < d1.n) (h2 : i < d2.n), 1 ≤ d1.lv ⟨i, h1⟩ →
+      (d1.df ⟨i, h1⟩).1.val = (d2.df ⟨i, h2⟩).1.val ∧
+        (d1.df ⟨i, h1⟩).2.val = (d2.df ⟨i, h2⟩).2.val)
+    (ha : ∀ i (h1 : i < d1.n) (h2 : i < d2.n), d1.a ⟨i, h1⟩ = d2.a ⟨i, h2⟩)
+    (hb : ∀ i j (h1 : i < d1.n) (h1' : j < d1.n) (h2 : i < d2.n) (h2' : j < d2.n),
+      d1.b ⟨i, h1⟩ ⟨j, h1'⟩ = d2.b ⟨i, h2⟩ ⟨j, h2'⟩)
+    (hc : ∀ i j k (h1 : i < d1.n) (h1' : j < d1.n) (h1'' : k < d1.n) (h2 : i < d2.n)
+      (h2' : j < d2.n) (h2'' : k < d2.n),
+      (if d1.Rec ⟨i, h1⟩ ⟨j, h1'⟩ then d1.c ⟨i, h1⟩ ⟨j, h1'⟩ ⟨k, h1''⟩ else 0) =
+        (if d2.Rec ⟨i, h2⟩ ⟨j, h2'⟩ then d2.c ⟨i, h2⟩ ⟨j, h2'⟩ ⟨k, h2''⟩ else 0)) :
+    d1.normalize = d2.normalize := by
+  obtain ⟨n1, s1, lv1, df1, a1, b1, c1⟩ := d1
+  obtain ⟨n2, s2, lv2, df2, a2, b2, c2⟩ := d2
+  have hn' : n1 = n2 := hn
+  subst hn'
+  have hs' : s1 = s2 := hs
+  subst hs'
+  have elv : lv1 = lv2 := funext fun t => hlv t.val t.isLt t.isLt
+  subst elv
+  have ea : a1 = a2 := funext fun t => ha t.val t.isLt t.isLt
+  subst ea
+  have eb : b1 = b2 := funext fun t => funext fun k => hb t.val k.val t.isLt k.isLt t.isLt k.isLt
+  subst eb
+  have edf : (fun t => if 1 ≤ lv1 t then df1 t else (t, t)) =
+      (fun t => if 1 ≤ lv1 t then df2 t else (t, t)) := by
+    funext t
+    by_cases h : 1 ≤ lv1 t
+    · rw [if_pos h, if_pos h]
+      have h' := hdf t.val t.isLt t.isLt h
+      exact Prod.ext (Fin.ext h'.1) (Fin.ext h'.2)
+    · rw [if_neg h, if_neg h]
+  have ec : (fun t k v => if SimsData.Rec ⟨n1, s1, lv1, df1, a1, b1, c1⟩ t k then c1 t k v
+      else 0) = (fun t k v => if SimsData.Rec ⟨n1, s1, lv1, df2, a1, b1, c2⟩ t k then c2 t k v
+      else 0) := by
+    funext t k v
+    exact hc t.val k.val v.val t.isLt k.isLt v.isLt t.isLt k.isLt v.isLt
+  show SimsData.mk n1 s1 lv1 (fun t => if 1 ≤ lv1 t then df1 t else (t, t)) a1 b1
+      (fun t k v => if SimsData.Rec ⟨n1, s1, lv1, df1, a1, b1, c1⟩ t k then c1 t k v else 0) =
+    SimsData.mk n1 s1 lv1 (fun t => if 1 ≤ lv1 t then df2 t else (t, t)) a1 b1
+      (fun t k v => if SimsData.Rec ⟨n1, s1, lv1, df2, a1, b1, c2⟩ t k then c2 t k v else 0)
+  rw [edf, ec]
+
+lemma rigid_of_eq {G H : Type u} [Group G] [Group H] [Finite G] [Finite H] {p : ℕ}
+    (hp : p.Prime) (D1 D2 : SimsData) (e : D1 = D2) (hv : D1.Valid) (Y1 : Fin D1.n → G)
+    (Y2 : Fin D2.n → H) (k1 : SimsRealizes p D1 Y1) (k2 : SimsRealizes p D2 Y2) :
+    Nonempty (G ≃* H) := by
+  subst e
+  exact sims_rigidity hp D1 hv Y1 Y2 k1 k2
+
+/-- The core index of the `j`-th weight-2 generator. -/
+def brCo (d : SimsData) (r : ℕ → ℕ) (j : ℕ) : ℕ :=
+  if h : fOff r 1 + j < d.n then (d.df ⟨fOff r 1 + j, h⟩).2.val else 0
+
+/-- The first index of the `j`-th weight-2 generator (the auxiliary function `f`). -/
+def brPa (d : SimsData) (r : ℕ → ℕ) (j : ℕ) : ℕ :=
+  if h : fOff r 1 + j < d.n then (d.df ⟨fOff r 1 + j, h⟩).1.val else 0
+
+/-- The index pair of the `j`-th generator of weight at least `3`. -/
+def brPr (d : SimsData) (r : ℕ → ℕ) (j : ℕ) : ℕ × ℕ :=
+  if h : fOff r 2 + j < d.n then ((d.df ⟨fOff r 2 + j, h⟩).1.val, (d.df ⟨fOff r 2 + j, h⟩).2.val)
+  else (0, 0)
+
+/-- The flattened relative order array. -/
+def brA (d : SimsData) (j : ℕ) : ℕ := if h : j < d.n then d.a ⟨j, h⟩ else 0
+
+/-- The flattened power word array. -/
+def brB (d : SimsData) (i j : ℕ) : ℕ :=
+  if h : i < d.n ∧ j < d.n then d.b ⟨i, h.1⟩ ⟨j, h.2⟩ else 0
+
+/-- The flattened commutator coefficient array on the recorded index ranges. -/
+def brCm (d : SimsData) (i j k : ℕ) : ℕ :=
+  if h : i < d.n ∧ j < d.n ∧ k < d.n then
+    (if d.Rec ⟨i, h.1⟩ ⟨j, h.2.1⟩ then d.c ⟨i, h.1⟩ ⟨j, h.2.1⟩ ⟨k, h.2.2⟩ else 0)
+  else 0
+
+/-- The size of the weight-2 block of core index `k + 1`: the increment `d_{k+2} - d_{k+1}`. -/
+def brFib (d : SimsData) (r : ℕ → ℕ) (k : ℕ) : ℕ :=
+  ((Finset.range (r 1)).filter (fun j => brCo d r j = k + 1)).card
+
+lemma brCo_eq (d : SimsData) (r : ℕ → ℕ) (t : Fin d.n) (j : ℕ) (hj : fOff r 1 + j = t.val) :
+    brCo d r j = (d.df t).2.val := by
+  have h : fOff r 1 + j < d.n := by have := t.isLt; omega
+  unfold brCo
+  rw [dif_pos h]
+  have e : (⟨fOff r 1 + j, h⟩ : Fin d.n) = t := Fin.ext hj
+  rw [e]
+
+lemma brPa_eq (d : SimsData) (r : ℕ → ℕ) (t : Fin d.n) (j : ℕ) (hj : fOff r 1 + j = t.val) :
+    brPa d r j = (d.df t).1.val := by
+  have h : fOff r 1 + j < d.n := by have := t.isLt; omega
+  unfold brPa
+  rw [dif_pos h]
+  have e : (⟨fOff r 1 + j, h⟩ : Fin d.n) = t := Fin.ext hj
+  rw [e]
+
+lemma brPr_eq (d : SimsData) (r : ℕ → ℕ) (t : Fin d.n) (j : ℕ) (hj : fOff r 2 + j = t.val) :
+    brPr d r j = ((d.df t).1.val, (d.df t).2.val) := by
+  have h : fOff r 2 + j < d.n := by have := t.isLt; omega
+  unfold brPr
+  rw [dif_pos h]
+  have e : (⟨fOff r 2 + j, h⟩ : Fin d.n) = t := Fin.ext hj
+  rw [e]
+
+lemma a_le_of_sum {d : SimsData} {m : ℕ} (hsum : ∑ t, d.a t = m) (t : Fin d.n) : d.a t ≤ m := by
+  rw [← hsum]
+  exact Finset.single_le_sum (f := d.a) (fun t _ => Nat.zero_le _) (Finset.mem_univ t)
+
+lemma brA_le {d : SimsData} {m : ℕ} (hsum : ∑ t, d.a t = m) (j : ℕ) : brA d j ≤ m := by
+  unfold brA
+  split_ifs with h
+  · exact a_le_of_sum hsum _
+  · exact Nat.zero_le _
+
+lemma brB_lt {d : SimsData} {p m : ℕ} (hp : 0 < p) (hb : d.Bounded p) (hsum : ∑ t, d.a t = m)
+    (i j : ℕ) : brB d i j < p ^ m := by
+  unfold brB
+  split_ifs with h
+  · exact lt_of_lt_of_le (hb.1 _ _) (Nat.pow_le_pow_right hp (a_le_of_sum hsum _))
+  · exact pow_pos hp m
+
+lemma brCm_lt {d : SimsData} {p m : ℕ} (hp : 0 < p) (hb : d.Bounded p) (hsum : ∑ t, d.a t = m)
+    (i j k : ℕ) : brCm d i j k < p ^ m := by
+  unfold brCm
+  split_ifs
+  · exact lt_of_lt_of_le (hb.2 _ _ _) (Nat.pow_le_pow_right hp (a_le_of_sum hsum _))
+  · exact pow_pos hp m
+  · exact pow_pos hp m
+
+lemma brPr_lt (d : SimsData) (r : ℕ → ℕ) {m : ℕ} (hnm : d.n ≤ m) (hm : 0 < m) (j : ℕ) :
+    (brPr d r j).1 < m ∧ (brPr d r j).2 < m := by
+  unfold brPr
+  split_ifs with h
+  · exact ⟨lt_of_lt_of_le (d.df ⟨fOff r 2 + j, h⟩).1.isLt hnm,
+      lt_of_lt_of_le (d.df ⟨fOff r 2 + j, h⟩).2.isLt hnm⟩
+  · exact ⟨hm, hm⟩
+
+/-- The full data: recorded Sims presentation data (Proposition 2.5) and the flattened power
+word and commutator coefficient arrays. -/
+abbrev FullData (p m : ℕ) : Type :=
+  Σ D : RecData m, (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) ×
+    (Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m))
+
+theorem card_fullData_le (p m : ℕ) (hp : 0 < p) :
+    Fintype.card (FullData p m) ≤
+      Fintype.card (RecData m) * ((p ^ m) ^ (m * m) * (p ^ m) ^ (m * m * m)) := by
+  rw [Fintype.card_sigma]
+  refine sum_le_card_mul _ _ _ le_rfl (fun D => ?_)
+  rw [Fintype.card_prod]
+  simp only [Fintype.card_fun, Fintype.card_fin]
+  have ht := D.2.2.1.tot_le
+  have hq : 1 ≤ p ^ m := Nat.one_le_pow _ _ hp
+  have e1 : ((p ^ m) ^ D.2.2.1.tot) ^ D.2.2.1.tot = (p ^ m) ^ (D.2.2.1.tot * D.2.2.1.tot) := by
+    rw [pow_mul]
+  have e2 : (((p ^ m) ^ D.2.2.1.tot) ^ D.2.2.1.tot) ^ D.2.2.1.tot =
+      (p ^ m) ^ (D.2.2.1.tot * D.2.2.1.tot * D.2.2.1.tot) := by
+    rw [pow_mul, pow_mul]
+  rw [e1, e2]
+  exact Nat.mul_le_mul (Nat.pow_le_pow_right hq (Nat.mul_le_mul ht ht))
+    (Nat.pow_le_pow_right hq (Nat.mul_le_mul (Nat.mul_le_mul ht ht) ht))
+
+/-! Readback of the code as functions on `ℕ`. -/
+
+def rdC {p m : ℕ} (D : FullData p m) : ℕ := D.1.1.val
+
+def rdS {p m : ℕ} (D : FullData p m) : ℕ := D.1.2.1.val
+
+def rdR {p m : ℕ} (D : FullData p m) (i : ℕ) : ℕ :=
+  if h : i < D.1.1.val then (D.1.2.2.1.1 ⟨i, h⟩).val else 0
+
+def rdInc {p m : ℕ} (D : FullData p m) (k : ℕ) : ℕ :=
+  if h : k < D.1.2.1.val - 1 then (D.1.2.2.2.1.1 ⟨k, h⟩).val else 0
+
+def rdF {p m : ℕ} (D : FullData p m) (j : ℕ) : ℕ :=
+  if h : j < D.1.2.2.1.r2 then (D.1.2.2.2.2.1.1 ⟨j, h⟩).val else 0
+
+def rdP {p m : ℕ} (D : FullData p m) (j : ℕ) : ℕ × ℕ :=
+  if h : j < D.1.2.2.1.r3 then
+    ((D.1.2.2.2.2.1.2 ⟨j, h⟩).1.val, (D.1.2.2.2.2.1.2 ⟨j, h⟩).2.val)
+  else (0, 0)
+
+def rdA {p m : ℕ} (D : FullData p m) (j : ℕ) : ℕ :=
+  if h : j < D.1.2.2.1.tot then (D.1.2.2.2.2.2.1 ⟨j, h⟩).val else 0
+
+def rdB {p m : ℕ} (D : FullData p m) (i j : ℕ) : ℕ :=
+  if h : i < D.1.2.2.1.tot ∧ j < D.1.2.2.1.tot then (D.2.1 ⟨i, h.1⟩ ⟨j, h.2⟩).val else 0
+
+def rdCm {p m : ℕ} (D : FullData p m) (i j k : ℕ) : ℕ :=
+  if h : i < D.1.2.2.1.tot ∧ j < D.1.2.2.1.tot ∧ k < D.1.2.2.1.tot then
+    (D.2.2 ⟨i, h.1⟩ ⟨j, h.2.1⟩ ⟨k, h.2.2⟩).val
+  else 0
+
+variable {G : Type u} [Group G] {p : ℕ} {u : ℕ → G} {d : SimsData} {X : Fin d.n → G}
+  {r : ℕ → ℕ}
+
+lemma SimsGen.n_eq' (hS : SimsGen p u d X r) : ∃ c, fOff r c = d.n := by
+  obtain ⟨c, hc⟩ := hS.n_eq
+  exact ⟨c, hc.symm⟩
+
+/-- The number of layers `c`: the least `c` with `fOff r c = d.n`. -/
+noncomputable def SimsGen.nL (hS : SimsGen p u d X r) : ℕ := Nat.find hS.n_eq'
+
+lemma SimsGen.nL_spec (hS : SimsGen p u d X r) : fOff r hS.nL = d.n := Nat.find_spec hS.n_eq'
+
+lemma SimsGen.nL_min (hS : SimsGen p u d X r) {w : ℕ} (hw : w < hS.nL) : fOff r w ≠ d.n :=
+  Nat.find_min hS.n_eq' hw
+
+/-- Every layer below `nL` is nonempty. -/
+lemma SimsGen.nL_pos [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) :
+    ∀ w < hS.nL, 0 < r w := by
+  intro w hw
+  by_contra h0
+  have hr0 : r w = 0 := by omega
+  have hlt : fOff r w < d.n := by
+    have h1 := fOff_mono r hw.le
+    have h2 := hS.nL_min hw
+    rw [hS.nL_spec] at h1
+    omega
+  have h4 : (⟨fOff r w, hlt⟩ : Fin d.n).val = fOff r w := rfl
+  have hw0 : w < d.lv ⟨fOff r w, hlt⟩ := by
+    obtain ⟨h1, h2⟩ := (hS.layer_iff ⟨fOff r w, hlt⟩ (d.lv ⟨fOff r w, hlt⟩)).mp rfl
+    by_contra hle
+    have hle' : d.lv ⟨fOff r w, hlt⟩ ≤ w := not_lt.mp hle
+    rcases lt_or_eq_of_le hle' with hl | he
+    · have h3 := fOff_mono r (show d.lv ⟨fOff r w, hlt⟩ + 1 ≤ w by omega)
+      rw [fOff_succ] at h3
+      omega
+    · rw [he, hr0] at h2
+      omega
+  have hsub : lcs G w ≤ lcs G (w + 1) := by
+    refine (hS.layer_gen w).trans (sup_le ?_ le_rfl)
+    rw [Subgroup.closure_le]
+    rintro _ ⟨t, ht, rfl⟩
+    exfalso
+    have := (hS.layer_iff t w).mp ht
+    omega
+  have hstab : ∀ k, lcs G (w + k) = lcs G w := by
+    intro k
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [show w + (k + 1) = (w + k) + 1 from rfl, lcs_succ, ih, ← lcs_succ]
+      exact le_antisymm (lcs_antitone (Nat.le_succ w)) hsub
+  have : Fact p.Prime := ⟨hp⟩
+  have hpg : IsPGroup p G := IsPGroup.of_card hS.realizes.card
+  have : Group.IsNilpotent G := hpg.isNilpotent
+  obtain ⟨N, hN⟩ : ∃ N, lcs G N = ⊥ :=
+    Subgroup.nilpotent_iff_lowerCentralSeries.mp inferInstance
+  have hbot : lcs G w = ⊥ := by
+    rw [← hstab N]
+    exact le_bot_iff.mp ((lcs_antitone (Nat.le_add_left N w)).trans (le_of_eq hN))
+  have hX : X ⟨fOff r w, hlt⟩ = 1 := by
+    have h := lcs_antitone hw0.le (hS.mem_lcs ⟨fOff r w, hlt⟩)
+    rw [hbot] at h
+    exact Subgroup.mem_bot.mp h
+  apply hS.layer_indep ⟨fOff r w, hlt⟩
+  rw [hX]
+  exact one_mem _
+
+lemma SimsGen.r_le_n (hS : SimsGen p u d X r) (w : ℕ) (hw : w < hS.nL) : r w ≤ d.n := by
+  have h1 := fOff_mono r (show w + 1 ≤ hS.nL from hw)
+  rw [fOff_succ, hS.nL_spec] at h1
+  omega
+
+lemma SimsGen.nL_le_n [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) : hS.nL ≤ d.n := by
+  have h := le_fOff r hS.nL (fun w hw => hS.nL_pos hp w hw)
+  rw [hS.nL_spec] at h
+  exact h
+
+lemma SimsGen.one_lt_nL (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) : 1 < hS.nL := by
+  obtain ⟨t, ht, -⟩ := hS.block_ne 1 le_rfl (by omega)
+  have := hS.lv_lt hS.nL_spec.symm t
+  omega
+
+lemma SimsGen.fOff_two_le (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) : fOff r 2 ≤ d.n := by
+  have h := fOff_mono r (show 2 ≤ hS.nL from hS.one_lt_nL hs2)
+  rw [hS.nL_spec] at h
+  exact h
+
+lemma SimsGen.pos_one (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) (j : ℕ) (hj : j < r 1) :
+    ∃ h : fOff r 1 + j < d.n, d.lv ⟨fOff r 1 + j, h⟩ = 1 := by
+  have h2 := hS.fOff_two_le hs2
+  have e : fOff r 2 = fOff r 1 + r 1 := fOff_succ r 1
+  exact ⟨by omega, (hS.layer_iff _ 1).mpr ⟨Nat.le_add_right _ _, Nat.add_lt_add_left hj _⟩⟩
+
+lemma SimsGen.brCo_bounds (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) (j : ℕ) (hj : j < r 1) :
+    1 ≤ brCo d r j ∧ brCo d r j < d.s := by
+  obtain ⟨h, hl⟩ := hS.pos_one hs2 j hj
+  rw [brCo_eq d r ⟨fOff r 1 + j, h⟩ j rfl]
+  have h1 : (d.df ⟨fOff r 1 + j, h⟩).1.val < (d.df ⟨fOff r 1 + j, h⟩).2.val :=
+    hS.valid.df_one _ hl
+  exact ⟨by omega, hS.valid.df_core _ (by omega)⟩
+
+lemma SimsGen.brPa_lt (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) (j : ℕ) (hj : j < r 1) :
+    brPa d r j < d.s - 1 := by
+  obtain ⟨h, hl⟩ := hS.pos_one hs2 j hj
+  rw [brPa_eq d r ⟨fOff r 1 + j, h⟩ j rfl]
+  have h1 : (d.df ⟨fOff r 1 + j, h⟩).1.val < (d.df ⟨fOff r 1 + j, h⟩).2.val :=
+    hS.valid.df_one _ hl
+  have h2 := hS.valid.df_core ⟨fOff r 1 + j, h⟩ (by omega)
+  omega
+
+lemma SimsGen.brCo_mono (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) (i j : ℕ) (hij : i ≤ j)
+    (hj : j < r 1) : brCo d r i ≤ brCo d r j := by
+  obtain ⟨h1, hl1⟩ := hS.pos_one hs2 i (by omega)
+  obtain ⟨h2, hl2⟩ := hS.pos_one hs2 j hj
+  rw [brCo_eq d r ⟨fOff r 1 + i, h1⟩ i rfl, brCo_eq d r ⟨fOff r 1 + j, h2⟩ j rfl]
+  exact hS.block_mono _ _ hl1 hl2 (show fOff r 1 + i ≤ fOff r 1 + j by omega)
+
+lemma SimsGen.brFib_pos (hS : SimsGen p u d X r) (k : ℕ) (hk : k < d.s - 1) :
+    0 < brFib d r k := by
+  obtain ⟨t, ht, hco⟩ := hS.block_ne (k + 1) (by omega) (by omega)
+  obtain ⟨a1, a2⟩ := (hS.layer_iff t 1).mp ht
+  apply Finset.card_pos.mpr
+  refine ⟨t.val - fOff r 1, Finset.mem_filter.mpr ⟨Finset.mem_range.mpr (by omega), ?_⟩⟩
+  rw [brCo_eq d r t (t.val - fOff r 1) (by omega)]
+  exact hco
+
+lemma brFib_le (d : SimsData) (r : ℕ → ℕ) (k : ℕ) : brFib d r k ≤ r 1 :=
+  (Finset.card_filter_le _ _).trans (Finset.card_range _).le
+
+lemma SimsGen.sum_brFib (hS : SimsGen p u d X r) (hs2 : 2 ≤ d.s) :
+    ∑ k ∈ Finset.range (d.s - 1), brFib d r k = r 1 := by
+  have hmaps : ∀ j ∈ Finset.range (r 1), brCo d r j - 1 ∈ Finset.range (d.s - 1) := by
+    intro j hj
+    rw [Finset.mem_range] at hj ⊢
+    have := hS.brCo_bounds hs2 j hj
+    omega
+  have h := Finset.card_eq_sum_card_fiberwise hmaps
+  rw [Finset.card_range] at h
+  rw [h]
+  refine Finset.sum_congr rfl fun k _ => ?_
+  unfold brFib
+  congr 1
+  apply Finset.filter_congr
+  intro j hj
+  have := hS.brCo_bounds hs2 j (Finset.mem_range.mp hj)
+  constructor
+  · intro e
+    omega
+  · intro e
+    omega
+
+/-- The rank vector `i ↦ r i` of `DataCount`. -/
+noncomputable def SimsGen.rankVec [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) : RankVec m hS.nL :=
+  ⟨fun i => ⟨r i.val, by have := hS.r_le_n i.val i.isLt; omega⟩,
+    fun i => hS.nL_pos hp i.val i.isLt, by
+      show ∑ i : Fin hS.nL, r i.val ≤ m
+      rw [sum_fin_eq_fOff, hS.nL_spec]
+      exact hnm⟩
+
+lemma SimsGen.rankVec_tot [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) : (hS.rankVec hp hnm).tot = d.n := by
+  unfold RankVec.tot
+  show ∑ i : Fin hS.nL, r i.val = d.n
+  rw [sum_fin_eq_fOff, hS.nL_spec]
+
+lemma SimsGen.rankVec_r2 [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : (hS.rankVec hp hnm).r2 = r 1 := by
+  unfold RankVec.r2
+  show ∑ i ∈ Finset.univ.filter (fun i : Fin hS.nL => i.val = 1), r i.val = r 1
+  exact Finset.sum_eq_single_of_mem ⟨1, hS.one_lt_nL hs2⟩ (by simp)
+    (fun b hb hne => absurd (Fin.ext (Finset.mem_filter.mp hb).2) hne)
+
+lemma SimsGen.rankVec_r3 [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : (hS.rankVec hp hnm).r3 = d.n - fOff r 2 := by
+  unfold RankVec.r3
+  show ∑ i ∈ Finset.univ.filter (fun i : Fin hS.nL => 2 ≤ i.val), r i.val = d.n - fOff r 2
+  rw [Finset.sum_filter, sum_ite_ge_fOff r 2 hS.nL (hS.one_lt_nL hs2), hS.nL_spec]
+
+/-- The increments of `(d_k)`. -/
+noncomputable def SimsGen.incrVec [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : PosVec (d.s - 1) (hS.rankVec hp hnm).r2 :=
+  ⟨fun k => ⟨brFib d r k.val, by
+      rw [hS.rankVec_r2 hp hnm hs2]
+      exact Nat.lt_succ_of_le (brFib_le d r k.val)⟩,
+    fun k => hS.brFib_pos k.val k.isLt, by
+      show ∑ k : Fin (d.s - 1), brFib d r k.val = _
+      rw [hS.rankVec_r2 hp hnm hs2, Fin.sum_univ_eq_sum_range (fun k => brFib d r k) (d.s - 1)]
+      exact hS.sum_brFib hs2⟩
+
+/-- The auxiliary function `f`. -/
+noncomputable def SimsGen.fAux [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : Fin (hS.rankVec hp hnm).r2 → Fin (d.s - 1) :=
+  fun j => ⟨brPa d r j.val, hS.brPa_lt hs2 j.val (by
+    have := j.isLt
+    rw [hS.rankVec_r2 hp hnm hs2] at this
+    exact this)⟩
+
+/-- The index pairs of the generators of weight at least `3`. -/
+noncomputable def SimsGen.pAux [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : Fin (hS.rankVec hp hnm).r3 → Fin m × Fin m :=
+  fun j => (⟨(brPr d r j.val).1, (brPr_lt d r hnm (by have := hS.valid.s_le; omega) j.val).1⟩,
+    ⟨(brPr d r j.val).2, (brPr_lt d r hnm (by have := hS.valid.s_le; omega) j.val).2⟩)
+
+/-- The relative order array. -/
+noncomputable def SimsGen.aVec [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
+    (hnm : d.n ≤ m) (hsum : ∑ t, d.a t = m) : PosVec (hS.rankVec hp hnm).tot m :=
+  ⟨fun j => ⟨brA d j.val, Nat.lt_succ_of_le (brA_le hsum j.val)⟩, fun j => by
+      have hj := j.isLt
+      rw [hS.rankVec_tot hp hnm] at hj
+      show 0 < brA d j.val
+      unfold brA
+      rw [dif_pos hj]
+      exact hS.a_pos _, by
+      show ∑ j : Fin (hS.rankVec hp hnm).tot, brA d j.val = m
+      rw [Fin.sum_univ_eq_sum_range (fun j => brA d j), hS.rankVec_tot hp hnm,
+        ← Fin.sum_univ_eq_sum_range (fun j => brA d j)]
+      have e : ∀ t : Fin d.n, brA d t.val = d.a t := fun t => by
+        unfold brA
+        exact dif_pos t.isLt
+      simp only [e]
+      exact hsum⟩
+
+/-- The code of a Sims generating set. -/
+noncomputable def SimsGen.enc [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) (m : ℕ) (hnm : d.n ≤ m)
+    (hs2 : 2 ≤ d.s) (hsum : ∑ t, d.a t = m) : FullData p m :=
+  ⟨⟨⟨hS.nL, by have := hS.nL_le_n hp; omega⟩, ⟨d.s, by have := hS.valid.s_le; omega⟩,
+      hS.rankVec hp hnm, hS.incrVec hp hnm hs2, (hS.fAux hp hnm hs2, hS.pAux hp hnm hs2),
+      hS.aVec hp hnm hsum⟩,
+    (fun i j => ⟨brB d i.val j.val, brB_lt hp.pos hS.bounded hsum _ _⟩,
+      fun i j k => ⟨brCm d i.val j.val k.val, brCm_lt hp.pos hS.bounded hsum _ _ _⟩)⟩
+
+section Readback
+
+variable [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ} (hnm : d.n ≤ m)
+  (hs2 : 2 ≤ d.s) (hsum : ∑ t, d.a t = m)
+
+lemma SimsGen.rdC_enc : rdC (hS.enc hp m hnm hs2 hsum) = hS.nL := rfl
+
+lemma SimsGen.rdS_enc : rdS (hS.enc hp m hnm hs2 hsum) = d.s := rfl
+
+lemma SimsGen.rdR_enc (i : ℕ) :
+    rdR (hS.enc hp m hnm hs2 hsum) i = dite (i < hS.nL) (fun _ => r i) (fun _ => 0) := rfl
+
+lemma SimsGen.rdInc_enc (k : ℕ) :
+    rdInc (hS.enc hp m hnm hs2 hsum) k =
+      dite (k < d.s - 1) (fun _ => brFib d r k) (fun _ => 0) := rfl
+
+lemma SimsGen.rdF_enc (j : ℕ) :
+    rdF (hS.enc hp m hnm hs2 hsum) j =
+      dite (j < (hS.rankVec hp hnm).r2) (fun _ => brPa d r j) (fun _ => 0) := rfl
+
+lemma SimsGen.rdP_enc (j : ℕ) : rdP (hS.enc hp m hnm hs2 hsum) j = brPr d r j := by
+  have e : rdP (hS.enc hp m hnm hs2 hsum) j = dite (j < (hS.rankVec hp hnm).r3)
+      (fun _ => ((brPr d r j).1, (brPr d r j).2)) (fun _ => (0, 0)) := rfl
+  rw [e, hS.rankVec_r3 hp hnm hs2]
+  have h2 := hS.fOff_two_le hs2
+  split_ifs with h
+  · rfl
+  · have h' : ¬ (fOff r 2 + j < d.n) := by omega
+    unfold brPr
+    rw [dif_neg h']
+
+lemma SimsGen.rdA_enc (j : ℕ) : rdA (hS.enc hp m hnm hs2 hsum) j = brA d j := by
+  have e : rdA (hS.enc hp m hnm hs2 hsum) j =
+      dite (j < (hS.rankVec hp hnm).tot) (fun _ => brA d j) (fun _ => 0) := rfl
+  rw [e, hS.rankVec_tot hp hnm]
+  split_ifs with h
+  · rfl
+  · unfold brA
+    rw [dif_neg h]
+
+lemma SimsGen.rdB_enc (i j : ℕ) : rdB (hS.enc hp m hnm hs2 hsum) i j = brB d i j := by
+  have e : rdB (hS.enc hp m hnm hs2 hsum) i j =
+      dite (i < (hS.rankVec hp hnm).tot ∧ j < (hS.rankVec hp hnm).tot)
+        (fun _ => brB d i j) (fun _ => 0) := rfl
+  rw [e, hS.rankVec_tot hp hnm]
+  split_ifs with h
+  · rfl
+  · unfold brB
+    rw [dif_neg h]
+
+lemma SimsGen.rdCm_enc (i j k : ℕ) :
+    rdCm (hS.enc hp m hnm hs2 hsum) i j k = brCm d i j k := by
+  have e : rdCm (hS.enc hp m hnm hs2 hsum) i j k =
+      dite (i < (hS.rankVec hp hnm).tot ∧ j < (hS.rankVec hp hnm).tot ∧
+        k < (hS.rankVec hp hnm).tot) (fun _ => brCm d i j k) (fun _ => 0) := rfl
+  rw [e, hS.rankVec_tot hp hnm]
+  split_ifs with h
+  · rfl
+  · unfold brCm
+    rw [dif_neg h]
+
+end Readback
+
+/-- Injectivity of the code up to normalisation: two Sims generating sets with the same code
+have the same normalised Sims data. -/
+theorem SimsGen.normalize_eq_of_enc {G₁ G₂ : Type u} [Group G₁] [Group G₂] [Finite G₁]
+    [Finite G₂] {p m : ℕ} (hp : p.Prime) {u₁ : ℕ → G₁} {d₁ : SimsData} {X₁ : Fin d₁.n → G₁}
+    {r₁ : ℕ → ℕ} {u₂ : ℕ → G₂} {d₂ : SimsData} {X₂ : Fin d₂.n → G₂} {r₂ : ℕ → ℕ}
+    (hS₁ : SimsGen p u₁ d₁ X₁ r₁) (hS₂ : SimsGen p u₂ d₂ X₂ r₂)
+    (hnm₁ : d₁.n ≤ m) (hs₁ : 2 ≤ d₁.s) (hsum₁ : ∑ t, d₁.a t = m)
+    (hnm₂ : d₂.n ≤ m) (hs₂ : 2 ≤ d₂.s) (hsum₂ : ∑ t, d₂.a t = m)
+    (heq : hS₁.enc hp m hnm₁ hs₁ hsum₁ = hS₂.enc hp m hnm₂ hs₂ hsum₂) :
+    d₁.normalize = d₂.normalize := by
+  have hc : hS₁.nL = hS₂.nL := by
+    have h := congrArg rdC heq
+    rwa [hS₁.rdC_enc hp hnm₁ hs₁ hsum₁, hS₂.rdC_enc hp hnm₂ hs₂ hsum₂] at h
+  have hs : d₁.s = d₂.s := by
+    have h := congrArg rdS heq
+    rwa [hS₁.rdS_enc hp hnm₁ hs₁ hsum₁, hS₂.rdS_enc hp hnm₂ hs₂ hsum₂] at h
+  have hr : ∀ i < hS₁.nL, r₁ i = r₂ i := by
+    intro i hi
+    have hi2 : i < hS₂.nL := by rw [← hc]; exact hi
+    have h := congrFun (congrArg rdR heq) i
+    rw [hS₁.rdR_enc hp hnm₁ hs₁ hsum₁, hS₂.rdR_enc hp hnm₂ hs₂ hsum₂, dif_pos hi,
+      dif_pos hi2] at h
+    exact h
+  have hfo : ∀ w ≤ hS₁.nL, fOff r₁ w = fOff r₂ w := fOff_congr hr
+  have hn : d₁.n = d₂.n := by
+    rw [← hS₁.nL_spec, ← hS₂.nL_spec, ← hc]
+    exact hfo _ le_rfl
+  have h1c : 1 < hS₁.nL := hS₁.one_lt_nL hs₁
+  have hr1 : r₁ 1 = r₂ 1 := hr 1 h1c
+  have hf1 : fOff r₁ 1 = fOff r₂ 1 := hfo 1 h1c.le
+  have hf2 : fOff r₁ 2 = fOff r₂ 2 := hfo 2 h1c
+  have hlv : ∀ i (h1 : i < d₁.n) (h2 : i < d₂.n), d₁.lv ⟨i, h1⟩ = d₂.lv ⟨i, h2⟩ := by
+    intro i h1 h2
+    have hw := hS₁.lv_lt hS₁.nL_spec.symm ⟨i, h1⟩
+    obtain ⟨e1, e2⟩ := (hS₁.layer_iff ⟨i, h1⟩ (d₁.lv ⟨i, h1⟩)).mp rfl
+    rw [hfo _ hw.le, hr _ hw] at e2
+    rw [hfo _ hw.le] at e1
+    exact ((hS₂.layer_iff ⟨i, h2⟩ (d₁.lv ⟨i, h1⟩)).mpr ⟨e1, e2⟩).symm
+  have hA : brA d₁ = brA d₂ := by
+    funext j
+    have h := congrFun (congrArg rdA heq) j
+    rwa [hS₁.rdA_enc hp hnm₁ hs₁ hsum₁, hS₂.rdA_enc hp hnm₂ hs₂ hsum₂] at h
+  have hB : brB d₁ = brB d₂ := by
+    funext i j
+    have h := congrFun (congrFun (congrArg rdB heq) i) j
+    rwa [hS₁.rdB_enc hp hnm₁ hs₁ hsum₁, hS₂.rdB_enc hp hnm₂ hs₂ hsum₂] at h
+  have hCm : brCm d₁ = brCm d₂ := by
+    funext i j k
+    have h := congrFun (congrFun (congrFun (congrArg rdCm heq) i) j) k
+    rwa [hS₁.rdCm_enc hp hnm₁ hs₁ hsum₁, hS₂.rdCm_enc hp hnm₂ hs₂ hsum₂] at h
+  have hP : brPr d₁ r₁ = brPr d₂ r₂ := by
+    funext j
+    have h := congrFun (congrArg rdP heq) j
+    rwa [hS₁.rdP_enc hp hnm₁ hs₁ hsum₁, hS₂.rdP_enc hp hnm₂ hs₂ hsum₂] at h
+  have hPa : ∀ j < r₁ 1, brPa d₁ r₁ j = brPa d₂ r₂ j := by
+    intro j hj
+    have hj1 : j < (hS₁.rankVec hp hnm₁).r2 := by rw [hS₁.rankVec_r2 hp hnm₁ hs₁]; exact hj
+    have hj2 : j < (hS₂.rankVec hp hnm₂).r2 := by rw [hS₂.rankVec_r2 hp hnm₂ hs₂, ← hr1]; exact hj
+    have h := congrFun (congrArg rdF heq) j
+    rw [hS₁.rdF_enc hp hnm₁ hs₁ hsum₁, hS₂.rdF_enc hp hnm₂ hs₂ hsum₂, dif_pos hj1,
+      dif_pos hj2] at h
+    exact h
+  have hfib : ∀ k, ((Finset.range (r₁ 1)).filter (fun j => brCo d₁ r₁ j = k)).card =
+      ((Finset.range (r₁ 1)).filter (fun j => brCo d₂ r₂ j = k)).card := by
+    intro k
+    by_cases hk : 1 ≤ k ∧ k < d₁.s
+    · have hk1 : k - 1 < d₁.s - 1 := by omega
+      have hk2 : k - 1 < d₂.s - 1 := by omega
+      have h := congrFun (congrArg rdInc heq) (k - 1)
+      rw [hS₁.rdInc_enc hp hnm₁ hs₁ hsum₁, hS₂.rdInc_enc hp hnm₂ hs₂ hsum₂, dif_pos hk1,
+        dif_pos hk2] at h
+      unfold brFib at h
+      rw [← hr1, show k - 1 + 1 = k by omega] at h
+      exact h
+    · have e1 : (Finset.range (r₁ 1)).filter (fun j => brCo d₁ r₁ j = k) = ∅ :=
+        Finset.filter_eq_empty_iff.mpr fun j hj => by
+          have := hS₁.brCo_bounds hs₁ j (Finset.mem_range.mp hj)
+          omega
+      have e2 : (Finset.range (r₁ 1)).filter (fun j => brCo d₂ r₂ j = k) = ∅ :=
+        Finset.filter_eq_empty_iff.mpr fun j hj => by
+          have hj' : j < r₂ 1 := by rw [← hr1]; exact Finset.mem_range.mp hj
+          have := hS₂.brCo_bounds hs₂ j hj'
+          omega
+      rw [e1, e2]
+  have hmono₂ : ∀ i j, i ≤ j → j < r₁ 1 → brCo d₂ r₂ i ≤ brCo d₂ r₂ j :=
+    fun i j hij hj => hS₂.brCo_mono hs₂ i j hij (by rw [← hr1]; exact hj)
+  have hco : ∀ j < r₁ 1, brCo d₁ r₁ j = brCo d₂ r₂ j := fun j hj =>
+    eq_of_mono_fiber _ _ _ (fun i j hij hj => hS₁.brCo_mono hs₁ i j hij hj) hmono₂ hfib j hj
+  have hdf : ∀ i (h1 : i < d₁.n) (h2 : i < d₂.n), 1 ≤ d₁.lv ⟨i, h1⟩ →
+      (d₁.df ⟨i, h1⟩).1.val = (d₂.df ⟨i, h2⟩).1.val ∧
+        (d₁.df ⟨i, h1⟩).2.val = (d₂.df ⟨i, h2⟩).2.val := by
+    intro i h1 h2 hl
+    by_cases hw : d₁.lv ⟨i, h1⟩ = 1
+    · obtain ⟨a1, a2⟩ := (hS₁.layer_iff ⟨i, h1⟩ 1).mp hw
+      have a1' : fOff r₁ 1 ≤ i := a1
+      have a2' : i < fOff r₁ 1 + r₁ 1 := a2
+      have ej1 : fOff r₁ 1 + (i - fOff r₁ 1) = (⟨i, h1⟩ : Fin d₁.n).val := by
+        show fOff r₁ 1 + (i - fOff r₁ 1) = i
+        omega
+      have ej2 : fOff r₂ 1 + (i - fOff r₁ 1) = (⟨i, h2⟩ : Fin d₂.n).val := by
+        show fOff r₂ 1 + (i - fOff r₁ 1) = i
+        omega
+      have hj : i - fOff r₁ 1 < r₁ 1 := by omega
+      constructor
+      · rw [← brPa_eq d₁ r₁ ⟨i, h1⟩ _ ej1, ← brPa_eq d₂ r₂ ⟨i, h2⟩ _ ej2]
+        exact hPa _ hj
+      · rw [← brCo_eq d₁ r₁ ⟨i, h1⟩ _ ej1, ← brCo_eq d₂ r₂ ⟨i, h2⟩ _ ej2]
+        exact hco _ hj
+    · have hge : 2 ≤ d₁.lv ⟨i, h1⟩ := by omega
+      have a1 := ((hS₁.layer_iff ⟨i, h1⟩ (d₁.lv ⟨i, h1⟩)).mp rfl).1
+      have a1' : fOff r₁ (d₁.lv ⟨i, h1⟩) ≤ i := a1
+      have a3 := fOff_mono r₁ hge
+      have ej1 : fOff r₁ 2 + (i - fOff r₁ 2) = (⟨i, h1⟩ : Fin d₁.n).val := by
+        show fOff r₁ 2 + (i - fOff r₁ 2) = i
+        omega
+      have ej2 : fOff r₂ 2 + (i - fOff r₁ 2) = (⟨i, h2⟩ : Fin d₂.n).val := by
+        show fOff r₂ 2 + (i - fOff r₁ 2) = i
+        omega
+      have e := congrFun hP (i - fOff r₁ 2)
+      rw [brPr_eq d₁ r₁ ⟨i, h1⟩ _ ej1, brPr_eq d₂ r₂ ⟨i, h2⟩ _ ej2] at e
+      exact Prod.mk.inj e
+  refine SimsData.normalize_eq hn hs hlv hdf ?_ ?_ ?_
+  · intro i h1 h2
+    have e := congrFun hA i
+    unfold brA at e
+    rwa [dif_pos h1, dif_pos h2] at e
+  · intro i j h1 h1' h2 h2'
+    have e := congrFun (congrFun hB i) j
+    unfold brB at e
+    rwa [dif_pos (And.intro h1 h1'), dif_pos (And.intro h2 h2')] at e
+  · intro i j k h1 h1' h1'' h2 h2' h2''
+    have e := congrFun (congrFun (congrFun hCm i) j) k
+    unfold brCm at e
+    rwa [dif_pos (And.intro h1 (And.intro h1' h1'')),
+      dif_pos (And.intro h2 (And.intro h2' h2''))] at e
+
+/-- `G` has Sims code `D`: some Sims generating set of `G` (in the sense of `SimsGen`) has
+code `D`. -/
+def SimsCode {p : ℕ} (hp : p.Prime) (m : ℕ) (G : Type u) [Group G] [Finite G]
+    (D : FullData p m) : Prop :=
+  ∃ (u : ℕ → G) (d : SimsData) (X : Fin d.n → G) (r : ℕ → ℕ) (hS : SimsGen p u d X r)
+    (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) (hsum : ∑ t, d.a t = m), hS.enc hp m hnm hs2 hsum = D
+
+theorem exists_simsCode {G : Type u} [Group G] [Finite G] {p m : ℕ} (hp : p.Prime)
+    (hG : Nat.card G = p ^ m) (hna : lcs G 1 ≠ ⊥) : ∃ D : FullData p m, SimsCode hp m G D := by
+  obtain ⟨u, d, X, r, hs2, hds, -, -, -, -, hnm, -, hS⟩ := exists_sims_gen hp hG hna
+  have hsum : ∑ t, d.a t = m := by
+    have h1 := hS.realizes.card
+    rw [hG] at h1
+    exact (Nat.pow_right_injective hp.two_le h1).symm
+  have hs2' : 2 ≤ d.s := by rw [hds]; exact hs2
+  exact ⟨_, u, d, X, r, hS, hnm, hs2', hsum, rfl⟩
+
+/-- Proposition 2.4 for codes: groups with the same Sims code are isomorphic. -/
+theorem simsCode_rigid {G H : Type u} [Group G] [Finite G] [Group H] [Finite H] {p m : ℕ}
+    (hp : p.Prime) {D : FullData p m} (hG : SimsCode hp m G D) (hH : SimsCode hp m H D) :
+    Nonempty (G ≃* H) := by
+  obtain ⟨u₁, d₁, X₁, r₁, hS₁, hnm₁, hs₁, hsum₁, e₁⟩ := hG
+  obtain ⟨u₂, d₂, X₂, r₂, hS₂, hnm₂, hs₂, hsum₂, e₂⟩ := hH
+  exact rigid_of_eq hp d₁.normalize d₂.normalize
+    (SimsGen.normalize_eq_of_enc hp hS₁ hS₂ hnm₁ hs₁ hsum₁ hnm₂ hs₂ hsum₂ (e₁.trans e₂.symm))
+    (SimsData.normalize_valid hS₁.valid) X₁ X₂ (SimsData.normalize_realizes hS₁.realizes)
+    (SimsData.normalize_realizes hS₂.realizes)
+
+/-- INF-1 with Propositions 2.4 and 2.5: the number of isomorphism classes of nonabelian
+groups of order `p ^ m` is at most the number of full Sims codes. -/
+theorem ncard_classes_le_fullData (p m : ℕ) (hp : p.Prime) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) ''
+      {G : FiniteGrp.{0} | Nat.card G = p ^ m ∧ lcs G 1 ≠ ⊥}).ncard ≤
+        Fintype.card (FullData p m) :=
+  ncard_classes_le_fintype_card _ (fun G D => SimsCode hp m G D)
+    (fun G hG => by
+      obtain ⟨h1, h2⟩ := hG
+      exact exists_simsCode hp h1 h2)
+    (fun _ _ _ _ _ hGD hHD => simsCode_rigid hp hGD hHD)
+
+/-- The same with the Proposition 2.5 count of the recorded data and the trivial count of the
+arrays. -/
+theorem ncard_classes_le_recData (p m : ℕ) (hp : p.Prime) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) ''
+      {G : FiniteGrp.{0} | Nat.card G = p ^ m ∧ lcs G 1 ≠ ⊥}).ncard ≤
+        Fintype.card (RecData m) * ((p ^ m) ^ (m * m) * (p ^ m) ^ (m * m * m)) :=
+  (ncard_classes_le_fullData p m hp).trans (card_fullData_le p m hp.pos)
+
+/-- Closed form, with `card_recData_le_pow`. -/
+theorem ncard_classes_le_closed (p m : ℕ) (hp : p.Prime) (hm : 1 ≤ m) :
+    (Quotient.mk (CategoryTheory.isIsomorphicSetoid FiniteGrp.{0}) ''
+      {G : FiniteGrp.{0} | Nat.card G = p ^ m ∧ lcs G 1 ≠ ⊥}).ncard ≤
+        (m + 1) ^ (5 * m + 2) * ((p ^ m) ^ (m * m) * (p ^ m) ^ (m * m * m)) :=
+  (ncard_classes_le_recData p m hp).trans (Nat.mul_le_mul (card_recData_le_pow m hm) le_rfl)
+
+end DataBridge
+
 end OMA.SimsLite
 
 #print axioms OMA.SimsLite.sims_powerWords_counted
+#print axioms OMA.SimsLite.ncard_classes_le_closed
