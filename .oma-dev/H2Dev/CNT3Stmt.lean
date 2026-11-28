@@ -331,8 +331,3 @@ end CNT3PartA
 
 end OMA.SimsLite
 
-#print axioms OMA.SimsLite.cnt3_partA
-#print axioms OMA.SimsLite.simsRankInl_eq
-#print axioms OMA.SimsLite.mem_cnt3Set_iff
-#print axioms OMA.SimsLite.cnt3_m_eq
-#print axioms OMA.SimsLite.cnt3Classes_finite
