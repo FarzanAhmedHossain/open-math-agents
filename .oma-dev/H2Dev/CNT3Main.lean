@@ -469,7 +469,3 @@ theorem cnt3Stmt_imp_mm (h : CNT3Stmt) : CNT3StmtMM := by
 end CNT3MainThm
 
 end OMA.SimsLite
-
-#print axioms OMA.SimsLite.cnt3_main
-#print axioms OMA.SimsLite.cnt3_main_mm
-#print axioms OMA.SimsLite.hypData
