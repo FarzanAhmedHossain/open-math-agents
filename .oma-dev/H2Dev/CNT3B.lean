@@ -689,7 +689,8 @@ theorem SimsGen.cbt_tuple [Fact p.Prime] (hp : p.Prime) (hS : SimsGen p u d X r)
   have hone : piW p G ⟨g' ⟨lfI1 h2, j⟩ ^ p ^ fibAk D ⟨lfI1 h2, j⟩, hmem⟩ = 1 := by
     have e1 : (⟨g' ⟨lfI1 h2, j⟩ ^ p ^ fibAk D ⟨lfI1 h2, j⟩, hmem⟩ : lcs G 1) =
         (⟨g' ⟨lfI1 h2, j⟩, S.mem ⟨lfI1 h2, j⟩⟩ : lcs G 1) ^ (p ^ fibAk D ⟨lfI1 h2, j⟩) :=
-      Subtype.ext (SubgroupClass.coe_pow _ _).symm
+      Subtype.ext (SubgroupClass.coe_pow
+        (⟨g' ⟨lfI1 h2, j⟩, S.mem ⟨lfI1 h2, j⟩⟩ : lcs G 1) (p ^ fibAk D ⟨lfI1 h2, j⟩)).symm
     obtain ⟨t, ht⟩ : ∃ t, fibAk D ⟨lfI1 h2, j⟩ = t + 1 :=
       ⟨fibAk D ⟨lfI1 h2, j⟩ - 1, by have := S.pos ⟨lfI1 h2, j⟩; omega⟩
     rw [e1, map_pow, ht, pow_succ, pow_mul, W_pow_p]
