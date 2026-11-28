@@ -336,7 +336,8 @@ lemma mem_sup_zpowers_decomp {K : Subgroup G} [K.Normal] {x : G} {p : ℕ} (hp :
   refine ⟨r, hrp, (x ^ p) ^ (e / (p : ℤ)) * k, K.mul_mem (zpow_mem hx _) hk, ?_⟩
   have he : e = (r : ℤ) + (p : ℤ) * (e / (p : ℤ)) := by
     rw [← hr]
-    exact (Int.emod_add_ediv e p).symm
+    have := Int.ediv_add_emod e (p : ℤ)
+    linarith
   calc x ^ e * k = x ^ ((r : ℤ) + (p : ℤ) * (e / (p : ℤ))) * k := by rw [← he]
     _ = x ^ r * ((x ^ p) ^ (e / (p : ℤ)) * k) := by
       rw [zpow_add, zpow_mul, zpow_natCast, zpow_natCast, mul_assoc]
@@ -392,7 +393,7 @@ lemma card_closure_sup_le (hp : 0 < p) {M : Subgroup G} (hM2 : lcs G 1 ≤ M)
     rw [pow_zero, one_mul]
     exact Subgroup.card_le_of_le hle
   | succ j ih =>
-    haveI : (Subgroup.closure (x '' Set.Iio j) ⊔ M).Normal :=
+    have : (Subgroup.closure (x '' Set.Iio j) ⊔ M).Normal :=
       normal_of_lcs_one_le (hM2.trans le_sup_right)
     have hle : Subgroup.closure (x '' Set.Iio (j + 1)) ⊔ M ≤
         (Subgroup.closure (x '' Set.Iio j) ⊔ M) ⊔ Subgroup.zpowers (x j) := by
@@ -431,7 +432,7 @@ lemma card_growth (hp : p.Prime) (hG : Nat.card G = p ^ n) (M : Subgroup G) {v :
     have h1 := ih fun k hk => hind k (by omega)
     have hle : Subgroup.closure (v '' Set.Iio t) ⊔ M ≤ Subgroup.closure (v '' Set.Iio (t + 1)) ⊔ M :=
       sup_le_sup_right (Subgroup.closure_mono
-        (Set.image_subset v (Set.Iio_subset_Iio (Nat.le_succ t)))) M
+        (Set.image_mono (Set.Iio_subset_Iio (Nat.le_succ t)))) M
     have hne : Subgroup.closure (v '' Set.Iio t) ⊔ M ≠
         Subgroup.closure (v '' Set.Iio (t + 1)) ⊔ M := by
       intro h
@@ -523,7 +524,7 @@ theorem core_flag (hp : p.Prime) (hG : Nat.card G = p ^ n) (N M : Subgroup G)
   have hHH : s ≤ 1 →
       ⁅Subgroup.closure (x '' Set.Iio s), Subgroup.closure (x '' Set.Iio s)⁆ ≤ N := by
     intro hs1
-    haveI := normal_of_sandwich (n := 1) hN3 hN2
+    have := normal_of_sandwich (n := 1) hN3 hN2
     apply commutator_closure_le
     rintro _ ⟨i, hi, rfl⟩ _ ⟨j, hj, rfl⟩
     have hi' : i < s := Set.mem_Iio.mp hi
@@ -537,7 +538,7 @@ theorem core_flag (hp : p.Prime) (hG : Nat.card G = p ^ n) (N M : Subgroup G)
     refine ⟨x, fun i hi => absurd hi (Nat.not_lt_zero i), strictChainN_zero N x, ?_,
       fun k hk => absurd hk (Nat.not_lt_zero k), rfl, fun k hk hks => absurd hks (by omega)⟩
     exact le_antisymm (WkN_le_lcs_one N hN2 x 0)
-      (hcore.trans (sup_le (hHH (by omega)) (le_WkN N x 0)))
+      (hcore.trans (sup_le ((hHH (by omega)).trans (le_WkN N x 0)) (le_WkN N x 0)))
   · subst hs
     exfalso
     exact hmin 0 (by omega) x (fun i hi => absurd hi (Nat.not_lt_zero i))
