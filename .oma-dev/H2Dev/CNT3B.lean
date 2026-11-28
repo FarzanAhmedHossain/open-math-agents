@@ -24,6 +24,18 @@ breadth `b_2`), and the deeper coefficients `p ^ ((C(r_1, 2) - r_2) s_3)`.
 * `cbt_realizedCB_ncard_le_two` : the same at `p = 2` with the count `Alt2.N2 r1 r2 s0`; the
   exponent of the `b`-th summand times the deeper factor is exactly `cnt3B` at breadth `b`
   (`logN2 + (C(r1,2) - r2)(s2 - r2) + (C(r1,2) - r2) s3 + s b (r2 + s3 - b + 1)`), since `b ≤ s3`.
+* `cbt_realizedCB_ncard_le_min` / `cbt_realizedCB_ncard_le_min_two` (the form CNT3 (b) needs):
+  terms A and B at a common breadth, `#CB ≤ (Σ_b min (A_b) (B_b)) · p ^ ((C(r1,2) - r2) s3)`
+  over the admissible `b`, where `A_b`, `B_b` are the `b`-th summands of `lf_realizedCB_ncard_le`
+  and `cbt_realizedCB_ncard_le` (the leading pairs are split by their breadth `cbtBrL`, and each
+  part is counted by both `cbt_lead_A_breadth` and `cbt_lead_B_breadth`). With `lf_sum_le_max`
+  this gives `#CB ≤ (min(s2, s3) + 1) · max_b min(A_b, B_b) · deeper`.
+* `cbt_realizedCB_params` : `r2 ≤ s2`, `r2 ≤ C(r1, 2)`, `s ≤ r1` whenever a code with data `D`
+  is realised (so the natural-number differences in the exponents are true differences).
+
+Note: the tuple count is at `s0 = simsRank G` while the breadth exponent uses the recorded core
+size `s = D.2.1`; their equality for the codes summed over is left to the assembly (filter the
+recorded data by `D.2.1 = s`, or prove `d.s = simsRank G` for `SimsGen`).
 
 ## Structure
 
@@ -35,6 +47,9 @@ breadth `b_2`), and the deeper coefficients `p ^ ((C(r_1, 2) - r_2) s_3)`.
 * Matrix tuples: `cbtTupZ`, `cbtTup`, `cbtZ`, `cbtTupZ_congr`, `cbtTupZ_eq_of_alt`,
   `cbtTupZ_inj`, `cbt_tup_trunc`.
 * `cbt_ncard_lead_le` : the B-analogue of `lf_ncard_lead_le`.
+* Fixed breadth: `cbtBrV`, `cbtBrV_eq` (a bracket is determined by its values on generators),
+  `cbtGen`, `cbtVec`, `cbtBrL` (the breadth of a leading pair), `LfIdent.cbt_val1/2`,
+  `LfIdent.cbt_mem`, `cbt_lead_inj`, `cbt_lead_adm`, `cbt_lead_A_breadth`, `cbt_lead_B_breadth`.
 * Group level: `SimsGenSet.cbt_basisW`, `SimsGenSet.cbt_basisV` (bases of `W`, `V` from the
   Sims generators, with the coordinates of `W` the weight-1 Sims coordinates mod `p`),
   `SimsGen.cbt_tuple` (the leading coefficients of a code give the matrix tuple of `β_G`,
@@ -702,6 +717,416 @@ theorem SimsGen.cbt_tuple [Fact p.Prime] (hp : p.Prime) (hS : SimsGen p u d X r)
 
 end CbtTuple
 
+section CbtBrDef
+
+/-! ### The breadth of a leading coefficient pair -/
+
+variable {L1 L2 L3 : Type*} [CommGroup L1] [CommGroup L2] [CommGroup L3]
+
+open Classical in
+/-- The breadth (48) of the bracket `L_2 × L_1 → L_3` with prescribed values `t j k` on the
+generator pairs `(y_j, g_k)` (and `0` if there is no such bracket). -/
+noncomputable def cbtBrV (p s : ℕ) {r n : ℕ} (g : Fin r → L1) (y : Fin n → L2)
+    (t : Fin n → Fin r → L3) : ℕ :=
+  if h : ∃ κ : L2 →* L1 →* L3, ∀ j k, κ (y j) (g k) = t j k then
+    brBreadth p (Classical.choose h) (Subgroup.closure (g '' {j | (j : ℕ) < s}))
+  else 0
+
+/-- A bracket is determined by its values on generators, so `cbtBrV` is its breadth. -/
+theorem cbtBrV_eq (p s : ℕ) {r n : ℕ} {g : Fin r → L1} {y : Fin n → L2}
+    (hg : Subgroup.closure (Set.range g) = ⊤) (hy : Subgroup.closure (Set.range y) = ⊤)
+    (t : Fin n → Fin r → L3) (κ : L2 →* L1 →* L3) (hκ : ∀ j k, κ (y j) (g k) = t j k) :
+    cbtBrV p s g y t = brBreadth p κ (Subgroup.closure (g '' {j | (j : ℕ) < s})) := by
+  have h : ∃ κ : L2 →* L1 →* L3, ∀ j k, κ (y j) (g k) = t j k := ⟨κ, hκ⟩
+  have he : Classical.choose h = κ := by
+    refine MonoidHom.eq_of_eqOn_dense hy ?_
+    rintro _ ⟨j, rfl⟩
+    refine MonoidHom.eq_of_eqOn_dense hg ?_
+    rintro _ ⟨k, rfl⟩
+    exact (Classical.choose_spec h j k).trans (hκ j k).symm
+  unfold cbtBrV
+  rw [dif_pos h]
+  exact congrArg (fun κ' => brBreadth p κ' (Subgroup.closure (g '' {j | (j : ℕ) < s}))) he
+
+end CbtBrDef
+
+/-- The unit vectors of the coordinate group (37). -/
+def cbtGen (p : ℕ) {n : ℕ} (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ) (j : Fin n) :
+    Multiplicative (LfQ p a b) :=
+  Multiplicative.ofAdd (QuotientAddGroup.mk (Pi.single j (1 : ℤ)))
+
+/-- The class of a coordinate vector in the coordinate group (37). -/
+def cbtVec (p : ℕ) {n : ℕ} (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ) (x : Fin n → ℕ) :
+    Multiplicative (LfQ p a b) :=
+  Multiplicative.ofAdd (QuotientAddGroup.mk (fun v => ((x v : ℕ) : ℤ)))
+
+lemma cbtGen_closure (p : ℕ) {n : ℕ} (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ) :
+    Subgroup.closure (Set.range (cbtGen p a b)) = ⊤ :=
+  lf_closure_single p a b
+
+/-- The breadth `b_2` (48) of a leading coefficient pair: the breadth, on the core
+`⟨g_0, ..., g_{s-1}⟩`, of the bracket `L_2 × L_1 → L_3` of the coordinate groups (37) whose values
+on the generator pairs `(y_j, g_k)` are the coefficient vectors `x2 j k`. -/
+noncomputable def cbtBrL (p s : ℕ) {r0 r1 r2 : ℕ} (a0 : Fin r0 → ℕ) (b0 : Fin r0 → Fin r0 → ℕ)
+    (a1 : Fin r1 → ℕ) (b1 : Fin r1 → Fin r1 → ℕ) (a2 : Fin r2 → ℕ) (b2 : Fin r2 → Fin r2 → ℕ)
+    (x2 : Fin r1 → Fin r0 → Fin r2 → ℕ) : ℕ :=
+  cbtBrV p s (cbtGen p a0 b0) (cbtGen p a1 b1) (fun j k => cbtVec p a2 b2 (x2 j k))
+
+section CbtReal
+
+/-! ### The transported brackets of a group on the coordinate generators -/
+
+variable {G : Type u} [Group G] {p c : ℕ} {r : Fin c → ℕ} {a : SimsIdx c r → ℕ}
+  {g : SimsIdx c r → G} {S : SimsGenSet p a g} {h2 : 2 < c}
+  {b0 : Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → ℕ}
+  {b1 : Fin (r (lfI1 h2)) → Fin (r (lfI1 h2)) → ℕ}
+  {b2 : Fin (r (lfI2 h2)) → Fin (r (lfI2 h2)) → ℕ}
+
+theorem SimsGenSet.LfIdent.cbt_val1 (I : S.LfIdent h2 b0 b1 b2) (j k : Fin (r (lfI0 h2))) :
+    brT1 (lfMulE I.φ1) (lfMulE I.φ2) (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 j)
+      (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 k) =
+      cbtVec p (fun v => a ⟨lfI1 h2, v⟩) b1 (S.lfLead1 h2 j k) := by
+  have e1 : cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 j =
+      lfMulE I.φ1 (Abelianization.of (g ⟨lfI0 h2, j⟩)) := (I.e1_gen j).symm
+  have e2 : cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 k =
+      lfMulE I.φ1 (Abelianization.of (g ⟨lfI0 h2, k⟩)) := (I.e1_gen k).symm
+  rw [e1, e2, brT1_of]
+  exact I.e2_coord (cw (g ⟨lfI0 h2, j⟩) (g ⟨lfI0 h2, k⟩)).2
+
+theorem SimsGenSet.LfIdent.cbt_val2 (I : S.LfIdent h2 b0 b1 b2) (j : Fin (r (lfI1 h2)))
+    (k : Fin (r (lfI0 h2))) :
+    brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3) (cbtGen p (fun v => a ⟨lfI1 h2, v⟩) b1 j)
+      (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 k) =
+      cbtVec p (fun v => a ⟨lfI2 h2, v⟩) b2 (S.lfLead2 h2 j k) := by
+  have e1 : cbtGen p (fun v => a ⟨lfI1 h2, v⟩) b1 j =
+      lfMulE I.φ2 (brq2 G ⟨g ⟨lfI1 h2, j⟩, S.mem ⟨lfI1 h2, j⟩⟩) := (I.e2_gen j).symm
+  have e2 : cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 k =
+      lfMulE I.φ1 (Abelianization.of (g ⟨lfI0 h2, k⟩)) := (I.e1_gen k).symm
+  rw [e1, e2, brT2_of]
+  exact I.e3_coord (cw2 ⟨g ⟨lfI1 h2, j⟩, S.mem ⟨lfI1 h2, j⟩⟩ (g ⟨lfI0 h2, k⟩)).2
+
+/-- The transported brackets of a group with a Sims core lie in the counted set, on the
+coordinate generators. -/
+theorem SimsGenSet.LfIdent.cbt_mem {s : ℕ} (I : S.LfIdent h2 b0 b1 b2)
+    (hcore : lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s})⁆ ⊔ lcs G 2)
+    (D : Finset (Fin (r (lfI0 h2)) × Fin (r (lfI0 h2))))
+    (w : Fin (r (lfI0 h2)) × Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (hDw : ∀ q ∈ D, S.lfLead1 h2 q.1 q.2 = w q) :
+    (brT1 (lfMulE I.φ1) (lfMulE I.φ2), brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3)) ∈
+      lfBrSet (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) s
+        (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0) D
+        (fun q => cbtVec p (fun v => a ⟨lfI1 h2, v⟩) b1 (w q)) :=
+  lf_brT_mem (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3) (fun j => g ⟨lfI0 h2, j⟩)
+    (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0) (fun j => I.e1_gen j) hcore D
+    (fun q => cbtVec p (fun v => a ⟨lfI1 h2, v⟩) b1 (w q)) (fun q hq => by
+      refine (I.e2_coord (cw (g ⟨lfI0 h2, q.1⟩) (g ⟨lfI0 h2, q.2⟩)).2).trans ?_
+      show _ = Multiplicative.ofAdd (QuotientAddGroup.mk (fun v => ((w q v : ℕ) : ℤ)))
+      rw [← hDw q hq]
+      rfl)
+
+end CbtReal
+
+section CbtLeadBreadth
+
+/-! ### Fixed-breadth counts of leading coefficient pairs (terms A and B) -/
+
+variable {p c : ℕ} {r : Fin c → ℕ} {a : SimsIdx c r → ℕ}
+
+/-- The leading coefficient pairs of groups inject into any set of bracket pairs containing the
+transported brackets of every realising group. -/
+theorem cbt_lead_inj (hp0 : 0 < p) (h2 : 2 < c)
+    (b0 : Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → ℕ)
+    (b1 : Fin (r (lfI1 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (b2 : Fin (r (lfI2 h2)) → Fin (r (lfI2 h2)) → ℕ) {s : ℕ}
+    (D : Finset (Fin (r (lfI0 h2)) × Fin (r (lfI0 h2))))
+    (w : Fin (r (lfI0 h2)) × Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (Λ : Set ((Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ) ×
+      (Fin (r (lfI1 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI2 h2)) → ℕ)))
+    (hΛ : ∀ x ∈ Λ, ∃ (G : Type u) (_ : Group G) (_ : Finite G) (g : SimsIdx c r → G)
+      (S : SimsGenSet p a g),
+      (∀ j v, (S.powerWords ⟨lfI0 h2, j⟩ ⟨lfI0 h2, v⟩).val = b0 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI1 h2, j⟩ ⟨lfI1 h2, v⟩).val = b1 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI2 h2, j⟩ ⟨lfI2 h2, v⟩).val = b2 j v) ∧
+      (3 < c ∨ lcs G 3 = ⊥) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s})⁆ ⊔ lcs G 2 ∧
+      (∀ q ∈ D, S.lfLead1 h2 q.1 q.2 = w q) ∧
+      x = (S.lfLead1 h2, S.lfLead2 h2))
+    (Sβ : Set ((Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) →*
+          Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) →*
+            Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) ×
+        (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) →*
+          Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) →*
+            Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2))))
+    (hSβ : ∀ (G : Type u) (_ : Group G) (g : SimsIdx c r → G) (S : SimsGenSet p a g)
+      (I : S.LfIdent h2 b0 b1 b2),
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s})⁆ ⊔ lcs G 2 →
+      (∀ q ∈ D, S.lfLead1 h2 q.1 q.2 = w q) → (S.lfLead1 h2, S.lfLead2 h2) ∈ Λ →
+      (brT1 (lfMulE I.φ1) (lfMulE I.φ2), brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3)) ∈ Sβ) :
+    Λ.ncard ≤ Sβ.ncard := by
+  classical
+  have : Finite (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) := (lf_card_quot_le hp0 _ b0).1
+  have : Finite (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) := (lf_card_quot_le hp0 _ b1).1
+  have : Finite (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2) := (lf_card_quot_le hp0 _ b2).1
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have := br_finite_pairs (L1 := Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0))
+    (L2 := Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1))
+    (L3 := Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2))
+  obtain ⟨R, hR⟩ : ∃ R : ((Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ) ×
+      (Fin (r (lfI1 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI2 h2)) → ℕ)) →
+      ((Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) →*
+          Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) →*
+            Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) ×
+        (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) →*
+          Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) →*
+            Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2))) → Prop, R =
+    fun x β => ∃ (G : Type u) (_ : Group G) (g : SimsIdx c r → G) (S : SimsGenSet p a g)
+      (I : S.LfIdent h2 b0 b1 b2), x = (S.lfLead1 h2, S.lfLead2 h2) ∧
+        β = (brT1 (lfMulE I.φ1) (lfMulE I.φ2), brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3)) :=
+    ⟨_, rfl⟩
+  have hfun : ∀ x x' β, R x β → R x' β → x = x' := by
+    intro x x' β h h'
+    rw [hR] at h h'
+    obtain ⟨G, _, g, S, I, rfl, rfl⟩ := h
+    obtain ⟨G', _, g', S', I', rfl, hβ⟩ := h'
+    obtain ⟨h1, h2'⟩ := Prod.mk.inj hβ
+    obtain ⟨e1, e2⟩ := SimsGenSet.lf_lead_eq hp0 I I' h1 h2'
+    rw [e1, e2]
+  have hex : ∀ x ∈ Λ, ∃ β, β ∈ Sβ ∧ R x β := by
+    intro x hx
+    obtain ⟨G, _, _, g, S, hb0, hb1, hb2, hl, hcore, hDw, rfl⟩ := hΛ x hx
+    obtain ⟨I⟩ := S.lf_ident_nonempty hp0 h2 hl b0 b1 b2 hb0 hb1 hb2
+    refine ⟨_, hSβ G inferInstance g S I hcore hDw hx, ?_⟩
+    rw [hR]
+    exact ⟨G, inferInstance, g, S, I, rfl, rfl⟩
+  let F := fun x => if h : x ∈ Λ then Classical.choose (hex x h) else 1
+  have hF : ∀ x (h : x ∈ Λ), F x = Classical.choose (hex x h) := fun x h => dif_pos h
+  have hmaps : ∀ x ∈ Λ, F x ∈ Sβ := fun x h => by
+    rw [hF x h]
+    exact (Classical.choose_spec (hex x h)).1
+  have hinj : Set.InjOn F Λ := by
+    intro x hx x' hx' he
+    refine hfun x x' (F x) ?_ ?_
+    · rw [hF x hx]
+      exact (Classical.choose_spec (hex x hx)).2
+    · rw [he, hF x' hx']
+      exact (Classical.choose_spec (hex x' hx')).2
+  exact Set.ncard_le_ncard_of_injOn F hmaps hinj (Set.toFinite _)
+
+/-- The breadth of a realised leading coefficient pair is admissible, (48)/(51):
+`s_3 ≤ s b_2` and `b_2 ≤ min(s_2, s_3)`. -/
+theorem cbt_lead_adm (hp : p.Prime) (h2 : 2 < c)
+    (b0 : Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → ℕ)
+    (b1 : Fin (r (lfI1 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (b2 : Fin (r (lfI2 h2)) → Fin (r (lfI2 h2)) → ℕ) {s : ℕ} (hs : s ≤ r (lfI0 h2))
+    (D : Finset (Fin (r (lfI0 h2)) × Fin (r (lfI0 h2))))
+    (w : Fin (r (lfI0 h2)) × Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (x : (Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ) ×
+      (Fin (r (lfI1 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI2 h2)) → ℕ))
+    (hx : ∃ (G : Type u) (_ : Group G) (_ : Finite G) (g : SimsIdx c r → G)
+      (S : SimsGenSet p a g),
+      (∀ j v, (S.powerWords ⟨lfI0 h2, j⟩ ⟨lfI0 h2, v⟩).val = b0 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI1 h2, j⟩ ⟨lfI1 h2, v⟩).val = b1 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI2 h2, j⟩ ⟨lfI2 h2, v⟩).val = b2 j v) ∧
+      (3 < c ∨ lcs G 3 = ⊥) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s})⁆ ⊔ lcs G 2 ∧
+      (∀ q ∈ D, S.lfLead1 h2 q.1 q.2 = w q) ∧
+      x = (S.lfLead1 h2, S.lfLead2 h2)) :
+    cbtBrL p s (fun v => a ⟨lfI0 h2, v⟩) b0 (fun v => a ⟨lfI1 h2, v⟩) b1
+        (fun v => a ⟨lfI2 h2, v⟩) b2 x.2 ∈
+      (Finset.range (min (∑ v, a ⟨lfI1 h2, v⟩) (∑ v, a ⟨lfI2 h2, v⟩) + 1)).filter
+        (fun β => (∑ v, a ⟨lfI2 h2, v⟩) ≤ s * β) := by
+  have hp0 := hp.pos
+  obtain ⟨G, _, _, g, S, hb0, hb1, hb2, hl, hcore, hDw, rfl⟩ := hx
+  obtain ⟨I⟩ := S.lf_ident_nonempty hp0 h2 hl b0 b1 b2 hb0 hb1 hb2
+  have : Finite (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) := (lf_card_quot_le hp0 _ b1).1
+  have : Finite (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2) := (lf_card_quot_le hp0 _ b2).1
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have hL2 := lf_card_mulQ I.φ2 I.card2
+  have hL3 := lf_card_mulQ I.φ3 I.card3
+  obtain ⟨-, -, -, hgen3, -⟩ := I.cbt_mem hcore D w hDw
+  obtain ⟨h51, hmin⟩ := br_breadth_range hp hs hL2 hL3 _
+    (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0) hgen3
+  have he : cbtBrL p s (fun v => a ⟨lfI0 h2, v⟩) b0 (fun v => a ⟨lfI1 h2, v⟩) b1
+      (fun v => a ⟨lfI2 h2, v⟩) b2 (S.lfLead1 h2, S.lfLead2 h2).2 =
+      brBreadth p (brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3))
+        (Subgroup.closure (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 '' {j | (j : ℕ) < s})) :=
+    cbtBrV_eq p s (cbtGen_closure p _ b0) (cbtGen_closure p _ b1)
+      (fun j k => cbtVec p (fun v => a ⟨lfI2 h2, v⟩) b2 (S.lfLead2 h2 j k))
+      (brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3)) I.cbt_val2
+  rw [he, Finset.mem_filter, Finset.mem_range]
+  exact ⟨Nat.lt_succ_of_le hmin, h51⟩
+
+/-- Term A at a fixed breadth `b` (eq. (53) at `c = 3` for fixed `b_2`, (55)): the leading
+coefficient pairs of `lf_ncard_lead_le` whose breadth `cbtBrL` is `b` number at most the `b`-th
+summand of the term-A bound. -/
+theorem cbt_lead_A_breadth (hp : p.Prime) (h2 : 2 < c)
+    (b0 : Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → ℕ)
+    (b1 : Fin (r (lfI1 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (b2 : Fin (r (lfI2 h2)) → Fin (r (lfI2 h2)) → ℕ) {s : ℕ} (hs : s ≤ r (lfI0 h2))
+    (D : Finset (Fin (r (lfI0 h2)) × Fin (r (lfI0 h2))))
+    (hD : ∀ q ∈ D, q.1 < q.2 ∧ (q.1 : ℕ) < s)
+    (w : Fin (r (lfI0 h2)) × Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (Λ : Set ((Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ) ×
+      (Fin (r (lfI1 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI2 h2)) → ℕ)))
+    (hΛ : ∀ x ∈ Λ, ∃ (G : Type u) (_ : Group G) (_ : Finite G) (g : SimsIdx c r → G)
+      (S : SimsGenSet p a g),
+      (∀ j v, (S.powerWords ⟨lfI0 h2, j⟩ ⟨lfI0 h2, v⟩).val = b0 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI1 h2, j⟩ ⟨lfI1 h2, v⟩).val = b1 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI2 h2, j⟩ ⟨lfI2 h2, v⟩).val = b2 j v) ∧
+      (3 < c ∨ lcs G 3 = ⊥) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s})⁆ ⊔ lcs G 2 ∧
+      (∀ q ∈ D, S.lfLead1 h2 q.1 q.2 = w q) ∧
+      x = (S.lfLead1 h2, S.lfLead2 h2))
+    (b : ℕ) (hΛb : ∀ x ∈ Λ, cbtBrL p s (fun v => a ⟨lfI0 h2, v⟩) b0 (fun v => a ⟨lfI1 h2, v⟩) b1
+      (fun v => a ⟨lfI2 h2, v⟩) b2 x.2 = b) :
+    Λ.ncard ≤ p ^ (s * (b * (r (lfI1 h2) + (∑ v, a ⟨lfI2 h2, v⟩) + 1 - b))) *
+        p ^ (((r (lfI0 h2)).choose 2 - D.card) * (∑ v, a ⟨lfI1 h2, v⟩) -
+          (r (lfI0 h2) - s).choose 2 * b) := by
+  classical
+  have hp0 := hp.pos
+  have : Finite (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) := (lf_card_quot_le hp0 _ b0).1
+  have : Finite (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) := (lf_card_quot_le hp0 _ b1).1
+  have : Finite (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2) := (lf_card_quot_le hp0 _ b2).1
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  rcases Λ.eq_empty_or_nonempty with hE | ⟨x0, hx0⟩
+  · rw [hE, Set.ncard_empty]
+    exact Nat.zero_le _
+  obtain ⟨G0, _, _, g0, S0, hb0, hb1, hb2, hl, -, -, -⟩ := hΛ x0 hx0
+  obtain ⟨I0⟩ := S0.lf_ident_nonempty hp0 h2 hl b0 b1 b2 hb0 hb1 hb2
+  have hL2 := lf_card_mulQ I0.φ2 I0.card2
+  have hL3 := lf_card_mulQ I0.φ3 I0.card3
+  refine le_trans (cbt_lead_inj hp0 h2 b0 b1 b2 (s := s) D w Λ hΛ _ ?_)
+    (br_eq53_breadth hp hs hL2 hL3 (cbtGen p (fun v => a ⟨lfI1 h2, v⟩) b1)
+      (cbtGen_closure p _ b1) (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0) (cbtGen_closure p _ b0)
+      D hD (fun q => cbtVec p (fun v => a ⟨lfI1 h2, v⟩) b1 (w q)) (b := b))
+  intro G _ g S I hcore hDw hx
+  obtain ⟨hA, hgen, hJ, -, hDv⟩ := I.cbt_mem hcore D w hDw
+  refine ⟨hA, hgen, hJ, ?_, hDv⟩
+  rw [← hΛb _ hx]
+  exact (cbtBrV_eq p s (cbtGen_closure p _ b0) (cbtGen_closure p _ b1)
+    (fun j k => cbtVec p (fun v => a ⟨lfI2 h2, v⟩) b2 (S.lfLead2 h2 j k))
+    (brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3)) I.cbt_val2).symm
+
+/-- Term B at a fixed breadth `b` (Remark 4.4 second alternative, (54), at fixed `b_2`): the
+leading coefficient pairs of `cbt_ncard_lead_le` whose breadth `cbtBrL` is `b` number at most the
+`b`-th summand of the term-B bound. -/
+theorem cbt_lead_B_breadth (hp : p.Prime) (h2 : 2 < c)
+    (b0 : Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → ℕ)
+    (b1 : Fin (r (lfI1 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (b2 : Fin (r (lfI2 h2)) → Fin (r (lfI2 h2)) → ℕ) (hb1 : ∀ j v, p ∣ b1 j v)
+    {s : ℕ} (hs : s ≤ r (lfI0 h2))
+    (D : Finset (Fin (r (lfI0 h2)) × Fin (r (lfI0 h2))))
+    (hD : ∀ q ∈ D, q.1 < q.2 ∧ (q.1 : ℕ) < s)
+    (w : Fin (r (lfI0 h2)) × Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ)
+    (Z' : Set (Fin (r (lfI1 h2)) → Matrix (Fin (r (lfI0 h2))) (Fin (r (lfI0 h2))) (ZMod p)))
+    (Λ : Set ((Fin (r (lfI0 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI1 h2)) → ℕ) ×
+      (Fin (r (lfI1 h2)) → Fin (r (lfI0 h2)) → Fin (r (lfI2 h2)) → ℕ)))
+    (hΛ : ∀ x ∈ Λ, ∃ (G : Type u) (_ : Group G) (_ : Finite G) (g : SimsIdx c r → G)
+      (S : SimsGenSet p a g),
+      (∀ j v, (S.powerWords ⟨lfI0 h2, j⟩ ⟨lfI0 h2, v⟩).val = b0 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI1 h2, j⟩ ⟨lfI1 h2, v⟩).val = b1 j v) ∧
+      (∀ j v, (S.powerWords ⟨lfI2 h2, j⟩ ⟨lfI2 h2, v⟩).val = b2 j v) ∧
+      (3 < c ∨ lcs G 3 = ⊥) ∧
+      lcs G 1 ≤ ⁅Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s}),
+        Subgroup.closure ((fun j => g ⟨lfI0 h2, j⟩) '' {j | (j : ℕ) < s})⁆ ⊔ lcs G 2 ∧
+      (∀ q ∈ D, S.lfLead1 h2 q.1 q.2 = w q) ∧
+      x = (S.lfLead1 h2, S.lfLead2 h2))
+    (hΛZ : ∀ x ∈ Λ, cbtTup p x.1 ∈ Z')
+    (b : ℕ) (hΛb : ∀ x ∈ Λ, cbtBrL p s (fun v => a ⟨lfI0 h2, v⟩) b0 (fun v => a ⟨lfI1 h2, v⟩) b1
+      (fun v => a ⟨lfI2 h2, v⟩) b2 x.2 = b) :
+    Λ.ncard ≤ p ^ (s * (b * (r (lfI1 h2) + (∑ v, a ⟨lfI2 h2, v⟩) + 1 - b))) *
+        (Z'.ncard * p ^ (((∑ v, a ⟨lfI1 h2, v⟩) - r (lfI1 h2)) *
+          ((r (lfI0 h2)).choose 2 - D.card))) := by
+  classical
+  have hp0 := hp.pos
+  haveI : NeZero p := ⟨hp.ne_zero⟩
+  have : Finite (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0) := (lf_card_quot_le hp0 _ b0).1
+  have : Finite (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1) := (lf_card_quot_le hp0 _ b1).1
+  have : Finite (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2) := (lf_card_quot_le hp0 _ b2).1
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI0 h2, v⟩) b0)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI1 h2, v⟩) b1)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  have : Finite (Multiplicative (LfQ p (fun v => a ⟨lfI2 h2, v⟩) b2)) :=
+    Finite.of_equiv _ Multiplicative.ofAdd
+  rcases Λ.eq_empty_or_nonempty with hE | ⟨x0, hx0⟩
+  · rw [hE, Set.ncard_empty]
+    exact Nat.zero_le _
+  obtain ⟨G0, _, _, g0, S0, hb0, hb1', hb2, hl, -, -, -⟩ := hΛ x0 hx0
+  obtain ⟨I0⟩ := S0.lf_ident_nonempty hp0 h2 hl b0 b1 b2 hb0 hb1' hb2
+  have hL2 := lf_card_mulQ I0.φ2 I0.card2
+  have hL3 := lf_card_mulQ I0.φ3 I0.card3
+  have hspan := cbt_span_le_ker p (fun v => a ⟨lfI1 h2, v⟩) b1 (fun v => S0.pos _) hb1
+  let π := AddMonoidHom.toMultiplicative (cbtRedAdd p (fun v => a ⟨lfI1 h2, v⟩) b1 hspan)
+  have hk : Nat.card π.ker ≤ p ^ ((∑ v, a ⟨lfI1 h2, v⟩) - r (lfI1 h2)) :=
+    cbt_card_ker_le hp _ b1 hspan hL2
+  obtain ⟨Z, hZ⟩ : ∃ Z : Set (↥(cbtP (r (lfI0 h2))) → Multiplicative (Fin (r (lfI1 h2)) → ZMod p)),
+      Z = {z | cbtTupZ (cbtZ z) ∈ Z'} := ⟨_, rfl⟩
+  have hZcard : Z.ncard ≤ Z'.ncard := by
+    refine Set.ncard_le_ncard_of_injOn (fun z => cbtTupZ (cbtZ z)) ?_ ?_ (Set.toFinite _)
+    · intro z hz
+      rw [hZ] at hz
+      exact hz
+    · intro z _ z' _ he
+      exact cbtTupZ_inj he
+  have hmain := cbt_eq53B_breadth hp hs hL3 (cbtGen p (fun v => a ⟨lfI1 h2, v⟩) b1)
+    (cbtGen_closure p _ b1) (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0) (cbtGen_closure p _ b0)
+    D (fun q hq => (hD q hq).1) (fun q => cbtVec p (fun v => a ⟨lfI1 h2, v⟩) b1 (w q)) π hk Z
+    {β | brAlt β.1 ∧ brJacobi β.1 β.2 ∧
+      Subgroup.closure {z | ∃ u ∈ Subgroup.closure
+          (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 '' {j | (j : ℕ) < s}),
+        ∃ u' ∈ Subgroup.closure (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 '' {j | (j : ℕ) < s}),
+          β.1 u u' = z} = ⊤ ∧
+      brBreadth p β.2
+        (Subgroup.closure (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 '' {j | (j : ℕ) < s})) = b ∧
+      (∀ q ∈ D, β.1 (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 q.1)
+        (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 q.2) =
+          cbtVec p (fun v => a ⟨lfI1 h2, v⟩) b1 (w q)) ∧
+      cbtRed π (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0) β.1 ∈ Z} (fun β hβ => hβ)
+  refine le_trans (cbt_lead_inj hp0 h2 b0 b1 b2 (s := s) D w Λ hΛ _ ?_)
+    (hmain.trans (Nat.mul_le_mul_left _ (Nat.mul_le_mul_right _ hZcard)))
+  intro G _ g S I hcore hDw hx
+  obtain ⟨hA, hgen, hJ, -, hDv⟩ := I.cbt_mem hcore D w hDw
+  refine ⟨hA, hJ, hgen, ?_, hDv, ?_⟩
+  · rw [← hΛb _ hx]
+    exact (cbtBrV_eq p s (cbtGen_closure p _ b0) (cbtGen_closure p _ b1)
+      (fun j k => cbtVec p (fun v => a ⟨lfI2 h2, v⟩) b2 (S.lfLead2 h2 j k))
+      (brT2 (lfMulE I.φ1) (lfMulE I.φ2) (lfMulE I.φ3)) I.cbt_val2).symm
+  · rw [hZ]
+    show cbtTupZ (cbtZ (cbtRed π (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0)
+      (brT1 (lfMulE I.φ1) (lfMulE I.φ2)))) ∈ Z'
+    have he : cbtTupZ (cbtZ (cbtRed π (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0)
+        (brT1 (lfMulE I.φ1) (lfMulE I.φ2)))) = cbtTup p (S.lfLead1 h2) := by
+      refine cbtTupZ_congr fun j k hjk v => ?_
+      show (if h : j < k then Multiplicative.toAdd (π (brT1 (lfMulE I.φ1) (lfMulE I.φ2)
+        (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 j) (cbtGen p (fun v => a ⟨lfI0 h2, v⟩) b0 k))) v
+          else 0) = ((S.lfLead1 h2 j k v : ℕ) : ZMod p)
+      rw [dif_pos hjk, I.cbt_val1 j k]
+      show (((S.lfLead1 h2 j k v : ℕ) : ℤ) : ZMod p) = _
+      exact Int.cast_natCast _
+    rw [he]
+    exact hΛZ _ hx
+
+end CbtLeadBreadth
+
 section CbtCount
 
 /-- Term B of the class-3 count: the commutator coefficient factor at class 3 for a prime `p`,
@@ -885,6 +1310,282 @@ theorem cbt_realizedCB_ncard_le_two {m : ℕ} (T : Set FiniteGrp.{0})
           ∑ v, fibAk D ⟨lfI2 h2, v⟩) := by
   rw [Alt2.N2_eq_ncard]
   exact cbt_realizedCB_ncard_le Nat.prime_two T D h2 h3 B s0 hT
+
+/-- Terms A and B at a common breadth (the fixed-breadth form of (54)/(55) needed by CNT3 (b)):
+the commutator coefficient factor at class 3 is at most the sum over the admissible breadths `b`
+of the minimum of the `b`-th term-A summand
+`p ^ (s b (r_2 + s_3 + 1 - b)) · p ^ ((C(r_1,2) - r_2) s_2 - C(r_1 - s, 2) b)` and the `b`-th
+term-B summand `p ^ (s b (r_2 + s_3 + 1 - b)) · #tuples · p ^ ((s_2 - r_2)(C(r_1,2) - r_2))`,
+times the deeper count `p ^ ((C(r_1, 2) - r_2) s_3)`. The leading pairs are split by their breadth
+`cbtBrL` (`cbt_lead_adm`), and each part is counted by both `cbt_lead_A_breadth` and
+`cbt_lead_B_breadth`. -/
+theorem cbt_realizedCB_ncard_le_min {p m : ℕ} [Fact p.Prime] (hp : p.Prime)
+    (T : Set FiniteGrp.{0}) (D : RecData m) (h2 : 2 < D.1.val) (h3 : D.1.val = 3)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) (s0 : ℕ)
+    (hT : ∀ G ∈ T, IsPGroup p G ∧ simsRank G = s0) :
+    (realizedCB hp T D B).ncard ≤
+      (∑ β ∈ (Finset.range (min (∑ v, fibAk D ⟨lfI1 h2, v⟩)
+          (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1)).filter
+          (fun β => (∑ v, fibAk D ⟨lfI2 h2, v⟩) ≤ D.2.1.val * β),
+        min (p ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+            p ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+              (∑ v, fibAk D ⟨lfI1 h2, v⟩) - (fibRk D (lfI0 h2) - D.2.1.val).choose 2 * β))
+          (p ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+            ({t : Fin (fibRk D (lfI1 h2)) →
+                Matrix (Fin (fibRk D (lfI0 h2))) (Fin (fibRk D (lfI0 h2))) (ZMod p) |
+                (∀ k, Alt2.IsAltMat (t k)) ∧ Alt2.GensOn t ⊤ ∧ Alt2.simsRk t = s0}.ncard *
+              p ^ (((∑ v, fibAk D ⟨lfI1 h2, v⟩) - fibRk D (lfI1 h2)) *
+                ((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)))))) *
+        p ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+          ∑ v, fibAk D ⟨lfI2 h2, v⟩) := by
+  rcases (realizedCB hp T D B).eq_empty_or_nonempty with hE | ⟨C0, hC0⟩
+  · rw [hE, Set.ncard_empty]
+    exact Nat.zero_le _
+  obtain ⟨G0, hG0T, u0, d0, X0, r0, hS0, hnm0, hs0, hsum0, e0⟩ := hC0
+  obtain ⟨c1, c2, c3, -, -, -, c7, c8⟩ := hS0.lf_code hp hnm0 hs0 hsum0 e0
+  have hn0 : d0.n = fOff r0 D.1.val := by rw [← c1]; exact hS0.nL_spec.symm
+  have hr00 : r0 0 = fibR D 0 := c3 0 (by rw [c1]; omega)
+  have hr01 : r0 1 = fibR D 1 := c3 1 (by rw [c1]; omega)
+  have hsr0 := (hS0.lf_core hn0 (by omega) hS0.lf_hcore).1
+  have hsr : D.2.1.val ≤ fibRk D (lfI0 h2) := by
+    show D.2.1.val ≤ fibR D 0
+    rw [← c2, ← hr00]
+    exact hsr0
+  have hgood : ∀ C ∈ realizedCB hp T D B, LfGood p hp.pos D h2 B (brCo d0 r0) C := by
+    rintro C ⟨G, -, u, d, X, r, hS, hnm, hs2, hsum, e⟩
+    obtain ⟨g1, g2, g3, -, -, -, g7, -⟩ := hS.lf_code hp hnm hs2 hsum e
+    refine hS.lf_good hp hnm hs2 hsum e h2 h3 _
+      (lf_brCo_common hS hS0 hs2 (g2.trans c2.symm) ?_ ?_)
+    · rw [g3 1 (by rw [g1]; omega), hr01]
+    · intro k hk
+      rw [g7 k hk, c7 k (by rw [c2, ← g2]; exact hk)]
+  have htup : ∀ C ∈ realizedCB hp T D B, cbtTup p (lfPhi1 D h2 C).1 ∈
+      {t : Fin (fibRk D (lfI1 h2)) →
+        Matrix (Fin (fibRk D (lfI0 h2))) (Fin (fibRk D (lfI0 h2))) (ZMod p) |
+        (∀ k, Alt2.IsAltMat (t k)) ∧ Alt2.GensOn t ⊤ ∧ Alt2.simsRk t = s0} := by
+    rintro C ⟨G, hGT, u, d, X, r, hS, hnm, hs2, hsum, e⟩
+    obtain ⟨hpG, hsG⟩ := hT G hGT
+    obtain ⟨⟨t1, t2, t3⟩, -⟩ := hS.cbt_tuple hp hnm hs2 hsum e h2 hpG
+    exact ⟨t1, t2, t3.trans hsG⟩
+  have hb1div : ∀ j v, p ∣ lfBB D B (lfI1 h2) j v :=
+    (hS0.cbt_tuple hp hnm0 hs0 hsum0 e0 h2 (hT G0 hG0T).1).2
+  have hjr : ∀ j : Fin (fibRk D (lfI1 h2)), j.val < r0 1 := fun j => by
+    have : j.val < fibR D 1 := j.isLt
+    omega
+  have hDp : ∀ q ∈ lfDp D h2 (lfFa D) (brCo d0 r0), q.1 < q.2 ∧ (q.1 : ℕ) < D.2.1.val := by
+    intro q hq
+    obtain ⟨j, hj1, hj2⟩ := (Finset.mem_filter.mp hq).2
+    rw [← c8 _ (hjr j)] at hj1
+    refine ⟨?_, ?_⟩
+    · show q.1.val < q.2.val
+      rw [hj1, hj2]
+      exact hS0.lf_brPa_lt_brCo hs0 (hjr j)
+    · rw [hj1, ← c2]
+      have := hS0.brPa_lt hs0 j.val (hjr j)
+      omega
+  have hb1 : ∀ j : Fin (fibRk D (lfI1 h2)), lfFa D j.val < fibRk D (lfI0 h2) := by
+    intro j
+    show lfFa D j.val < fibR D 0
+    rw [← c8 _ (hjr j), ← hr00]
+    have := hS0.brPa_lt hs0 j.val (hjr j)
+    omega
+  have hb2 : ∀ j : Fin (fibRk D (lfI1 h2)), brCo d0 r0 j.val < fibRk D (lfI0 h2) := by
+    intro j
+    show brCo d0 r0 j.val < fibR D 0
+    rw [← hr00]
+    have := hS0.brCo_bounds hs0 j.val (hjr j)
+    omega
+  obtain ⟨F, hF⟩ : ∃ F : Fin (fibRk D (lfI1 h2)) →
+      Fin (fibRk D (lfI0 h2)) × Fin (fibRk D (lfI0 h2)),
+      ∀ j, (F j).1.val = lfFa D j.val ∧ (F j).2.val = brCo d0 r0 j.val :=
+    ⟨fun j => (⟨_, hb1 j⟩, ⟨_, hb2 j⟩), fun j => ⟨rfl, rfl⟩⟩
+  have hFinj : Function.Injective F := by
+    intro j j' hjj
+    have e1 : lfFa D j.val = lfFa D j'.val := by rw [← (hF j).1, ← (hF j').1, hjj]
+    have e2 : brCo d0 r0 j.val = brCo d0 r0 j'.val := by rw [← (hF j).2, ← (hF j').2, hjj]
+    rw [← c8 _ (hjr j), ← c8 _ (hjr j')] at e1
+    exact Fin.ext (hS0.lf_pair_inj hs0 (hjr j) (hjr j') e1 e2)
+  have himg : lfDp D h2 (lfFa D) (brCo d0 r0) = Finset.univ.image F := by
+    ext q
+    simp only [lfDp, Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_image]
+    constructor
+    · rintro ⟨j, h1, h2'⟩
+      exact ⟨j, Prod.ext (Fin.ext ((hF j).1.trans h1.symm)) (Fin.ext ((hF j).2.trans h2'.symm))⟩
+    · rintro ⟨j, rfl⟩
+      exact ⟨j, (hF j).1, (hF j).2⟩
+  have hDcard : (lfDp D h2 (lfFa D) (brCo d0 r0)).card = fibRk D (lfI1 h2) := by
+    rw [himg, Finset.card_image_of_injective _ hFinj, Finset.card_univ, Fintype.card_fin]
+  obtain ⟨ΛB, hΛB⟩ : ∃ Λ : Set (LfLeadT D h2), Λ =
+      {x | x ∈ lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2))
+        (lfDp D h2 (lfFa D) (brCo d0 r0)) (lfW D h2 (lfFa D) (brCo d0 r0)) ∧
+        cbtTup p x.1 ∈ {t : Fin (fibRk D (lfI1 h2)) →
+          Matrix (Fin (fibRk D (lfI0 h2))) (Fin (fibRk D (lfI0 h2))) (ZMod p) |
+          (∀ k, Alt2.IsAltMat (t k)) ∧ Alt2.GensOn t ⊤ ∧ Alt2.simsRk t = s0}} := ⟨_, rfl⟩
+  have hΛsub : ∀ x ∈ ΛB, x ∈ lfLam p D h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2))
+      (lfBB D B (lfI2 h2)) (lfDp D h2 (lfFa D) (brCo d0 r0)) (lfW D h2 (lfFa D) (brCo d0 r0)) ∧
+      cbtTup p x.1 ∈ {t : Fin (fibRk D (lfI1 h2)) →
+        Matrix (Fin (fibRk D (lfI0 h2))) (Fin (fibRk D (lfI0 h2))) (ZMod p) |
+        (∀ k, Alt2.IsAltMat (t k)) ∧ Alt2.GensOn t ⊤ ∧ Alt2.simsRk t = s0} := by
+    intro x hx
+    rw [hΛB] at hx
+    exact hx
+  have hΛfin : ΛB.Finite := by
+    refine (Set.finite_range (fun y : (Fin (fibRk D (lfI0 h2)) → Fin (fibRk D (lfI0 h2)) →
+        (v : Fin (fibRk D (lfI1 h2))) → Fin (p ^ fibAk D ⟨lfI1 h2, v⟩)) ×
+        (Fin (fibRk D (lfI1 h2)) → Fin (fibRk D (lfI0 h2)) →
+          (v : Fin (fibRk D (lfI2 h2))) → Fin (p ^ fibAk D ⟨lfI2 h2, v⟩)) =>
+        ((fun j k v => (y.1 j k v).val, fun j k v => (y.2 j k v).val) : LfLeadT D h2))).subset ?_
+    intro x hx
+    obtain ⟨⟨-, hx1, hx2⟩, -⟩ := hΛsub x hx
+    exact ⟨(fun j k v => ⟨x.1 j k v, hx1 j k v⟩, fun j k v => ⟨x.2 j k v, hx2 j k v⟩), rfl⟩
+  -- the leading pairs split by their breadth; each part is counted by both terms
+  obtain ⟨Λb, hΛb⟩ : ∃ Λb : ℕ → Set (LfLeadT D h2), ∀ b, Λb b = {x | x ∈ ΛB ∧
+      cbtBrL p D.2.1.val (fun v => fibAk D ⟨lfI0 h2, v⟩) (lfBB D B (lfI0 h2))
+        (fun v => fibAk D ⟨lfI1 h2, v⟩) (lfBB D B (lfI1 h2))
+        (fun v => fibAk D ⟨lfI2 h2, v⟩) (lfBB D B (lfI2 h2)) x.2 = b} :=
+    ⟨fun b => {x | x ∈ ΛB ∧
+      cbtBrL p D.2.1.val (fun v => fibAk D ⟨lfI0 h2, v⟩) (lfBB D B (lfI0 h2))
+        (fun v => fibAk D ⟨lfI1 h2, v⟩) (lfBB D B (lfI1 h2))
+        (fun v => fibAk D ⟨lfI2 h2, v⟩) (lfBB D B (lfI2 h2)) x.2 = b}, fun b => rfl⟩
+  have hmemb : ∀ b x, x ∈ Λb b → x ∈ ΛB ∧
+      cbtBrL p D.2.1.val (fun v => fibAk D ⟨lfI0 h2, v⟩) (lfBB D B (lfI0 h2))
+        (fun v => fibAk D ⟨lfI1 h2, v⟩) (lfBB D B (lfI1 h2))
+        (fun v => fibAk D ⟨lfI2 h2, v⟩) (lfBB D B (lfI2 h2)) x.2 = b := by
+    intro b x hx
+    rw [hΛb b] at hx
+    exact hx
+  have hsub : ΛB ⊆ ⋃ b ∈ (Finset.range (min (∑ v, fibAk D ⟨lfI1 h2, v⟩)
+      (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1)).filter
+      (fun β => (∑ v, fibAk D ⟨lfI2 h2, v⟩) ≤ D.2.1.val * β), Λb b := by
+    intro x hx
+    refine Set.mem_iUnion₂.2 ⟨_, cbt_lead_adm (p := p) (c := D.1.val) (r := fibRk D)
+      (a := fibAk D) hp h2 (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2)) hsr
+      (lfDp D h2 (lfFa D) (brCo d0 r0)) (lfW D h2 (lfFa D) (brCo d0 r0)) x
+      (hΛsub x hx).1.1, ?_⟩
+    rw [hΛb]
+    exact ⟨hx, rfl⟩
+  have hunfin : (⋃ b ∈ (Finset.range (min (∑ v, fibAk D ⟨lfI1 h2, v⟩)
+      (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1)).filter
+      (fun β => (∑ v, fibAk D ⟨lfI2 h2, v⟩) ≤ D.2.1.val * β), Λb b).Finite :=
+    hΛfin.subset (Set.iUnion₂_subset fun b _ x hx => (hmemb b x hx).1)
+  have hLead : ΛB.ncard ≤ ∑ β ∈ (Finset.range (min (∑ v, fibAk D ⟨lfI1 h2, v⟩)
+          (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1)).filter
+          (fun β => (∑ v, fibAk D ⟨lfI2 h2, v⟩) ≤ D.2.1.val * β),
+        min (p ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+            p ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+              (∑ v, fibAk D ⟨lfI1 h2, v⟩) - (fibRk D (lfI0 h2) - D.2.1.val).choose 2 * β))
+          (p ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+            ({t : Fin (fibRk D (lfI1 h2)) →
+                Matrix (Fin (fibRk D (lfI0 h2))) (Fin (fibRk D (lfI0 h2))) (ZMod p) |
+                (∀ k, Alt2.IsAltMat (t k)) ∧ Alt2.GensOn t ⊤ ∧ Alt2.simsRk t = s0}.ncard *
+              p ^ (((∑ v, fibAk D ⟨lfI1 h2, v⟩) - fibRk D (lfI1 h2)) *
+                ((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2))))) := by
+    refine (Set.ncard_le_ncard hsub hunfin).trans ((br_ncard_biUnion_le _ Λb).trans ?_)
+    refine Finset.sum_le_sum fun b _ => le_min ?_ ?_
+    · have h := cbt_lead_A_breadth (p := p) (c := D.1.val) (r := fibRk D) (a := fibAk D) hp h2
+        (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2)) hsr
+        (lfDp D h2 (lfFa D) (brCo d0 r0)) hDp (lfW D h2 (lfFa D) (brCo d0 r0)) (Λb b)
+        (fun x hx => ((hΛsub x (hmemb b x hx).1).1).1) b (fun x hx => (hmemb b x hx).2)
+      rw [hDcard] at h
+      exact h
+    · have h := cbt_lead_B_breadth (p := p) (c := D.1.val) (r := fibRk D) (a := fibAk D) hp h2
+        (lfBB D B (lfI0 h2)) (lfBB D B (lfI1 h2)) (lfBB D B (lfI2 h2)) hb1div hsr
+        (lfDp D h2 (lfFa D) (brCo d0 r0)) hDp (lfW D h2 (lfFa D) (brCo d0 r0))
+        {t : Fin (fibRk D (lfI1 h2)) →
+          Matrix (Fin (fibRk D (lfI0 h2))) (Fin (fibRk D (lfI0 h2))) (ZMod p) |
+          (∀ k, Alt2.IsAltMat (t k)) ∧ Alt2.GensOn t ⊤ ∧ Alt2.simsRk t = s0} (Λb b)
+        (fun x hx => ((hΛsub x (hmemb b x hx).1).1).1)
+        (fun x hx => (hΛsub x (hmemb b x hx).1).2) b (fun x hx => (hmemb b x hx).2)
+      rw [hDcard] at h
+      exact h
+  -- the deeper count
+  have hDeep := br_deeper_count_fin (Γ := LfDeepG p D h2)
+    (lf_card_box (p := p) (fun v : Fin (fibRk D (lfI2 h2)) => fibAk D ⟨lfI2 h2, v⟩))
+    (lfDp D h2 (lfFa D) (brCo d0 r0)) (fun q hq => (hDp q hq).1)
+    (fun _ _ => ⟨0, pow_pos hp.pos _⟩)
+  rw [hDcard] at hDeep
+  have hinj : Set.InjOn (fun C => (lfPhi1 D h2 C, lfPhi3 hp.pos D h2 C))
+      (realizedCB hp T D B) := by
+    intro C hC C' hC' he
+    exact lf_phi_inj hp.pos h2 (hgood C hC) (hgood C' hC') (congrArg Prod.fst he)
+      (congrArg Prod.snd he)
+  have hmaps : ∀ C ∈ realizedCB hp T D B, (fun C => (lfPhi1 D h2 C, lfPhi3 hp.pos D h2 C)) C ∈
+      (lfTrunc D h2 (brCo d0 r0) '' ΛB) ×ˢ
+        lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0)) := by
+    intro C hC
+    obtain ⟨x, hx, hxe⟩ := (hgood C hC).lead
+    have hxB : x ∈ ΛB := by
+      rw [hΛB]
+      refine ⟨hx, ?_⟩
+      have h := htup C hC
+      rw [hxe, cbt_tup_trunc] at h
+      exact h
+    show (lfPhi1 D h2 C, lfPhi3 hp.pos D h2 C) ∈ _
+    exact Set.mk_mem_prod ⟨x, hxB, hxe.symm⟩ (hgood C hC).deep
+  calc (realizedCB hp T D B).ncard
+      ≤ ((lfTrunc D h2 (brCo d0 r0) '' ΛB) ×ˢ
+          lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0))).ncard :=
+        Set.ncard_le_ncard_of_injOn _ hmaps hinj
+          ((hΛfin.image (lfTrunc D h2 (brCo d0 r0))).prod (Set.toFinite _))
+    _ = (lfTrunc D h2 (brCo d0 r0) '' ΛB).ncard *
+          (lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0))).ncard := Set.ncard_prod
+    _ ≤ ΛB.ncard * (lfDset p hp.pos D h2 (lfDp D h2 (lfFa D) (brCo d0 r0))).ncard :=
+        Nat.mul_le_mul_right _ (Set.ncard_image_le hΛfin)
+    _ ≤ _ := Nat.mul_le_mul hLead hDeep
+
+/-- `cbt_realizedCB_ncard_le_min` at `p = 2` with the count `N_2(r_1, r_2, s0)`: the input `M(D)`
+for `lf_ncard_classes_le_fiberB_pw` matching `min (cnt3A b) (cnt3B b)` summed over the admissible
+breadths `b` (the `b`-th term-A exponent times the deeper factor is
+`(C(r_1,2) - r_2) s_2 - C(r_1 - s, 2) b + s b (r_2 + s_3 + 1 - b) + (C(r_1,2) - r_2) s_3`, the
+`b`-th term-B exponent as in `cbt_realizedCB_ncard_le_two`). -/
+theorem cbt_realizedCB_ncard_le_min_two {m : ℕ} (T : Set FiniteGrp.{0})
+    (D : RecData m) (h2 : 2 < D.1.val) (h3 : D.1.val = 3)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)) (s0 : ℕ)
+    (hT : ∀ G ∈ T, IsPGroup 2 G ∧ simsRank G = s0) :
+    (realizedCB Nat.prime_two T D B).ncard ≤
+      (∑ β ∈ (Finset.range (min (∑ v, fibAk D ⟨lfI1 h2, v⟩)
+          (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1)).filter
+          (fun β => (∑ v, fibAk D ⟨lfI2 h2, v⟩) ≤ D.2.1.val * β),
+        min (2 ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+            2 ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+              (∑ v, fibAk D ⟨lfI1 h2, v⟩) - (fibRk D (lfI0 h2) - D.2.1.val).choose 2 * β))
+          (2 ^ (D.2.1.val * (β * (fibRk D (lfI1 h2) + (∑ v, fibAk D ⟨lfI2 h2, v⟩) + 1 - β))) *
+            (Alt2.N2 (fibRk D (lfI0 h2)) (fibRk D (lfI1 h2)) s0 *
+              2 ^ (((∑ v, fibAk D ⟨lfI1 h2, v⟩) - fibRk D (lfI1 h2)) *
+                ((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)))))) *
+        2 ^ (((fibRk D (lfI0 h2)).choose 2 - fibRk D (lfI1 h2)) *
+          ∑ v, fibAk D ⟨lfI2 h2, v⟩) := by
+  rw [Alt2.N2_eq_ncard]
+  exact cbt_realizedCB_ncard_le_min Nat.prime_two T D h2 h3 B s0 hT
+
+/-- Parameter facts for the natural-number exponents of the B-term (bookkeeping for the cast to
+`cnt3B`): if some code with recorded data `D` (3 layers) is realised by a `p`-group, then
+`r_2 ≤ s_2`, `r_2 ≤ C(r_1, 2)` and `s ≤ r_1` (so `s_2 - r_2`, `C(r_1, 2) - r_2` are true
+differences; `b ≤ s_3` holds on the admissible breadths). -/
+theorem cbt_realizedCB_params {p m : ℕ} [Fact p.Prime] (hp : p.Prime) (T : Set FiniteGrp.{0})
+    (D : RecData m) (h2 : 2 < D.1.val)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (p ^ m)) (hT : ∀ G ∈ T, IsPGroup p G)
+    (hne : (realizedCB hp T D B).Nonempty) :
+    fibRk D (lfI1 h2) ≤ ∑ v, fibAk D ⟨lfI1 h2, v⟩ ∧
+      fibRk D (lfI1 h2) ≤ (fibRk D (lfI0 h2)).choose 2 ∧ D.2.1.val ≤ fibRk D (lfI0 h2) := by
+  obtain ⟨C0, G0, hG0T, u0, d0, X0, r0, hS0, hnm0, hs0, hsum0, e0⟩ := hne
+  obtain ⟨c1, c2, c3, c4, -, -, -, -⟩ := hS0.lf_code hp hnm0 hs0 hsum0 e0
+  have hn0 : d0.n = fOff r0 D.1.val := by rw [← c1]; exact hS0.nL_spec.symm
+  have hr00 : r0 0 = fibR D 0 := c3 0 (by rw [c1]; omega)
+  have hsr0 := (hS0.lf_core hn0 (by omega) hS0.lf_hcore).1
+  obtain ⟨⟨hA, hg, -⟩, -⟩ := hS0.cbt_tuple hp hnm0 hs0 hsum0 e0 h2 (hT G0 hG0T)
+  have hfo : ∀ w ≤ D.1.val, fOff r0 w = fOff (fibR D) w :=
+    fOff_congr (fun w hw => c3 w (by rw [c1]; exact hw))
+  obtain ⟨g', S, -⟩ := hS0.lf_reindex hp hn0 h2 (fibRk D)
+    (fun i => c3 i.val (by rw [c1]; exact i.isLt)) (fibAk D) (fun k => by
+      show fibA D (fOff (fibR D) k.1.val + k.2.val) = _
+      rw [c4, hfo _ k.1.isLt.le])
+  refine ⟨?_, Alt2.card_le_choose _ hA ((Alt2.gensOn_top_iff _).1 hg), ?_⟩
+  · calc fibRk D (lfI1 h2) = ∑ _v : Fin (fibRk D (lfI1 h2)), 1 := by simp
+      _ ≤ ∑ v, fibAk D ⟨lfI1 h2, v⟩ := Finset.sum_le_sum fun v _ => S.pos _
+  · show D.2.1.val ≤ fibR D 0
+    rw [← c2, ← hr00]
+    exact hsr0
 
 end CbtCount
 
