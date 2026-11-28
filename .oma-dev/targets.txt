@@ -1,1 +1,1 @@
-H2Dev.CommForm
+H2Dev.CoreFlag
