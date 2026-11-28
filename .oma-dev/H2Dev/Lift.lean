@@ -2198,7 +2198,4 @@ theorem lf_sum_le_max {s s2 s3 : ℕ} (f : ℕ → ℕ) (M : ℕ)
 
 end LfCBCount
 
-#print axioms lf_realizedCB_ncard_le
-#print axioms SimsGen.lf_good
-
 end OMA.SimsLite
