@@ -1375,7 +1375,7 @@ def flatB {n q : ℕ} (B : Fin n → Fin n → Fin q) (i j : ℕ) : ℕ :=
 lemma flatB_fin {n q : ℕ} (B : Fin n → Fin n → Fin q) (i j : Fin n) :
     flatB B i.val j.val = (B i j).val := by
   unfold flatB
-  rw [dif_pos ⟨i.isLt, j.isLt⟩]
+  rw [dif_pos ⟨i.isLt, j.isLt⟩] <;> rfl
 
 /-- The layer ranks of recorded data, on `ℕ`. -/
 def fibR {m : ℕ} (D : RecData m) (i : ℕ) : ℕ :=
@@ -1397,14 +1397,15 @@ lemma fibTot {m : ℕ} (D : RecData m) : D.2.2.1.tot = fOff (fibR D) D.1.val := 
   rw [← sum_fin_eq_fOff]
   refine Finset.sum_congr rfl fun i _ => ?_
   unfold fibR
-  rw [dif_pos i.isLt]
+  rw [dif_pos i.isLt] <;> rfl
 
 lemma fibPos_lt {m : ℕ} (D : RecData m) (k : SimsIdx D.1.val (fibRk D)) :
     fOff (fibR D) k.1.val + k.2.val < D.2.2.1.tot :=
   brPos_lt (fibR D) (fibTot D) k.1 k.2
 
 lemma fibAk_pos {m : ℕ} (D : RecData m) (k : SimsIdx D.1.val (fibRk D)) : 1 ≤ fibAk D k := by
-  unfold fibAk fibA
+  show 1 ≤ fibA D (fOff (fibR D) k.1.val + k.2.val)
+  unfold fibA
   rw [dif_pos (fibPos_lt D k)]
   exact D.2.2.2.2.2.2.1 _
 
@@ -1442,7 +1443,9 @@ theorem ncard_classes_le_fiber {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0})
   · rintro s₁ - s₂ - D x ⟨G₁, hG₁, rfl, h₁⟩ ⟨G₂, hG₂, rfl, h₂⟩
     obtain ⟨e⟩ := simsCode_rigid hp h₁ h₂
     exact Quotient.sound ⟨CategoryTheory.InducedCategory.isoMk (MulEquiv.toGrpIso e)⟩
-  · rw [Finset.card_product, Set.ncard_eq_toFinset_card (realizedB hp T D) (Set.toFinite _),
+  · show ((Set.toFinite (realizedB hp T D)).toFinset ×ˢ
+      (Set.toFinite (realizedC hp T D)).toFinset).card = _
+    rw [Finset.card_product, Set.ncard_eq_toFinset_card (realizedB hp T D) (Set.toFinite _),
       Set.ncard_eq_toFinset_card (realizedC hp T D) (Set.toFinite _)]
 
 /-- The fibrewise count with the selection given by a predicate on the recorded data that holds
@@ -1529,8 +1532,7 @@ lemma pwOfB_val_of_code {m : ℕ} (hp : p.Prime) {H : Type u} [Group H] [Finite 
       flatB B (fOff (fibR D) k.1.val + k.2.val) (fOff (fibR D) h.1.val + h.2.val) := by
   have hlt : flatB B (fOff (fibR D) k.1.val + k.2.val) (fOff (fibR D) h.1.val + h.2.val) <
       p ^ fibAk D h := flatB_lt_of_code hp hc _ _ (fibPos_lt D h)
-  unfold pwOfB
-  rw [dif_pos hlt]
+  simp only [pwOfB, dif_pos hlt]
 
 /-- Transport of realised power word arrays along equal ranks and relative orders. -/
 lemma realizedPW_congr {c c' : ℕ} {r : Fin c → ℕ} {r' : Fin c' → ℕ} {a : SimsIdx c r → ℕ}
@@ -1603,8 +1605,8 @@ theorem ncard_classes_le_fiber_pw {m : ℕ} (hp : p.Prime) (T : Set FiniteGrp.{0
       ∑ D ∈ I, p ^ pwBound2 (fibAk D) * (realizedC hp T D).ncard := by
   haveI : Fact p.Prime := ⟨hp⟩
   refine (ncard_classes_le_fiber hp T I hI).trans (Finset.sum_le_sum fun D _ => ?_)
-  exact Nat.mul_le_mul_right _ ((ncard_realizedB_le hp T D).trans
-    (liqiao_thm_3_1 D.1.val (fibRk D) (fibAk D) (fibAk_pos D)))
+  exact Nat.mul_le_mul ((ncard_realizedB_le hp T D).trans
+    (liqiao_thm_3_1 D.1.val (fibRk D) (fibAk D) (fibAk_pos D))) le_rfl
 
 end FiberCount
 
