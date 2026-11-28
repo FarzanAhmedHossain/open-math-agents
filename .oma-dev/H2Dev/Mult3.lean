@@ -636,11 +636,3 @@ end Mult3Group
 end Mult3
 
 end OMA.SimsLite
-
-#print axioms OMA.SimsLite.Mult3.mult3_k_add_s_le
-#print axioms OMA.SimsLite.Mult3.prop_13_1_count
-#print axioms OMA.SimsLite.Mult3.prop_13_2_fiber
-#print axioms OMA.SimsLite.Mult3.rem_6_4_fiber
-#print axioms OMA.SimsLite.Mult3.cor_14_1_dim_bound
-#print axioms OMA.SimsLite.Mult3.cor_14_1_div
-#print axioms OMA.SimsLite.mult3_ncard_le_cnt3
