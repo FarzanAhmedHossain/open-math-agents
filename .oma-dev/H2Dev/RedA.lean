@@ -26,6 +26,10 @@ Hypotheses:
 * `H3` (N2A): Theorem 7.1 (i) at `p = 2`.
 Theorem 7.1 (ii) (Section 10) is not needed: at the binary endpoint `r2 = C(s-1, 2)` the
 multiplicity bound `H2` is used instead.
+`H2` is stated for `C(s-1, 2) ≤ r2`, while Corollary 14.1 states only `C(s-1, 2) < r2`;
+the ingredients (Props 13.1, 13.2, Remark 6.4) carry no saturation hypothesis.  If a reviewer
+rejects the endpoint, the Option I fallback (`H2Dev/RedAOptI.lean`: `H2s` with strict saturation,
+`H4` = Theorem 7.1 (ii), and Lemma 11.1 in `main`) replaces `H2`.
 
 `main` is the Part III arithmetic at class `3` (class-three forms of Theorem 11.3, (129)-(130),
 Prop 12.1 (ii), Lemma 14.2, (157) and the case split of Theorem 14.3), plus the sum over the
@@ -112,6 +116,21 @@ exponent is `A b2` of (55) (`H1`), and at `δ = 0` the group `L_1 = G/γ_2` is e
 so `Z_≥2 = 0`, `dim Z_core = s` and `dim Z_0 = r1 - s` exactly (Section 13.1).  With
 `k = dim K ≤ r1 - s` the exponent is `PW + A b2 - (r1 - s)^2 + k (2 r1 - s - k - s r2)`, i.e.
 (153) with `z = dim Z_0 = r1 - s` and `PW + A b2` in place of `F_(1/2) + 2 m2 e + r1 δ`.
+
+Citation chain (this statement is not literally a displayed result; it is assembled as follows).
+The starting bound is (87) (p.42, proof of Theorem 6.3): the power word count (47) of
+Theorem 3.1 plus the commutator exponent (55), with `Δ_p` omitted; at class three this is
+`PW + A b2` per fixed recorded data and breadth.  (85) is the range-free relaxation of (87), and
+(151)/(153) are written with (85); here the unrelaxed (87) is kept.  By Remark 6.4 (p.43,
+`q` may be 'subtracted from the commutator exponent in (55)'), the rank `q = s (dim K) r2` of
+the core-outside equations from the proof of Proposition 13.2 (pp.80-81) is subtracted; that
+proof also counts the subspaces `K` of dimension `k` by `π_∞(2)^(-1) 2^(k (r1 - k))`
+(Lemma 2.7 (i)).  Proposition 13.1 (p.80) gives the multiplicity
+`≥ π_∞(2) 2^((dim Z_0)^2 - (dim Z_0) k)`, and at `δ = 0` the bounds
+`max{0, r1 - s - δ} ≤ dim Z_0 ≤ r1 - s` (p.79) give `dim Z_0 = r1 - s`.  Proposition 2.4 (the
+array pair determines the group) and Proposition 2.5 (the data count) finish the count, as in the
+proof of Corollary 14.1.  Algebra: `-Z_0^2 + Z_0 k + k (r1 - k) - s k r2` with `Z_0 = r1 - s`
+equals `-(r1 - s)^2 + k (2 r1 - s - k - s r2)`.
 The term `C m (log_2 m + 1)` absorbs the recorded data, the breadth, `dim K`, and the constant
 `2 log_2 π_∞(2)^(-1)`. -/
 def H2 : Prop :=
