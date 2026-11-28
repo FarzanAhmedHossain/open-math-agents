@@ -1430,12 +1430,5 @@ theorem br_s2_le_group (hG : IsPGroup p G) :
 
 end BrGroup
 
-#print axioms br_lemma61_group
-#print axioms br_s2_le_group
-#print axioms br_prop43
-#print axioms br_prop42_crude
-#print axioms brB_jacobi
-#print axioms br_rem44_lift
-#print axioms br_eq53
 
 end OMA.SimsLite
