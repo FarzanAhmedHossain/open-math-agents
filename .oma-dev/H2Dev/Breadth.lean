@@ -2193,24 +2193,5 @@ theorem brT2_coeff_eq {G' : Type u} [Group G'] (e1' : Abelianization G' ≃* L1)
 end BrTransport
 
 
-#print axioms br_card_subgroups_le
-#print axioms br_card_homs_le_sharp
-#print axioms br_prop42
-#print axioms br_eq53
-#print axioms br_eq53_breadth
-#print axioms br_eq53_sum
-#print axioms br_s3_le_breadth
-#print axioms br_breadth_range
-#print axioms br_deeper_count_fin
-#print axioms br_bracket_set_finite
-#print axioms br_prop43_fin
-#print axioms br_rem44_lift
-#print axioms br_lemma61_group
-#print axioms br_s2_le_group
-#print axioms brB_jacobi
-#print axioms brT_jacobi
-#print axioms brT1_closure
-#print axioms brT1_coeff_eq
-#print axioms brT2_coeff_eq
 
 end OMA.SimsLite
