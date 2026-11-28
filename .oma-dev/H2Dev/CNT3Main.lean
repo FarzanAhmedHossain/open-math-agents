@@ -329,8 +329,15 @@ theorem hypStrat_of_B (hB : HypBStrat) : HypStrat := by
       hB m r1 r2 s lam m2 m3 r3 D hL B β hβ⟩⟩
   obtain ⟨h2, h3, hs, -, -, hs2, hs3⟩ := hL
   have h := lf_realizedCB_subset_strata Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D h2 h3 B
-  rw [hs2, hs3, hs] at h
-  exact h
+  intro C hC
+  obtain ⟨β, hβ, hCβ⟩ := Set.mem_iUnion₂.1 (h hC)
+  refine Set.mem_iUnion₂.2 ⟨β, ?_, hCβ⟩
+  rw [Finset.mem_filter, Finset.mem_range] at hβ
+  obtain ⟨hb1, hb2⟩ := hβ
+  rw [hs2, hs3] at hb1
+  rw [hs3, hs] at hb2
+  rw [cnt3Adm_mem]
+  exact ⟨by omega, hb2⟩
 
 /-- The facts used by the assembly, for a nonempty parameter set. -/
 theorem cnt3_setup (hPW : HypPW) (hne : (cnt3Set m r1 r2 s lam m2 m3 r3).Nonempty) :
