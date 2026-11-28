@@ -919,8 +919,3 @@ end GrBreadth
 
 end OMA.SimsLite
 
-#print axioms OMA.SimsLite.grBr_jacobi
-#print axioms OMA.SimsLite.remark_2_6
-#print axioms OMA.SimsLite.core_L3_closure
-#print axioms OMA.SimsLite.SimsGenSet.layer_power
-#print axioms OMA.SimsLite.breadth_two_class3
