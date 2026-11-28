@@ -270,6 +270,9 @@ theorem card_quot_frattini (hG : IsPGroup p G) :
     rw [h1]
   letI : Module (ZMod p) (Additive (FratQ G)) := AddCommGroup.zmodModule hpow
   have : Finite (FratQ G) := Finite.of_surjective (fratPi G) fratPi_surjective
+  have : Finite (Additive (FratQ G)) := inferInstance
+  have : Module.Free (ZMod p) (Additive (FratQ G)) := inferInstance
+  have : Module.Finite (ZMod p) (Additive (FratQ G)) := inferInstance
   have hcardQ : Nat.card (G ⧸ frattini G) = Nat.card (Additive (FratQ G)) := by
     have e := Nat.card_congr
       (QuotientGroup.quotientKerEquivOfSurjective (fratPi G) fratPi_surjective).toEquiv
@@ -277,7 +280,7 @@ theorem card_quot_frattini (hG : IsPGroup p G) :
     exact e
   have hcard : Nat.card (Additive (FratQ G)) =
       p ^ Module.finrank (ZMod p) (Additive (FratQ G)) := by
-    rw [Module.natCard_eq_pow_finrank (K := ZMod p), Nat.card_zmod]
+    rw [Module.natCard_eq_pow_finrank (K := ZMod p) (V := Additive (FratQ G)), Nat.card_zmod]
   rw [hcardQ, hcard]
   congr 1
   apply le_antisymm
@@ -292,15 +295,18 @@ theorem card_quot_frattini (hG : IsPGroup p G) :
         { carrier := {x | Additive.ofMul (fratPi G x) ∈
             Submodule.span (ZMod p) (T : Set (Additive (FratQ G)))}
           mul_mem' := fun {a b} ha hb => by
-            show Additive.ofMul (fratPi G (a * b)) ∈ _
+            show Additive.ofMul (fratPi G (a * b)) ∈
+              Submodule.span (ZMod p) (T : Set (Additive (FratQ G)))
             rw [map_mul, ofMul_mul]
             exact Submodule.add_mem _ ha hb
           one_mem' := by
-            show Additive.ofMul (fratPi G 1) ∈ _
+            show Additive.ofMul (fratPi G 1) ∈
+              Submodule.span (ZMod p) (T : Set (Additive (FratQ G)))
             rw [map_one, ofMul_one]
             exact Submodule.zero_mem _
           inv_mem' := fun {a} ha => by
-            show Additive.ofMul (fratPi G a⁻¹) ∈ _
+            show Additive.ofMul (fratPi G a⁻¹) ∈
+              Submodule.span (ZMod p) (T : Set (Additive (FratQ G)))
             rw [map_inv, ofMul_inv]
             exact Submodule.neg_mem _ ha }
       have hK : Subgroup.closure (S : Set G) ≤ K := by
