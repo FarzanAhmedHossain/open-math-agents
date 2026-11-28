@@ -573,6 +573,12 @@ def SimsData.normalize (d : SimsData) : SimsData where
   b := d.b
   c := fun t k v => if d.Rec t k then d.c t k v else 0
 
+lemma SimsData.normalize_c_supp {d : SimsData} (hd : d.Valid) (t k v : Fin d.n)
+    (h : (if d.Rec t k then d.c t k v else 0) ≠ 0) : d.lv t < d.lv v := by
+  split_ifs at h with hr
+  · exact hd.c_supp t k v h
+  · exact absurd rfl h
+
 lemma SimsData.normalize_valid {d : SimsData} (hd : d.Valid) : d.normalize.Valid where
   mono := hd.mono
   s_le := hd.s_le
@@ -591,11 +597,7 @@ lemma SimsData.normalize_valid {d : SimsData} (hd : d.Valid) : d.normalize.Valid
     rw [e]
     exact hd.df_one t ht
   b_supp := hd.b_supp
-  c_supp := fun t k v h => by
-    have h' : (if d.Rec t k then d.c t k v else 0) ≠ 0 := h
-    split_ifs at h' with hr
-    · exact hd.c_supp t k v h'
-    · exact absurd rfl h'
+  c_supp := fun t k v h => SimsData.normalize_c_supp hd t k v h
 
 lemma SimsData.normalize_realizes {G : Type u} [Group G] {p : ℕ} {d : SimsData}
     {X : Fin d.n → G} (h : SimsRealizes p d X) : SimsRealizes p d.normalize X where
@@ -781,9 +783,8 @@ theorem card_fullData_le (p m : ℕ) (hp : 0 < p) :
   have hq : 1 ≤ p ^ m := Nat.one_le_pow _ _ hp
   have e1 : ((p ^ m) ^ D.2.2.1.tot) ^ D.2.2.1.tot = (p ^ m) ^ (D.2.2.1.tot * D.2.2.1.tot) := by
     rw [pow_mul]
-  have e2 : (((p ^ m) ^ D.2.2.1.tot) ^ D.2.2.1.tot) ^ D.2.2.1.tot =
-      (p ^ m) ^ (D.2.2.1.tot * D.2.2.1.tot * D.2.2.1.tot) := by
-    rw [pow_mul, pow_mul]
+  have e2 : ((p ^ m) ^ (D.2.2.1.tot * D.2.2.1.tot)) ^ D.2.2.1.tot =
+      (p ^ m) ^ (D.2.2.1.tot * D.2.2.1.tot * D.2.2.1.tot) := (pow_mul _ _ _).symm
   rw [e1, e2]
   exact Nat.mul_le_mul (Nat.pow_le_pow_right hq (Nat.mul_le_mul ht ht))
     (Nat.pow_le_pow_right hq (Nat.mul_le_mul (Nat.mul_le_mul ht ht) ht))
@@ -989,7 +990,10 @@ lemma SimsGen.rankVec_r2 [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m :
     (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : (hS.rankVec hp hnm).r2 = r 1 := by
   unfold RankVec.r2
   show ∑ i ∈ Finset.univ.filter (fun i : Fin hS.nL => i.val = 1), r i.val = r 1
-  exact Finset.sum_eq_single_of_mem ⟨1, hS.one_lt_nL hs2⟩ (by simp)
+  have hmem : (⟨1, hS.one_lt_nL hs2⟩ : Fin hS.nL) ∈
+      Finset.univ.filter (fun i : Fin hS.nL => i.val = 1) :=
+    Finset.mem_filter.mpr ⟨Finset.mem_univ _, rfl⟩
+  exact Finset.sum_eq_single_of_mem _ hmem
     (fun b hb hne => absurd (Fin.ext (Finset.mem_filter.mp hb).2) hne)
 
 lemma SimsGen.rankVec_r3 [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
@@ -1012,10 +1016,8 @@ noncomputable def SimsGen.incrVec [Finite G] (hp : p.Prime) (hS : SimsGen p u d 
 /-- The auxiliary function `f`. -/
 noncomputable def SimsGen.fAux [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
     (hnm : d.n ≤ m) (hs2 : 2 ≤ d.s) : Fin (hS.rankVec hp hnm).r2 → Fin (d.s - 1) :=
-  fun j => ⟨brPa d r j.val, hS.brPa_lt hs2 j.val (by
-    have := j.isLt
-    rw [hS.rankVec_r2 hp hnm hs2] at this
-    exact this)⟩
+  fun j => ⟨brPa d r j.val, hS.brPa_lt hs2 j.val
+    (lt_of_lt_of_eq j.isLt (hS.rankVec_r2 hp hnm hs2))⟩
 
 /-- The index pairs of the generators of weight at least `3`. -/
 noncomputable def SimsGen.pAux [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
@@ -1027,8 +1029,7 @@ noncomputable def SimsGen.pAux [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r
 noncomputable def SimsGen.aVec [Finite G] (hp : p.Prime) (hS : SimsGen p u d X r) {m : ℕ}
     (hnm : d.n ≤ m) (hsum : ∑ t, d.a t = m) : PosVec (hS.rankVec hp hnm).tot m :=
   ⟨fun j => ⟨brA d j.val, Nat.lt_succ_of_le (brA_le hsum j.val)⟩, fun j => by
-      have hj := j.isLt
-      rw [hS.rankVec_tot hp hnm] at hj
+      have hj : j.val < d.n := lt_of_lt_of_eq j.isLt (hS.rankVec_tot hp hnm)
       show 0 < brA d j.val
       unfold brA
       rw [dif_pos hj]
