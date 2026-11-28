@@ -1159,7 +1159,7 @@ def powImg (A B : Subgroup G) [B.Normal] (p : ℕ)
     show ∃ c ∈ A, QuotientGroup.mk' B a ^ p * QuotientGroup.mk' B b ^ p =
       QuotientGroup.mk' B c ^ p
     refine ⟨a * b, A.mul_mem ha hb, ?_⟩
-    rw [map_mul, (hc a ha b hb : Commute _ _).mul_pow]
+    rw [map_mul, Commute.mul_pow (hc a ha b hb) p]
   one_mem' := by
     show ∃ c ∈ A, (1 : G ⧸ B) = QuotientGroup.mk' B c ^ p
     exact ⟨1, A.one_mem, by rw [map_one, one_pow]⟩
@@ -1846,7 +1846,8 @@ lemma lay0_indep (hu : ∀ k < s, u k ∉ Subgroup.closure (u '' Set.Iio k) ⊔ 
       have h1 : i < s + (lay0E p s u).r := hi
       omega
     apply gLay_indep _ _ _ _ _ hi'
-    refine (sup_le ?_ ?_) hmem
+    refine (sup_le ?_ ?_ : _ ≤ Subgroup.closure ((lay0E p s u).x '' Set.Iio (i - s)) ⊔
+      (Subgroup.closure (u '' Set.Iio s) ⊔ pPhi p G)) hmem
     · rw [Subgroup.closure_le]
       rintro _ ⟨i', hi'', rfl⟩
       have hi''' : i' < i := hi''
@@ -1864,7 +1865,8 @@ lemma lay0_span (g : G) :
   obtain ⟨j, hj, rfl⟩ := allElt_surj g
   have h1 := gLay_span (allElt G) (Subgroup.closure (u '' Set.Iio s) ⊔ pPhi p G) (Nat.card G)
     id id le_rfl hj
-  refine (sup_le ?_ ?_) h1
+  refine (sup_le ?_ ?_ : _ ≤ Subgroup.closure ((lay0 p s u).x '' Set.Iio (lay0 p s u).r) ⊔
+    pPhi p G) h1
   · rw [Subgroup.closure_le]
     rintro _ ⟨i, ⟨hi, -⟩, rfl⟩
     have hi' : i < (lay0E p s u).r := hi
@@ -2277,6 +2279,7 @@ lemma flat_blocks (p : ℕ) (u : ℕ → G) (hstrict : StrictChainN (pN p G) u s
       exact ⟨h1, by omega⟩
   apply hstrict (k + 1) (by omega) (by omega)
   rw [Nat.add_sub_cancel, hWk k (by omega), hWk (k + 1) (by omega), hset]
+  rfl
 
 end Flat
 
@@ -2528,7 +2531,7 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
   have hlv := lv_mem_lcs (fData s L r pa co) hd (fX L r xs) hdf
   obtain ⟨b, c, hv, hb, hr⟩ :=
     exists_arrays (fData s L r pa co) (fX L r xs) hp hG hd hgen hdf hdeep
-  have hind := flat_indep (s := s) (pa := pa) (co := co) p Hind
+  have hind := flat_indep (s := s) (L := L) (pa := pa) (co := co) p Hind
   have ha1 : ∀ t, 1 ≤ relOrd p (fData s L r pa co) (fX L r xs) t := by
     intro t
     by_contra h0'
@@ -2547,8 +2550,8 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
       (fData s L r pa co).lv t = 1 ∧ ((fData s L r pa co).df t).2.val < k}) ⊔ pN p G :=
     fun k hk => flat_Wk p u H0 Hpa Hco H1 Hx Hc0 hL1 HS1 hk
   have hex := nf_exists_of hp hG (fData s L r pa co) hd (fX L r xs) hgen hlv hdeep
-  refine ⟨{ fData s L r pa co with a := relOrd p (fData s L r pa co) (fX L r xs), b := b,
-    c := c }, fX L r xs, rfl, ?_⟩
+  refine ⟨⟨(fData s L r pa co).n, (fData s L r pa co).s, (fData s L r pa co).lv,
+    (fData s L r pa co).df, relOrd p (fData s L r pa co) (fX L r xs), b, c⟩, fX L r xs, rfl, ?_⟩
   refine
     { core := fun t ht => flat_core u H0 Hc0 t ht
       valid := hv
