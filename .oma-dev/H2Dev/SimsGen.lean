@@ -2582,10 +2582,10 @@ theorem flat_final [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ 
       exact ⟨h1, h2⟩
     · rintro ⟨h1, h2⟩
       by_cases hw : w ≤ L
-      · exact fLv_eq hw h1 (by rw [fOff_succ]; exact h2)
+      · exact fLv_eq hw h1 (lt_of_lt_of_eq h2 (fOff_succ (fLen L r) w).symm)
       · exfalso
         have h3 := fOff_mono (fLen L r) (show L + 1 ≤ w by omega)
-        have h4 := t.isLt
+        have h4 : t.val < fOff (fLen L r) (L + 1) := t.isLt
         omega
   · intro w
     by_cases hw : w ≤ L
