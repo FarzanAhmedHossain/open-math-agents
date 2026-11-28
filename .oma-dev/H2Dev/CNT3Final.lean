@@ -100,8 +100,6 @@ theorem cnt3_stmt : CNT3Stmt := by
     omega
   exact cnt3_final hC0 hm hnm hN hcount
 
-#print axioms cnt3_stmt
-
 end CNT3Final
 
 end OMA.SimsLite
