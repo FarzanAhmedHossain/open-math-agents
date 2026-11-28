@@ -479,7 +479,7 @@ lemma final_ineq (C : ℝ) : ∀ᶠ m : ℕ in atTop, ∀ N : ℕ,
   have hu0 : (0 : ℝ) ≤ (2 : ℝ) ^ F := Real.rpow_nonneg (by norm_num) _
   have hN0 : (0 : ℝ) ≤ (N : ℝ) := Nat.cast_nonneg _
   have e1 : ((32 : ℝ) * (2 : ℝ) ^ F) ^ 27 = (2 : ℝ) ^ ((135 : ℝ) + 27 * F) := by
-    rw [mul_pow, Real.rpow_add (by norm_num : (0 : ℝ) < 2), ← Real.rpow_natCast ((2 : ℝ) ^ F) 27,
+    rw [mul_pow, Real.rpow_add (by norm_num : (0 : ℝ) < 2) 135 (27 * F), ← Real.rpow_natCast ((2 : ℝ) ^ F) 27,
       ← Real.rpow_mul (by norm_num : (0 : ℝ) ≤ 2)]
     have h135 : (2 : ℝ) ^ (135 : ℝ) = (32 : ℝ) ^ 27 := by
       rw [show (135 : ℝ) = ((135 : ℕ) : ℝ) by norm_num, Real.rpow_natCast]; norm_num
