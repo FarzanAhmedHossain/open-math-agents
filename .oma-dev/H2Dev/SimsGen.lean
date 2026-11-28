@@ -767,7 +767,7 @@ lemma relOrd_spec [Finite G] (hG : Nat.card G = p ^ m) (t : Fin d.n) :
     X t ^ (p ^ relOrd p d X t) ∈ Subgroup.closure (X '' lset d (d.lv t) t.val) := by
   have hne : {a : ℕ | X t ^ (p ^ a) ∈ Subgroup.closure (X '' lset d (d.lv t) t.val)}.Nonempty := by
     refine ⟨m, ?_⟩
-    show X t ^ (p ^ m) ∈ _
+    show X t ^ (p ^ m) ∈ Subgroup.closure (X '' lset d (d.lv t) t.val)
     rw [← hG, pow_card_eq_one']
     exact one_mem _
   exact Nat.sInf_mem hne
@@ -1086,12 +1086,10 @@ theorem exists_arrays [Finite G] (hp : p.Prime) (hG : Nat.card G = p ^ m) (hd : 
   choose b hb using hb
   choose c hc using hc
   refine ⟨b, c, ?_, ⟨fun t u => (hb t).2.1 u, fun t k u => (hc t k).2.1 u⟩, ?_⟩
-  · exact { mono := hd.mono, s_le := hd.s_le, core := hd.core, df_lv := hd.df_lv,
-      df_core := hd.df_core, df_one := hd.df_one, b_supp := fun t u h => (hb t).1 u h,
-      c_supp := fun t k u h => (hc t k).1 u h }
-  · exact { card := card_eq_relOrd d X hp hG hgen hlv hdeep, gen := hgen, dfeq := hdf,
-      pow := fun t => (hb t).2.2, comm0 := fun t k _ _ _ => (hc t k).2.2,
-      comm1 := fun t k _ _ => (hc t k).2.2, comm2 := fun t k _ _ => (hc t k).2.2 }
+  · exact ⟨⟨hd.mono, hd.s_le, hd.core, hd.df_lv, hd.df_core, hd.df_one⟩,
+      fun t u h => (hb t).1 u h, fun t k u h => (hc t k).1 u h⟩
+  · exact ⟨card_eq_relOrd d X hp hG hgen hlv hdeep, hgen, hdf, fun t => (hb t).2.2,
+      fun t k _ _ _ => (hc t k).2.2, fun t k _ _ => (hc t k).2.2, fun t k _ _ => (hc t k).2.2⟩
 
 end Layers
 
