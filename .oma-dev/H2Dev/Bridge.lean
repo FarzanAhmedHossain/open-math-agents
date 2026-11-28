@@ -1310,5 +1310,3 @@ end DataBridge
 
 end OMA.SimsLite
 
-#print axioms OMA.SimsLite.sims_powerWords_counted
-#print axioms OMA.SimsLite.ncard_classes_le_closed
