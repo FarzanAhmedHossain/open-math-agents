@@ -889,6 +889,3 @@ theorem cbt_realizedCB_ncard_le_two {m : ℕ} (T : Set FiniteGrp.{0})
 end CbtCount
 
 end OMA.SimsLite
-
-#print axioms OMA.SimsLite.cbt_realizedCB_ncard_le
-#print axioms OMA.SimsLite.cbt_realizedCB_ncard_le_two
