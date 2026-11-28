@@ -73,7 +73,8 @@ lemma nfw_mem {n : ℕ} (X : Fin n → D) (e : Fin n → ℕ) (T : Set (Fin n))
   by_cases ht : e t = 0
   · rw [ht, pow_zero]
     exact one_mem _
-  · exact pow_mem (Subgroup.subset_closure (⟨t, h t ht, rfl⟩ : X t ∈ X '' T)) _
+  · have hmem : X t ∈ Subgroup.closure (X '' T) := Subgroup.subset_closure ⟨t, h t ht, rfl⟩
+    exact pow_mem hmem _
 
 end SProd
 
