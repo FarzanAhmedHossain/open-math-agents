@@ -30,6 +30,17 @@ definitions `Isotropic`, `IsHollowing`, `IsMinHollowing`, `rad`, `valL` of `H2De
   `b(u, v) = A(u, v)`.
 * `lemma109` (Lemma 10.9): the coefficient maps `w_j`, `P`, `Q` (linear in `u ∈ X0`) with unique
   expansion `r(z_j, u) = w_j(u) + Σ_i P(u)_{ij} r(z_i, x) + Σ_i Q(u)_{ij} r(z_i, y)`.
+* `prop1010` (Prop 10.10, determinant constraint): if moreover `B` is `h`-hollowing and
+  `b(u, v) = 1`, then `det [[I + P(u), P(v)], [Q(u), I + Q(v)]] = 0` (109).  Proof as in the
+  paper: hollowing makes the `M` rows of `R_{B, H_{u,v}}` dependent, the last row drops out by
+  its first coordinate, and the coordinates along `r(z_i, x)`, `r(z_i, y)` (via the basis `bF` of
+  `F^M` extending the rows) give the block system.
+* Lemma 10.11 (Reed-Muller support): `HasDeg f d` (`f : F_2^n → F_2` is a polynomial function of
+  total degree `≤ d`), `suppCard f = |supp f|`; `rm_support` (`f ≠ 0 → 2^(n-d) ≤ |supp f|`, the
+  minimum distance of `RM(d, n)`, by induction on `n` via `finSuccEquiv`) and `rm_span`
+  (`f 0 = 1 → codim span (supp f) ≤ d`, by restricting `f` to a complement of `span (supp f)`,
+  where it becomes the delta function at `0`; `totalDegree_bind₁_le_of`: linear substitutions do
+  not raise the degree).
 -/
 
 namespace OMA.SimsLite.N2B
@@ -798,6 +809,234 @@ theorem lemma109 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (i0 : Fin M
 
 end Rows
 
+/-! ### Prop 10.10 (determinant constraint) -/
+
+section Prop1010
+
+variable {F : Type*} [Field F] {R M : ℕ}
+
+/-- Prop 10.10 (determinant constraint).  Keep the data of Lemmas 10.7-10.9 (`B = span β`
+`h`-hollowing with `h = k + 2`, `A = β i0` vanishing on `H = span (z, x, y)`, the rows
+`rowFam β z x y` a basis of `V0`, `X0 ≤ H^{⊥_A}` with `X0 ∩ H = 0`, and coefficient maps
+`w, P, Q` as in Lemma 10.9).  If `u, v ∈ X0` satisfy `b(u, v) = A(u, v) = 1`, then
+`F(u, v) = det [[I + P(u), P(v)], [Q(u), I + Q(v)]] = 0` (109). -/
+theorem prop1010 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r, IsAltMat (β r))
+    (hhol : IsHollowing (Submodule.span F (Set.range β)) (k + 2)) (i0 : Fin M)
+    {H X0 : Submodule F (Fin R → F)} (hiso : Isotropic (β i0) H)
+    {z : Fin k → (Fin R → F)} {x y : Fin R → F}
+    (hli : LinearIndependent F (hBasis z x y))
+    (hsp : Submodule.span F (Set.range (hBasis z x y)) = H)
+    (hrli : LinearIndependent F (rowFam β z x y))
+    (hrsp : Submodule.span F (Set.range (rowFam β z x y)) = V0 i0)
+    (hX0 : X0 ≤ perpA (β i0) H) (hX0H : X0 ⊓ H = ⊥)
+    (w : Fin k → (X0 →ₗ[F] (Fin M → F))) (P Q : X0 →ₗ[F] Matrix (Fin k) (Fin k) F)
+    (hw : ∀ j u, w j u ∈ Wsp β z)
+    (hrep : ∀ j (u : X0), valL β (z j) u =
+      w j u + ∑ i, P u i j • valL β (z i) x + ∑ i, Q u i j • valL β (z i) y)
+    (u v : X0) (huv : bfL (u : Fin R → F) v (β i0) = 1) :
+    (Matrix.fromBlocks (1 + P u) (P v) (Q u) (1 + Q v)).det = 0 := by
+  classical
+  obtain ⟨-, hfr', hrow0, hlast⟩ :=
+    lemma108 β i0 (hA i0) hiso hli hsp hX0 hX0H u.2 v.2
+  -- a nonzero form of `B` vanishing on `H_{u,v}`
+  obtain ⟨A', hA'B, hA'0, hA'iso⟩ := hhol _ hfr'
+  obtain ⟨c, hc⟩ := (Submodule.mem_span_range_iff_exists_fun F).1 hA'B
+  have hc0 : c ≠ 0 := by
+    rintro rfl
+    apply hA'0
+    rw [← hc]
+    simp
+  have hperp : ∀ a b, a ∈ Submodule.span F (Set.range (hBasis z (x + u) (y + v))) →
+      b ∈ Submodule.span F (Set.range (hBasis z (x + u) (y + v))) →
+      ∑ r, c r * valL β a b r = 0 := by
+    intro a b ha hb
+    have h := hA'iso a ha b hb
+    rw [← hc, bfL_sum] at h
+    exact h
+  have hmem : ∀ e, hBasis z (x + u) (y + v) e ∈
+      Submodule.span F (Set.range (hBasis z (x + u) (y + v))) :=
+    fun e => Submodule.subset_span ⟨e, rfl⟩
+  -- the `M` rows of `R_{B, H_{u,v}}`
+  let G : Option (TPairs k ⊕ (Fin k ⊕ Fin k)) → (Fin M → F) := fun o =>
+    Option.elim o (valL β (x + u) (y + v)) (rowFam β z (x + u) (y + v))
+  have hGperp : ∀ o, ∑ r, c r * G o r = 0 := by
+    intro o
+    rcases o with _ | p | i | i
+    · exact hperp _ _ (hmem (Sum.inr 0)) (hmem (Sum.inr 1))
+    · exact hperp _ _ (hmem (Sum.inl p.1.1)) (hmem (Sum.inl p.1.2))
+    · exact hperp _ _ (hmem (Sum.inl i)) (hmem (Sum.inr 0))
+    · exact hperp _ _ (hmem (Sum.inl i)) (hmem (Sum.inr 1))
+  have hcardι : Fintype.card (TPairs k ⊕ (Fin k ⊕ Fin k)) + 1 = M := by
+    have h1 := finrank_span_eq_card hrli
+    rw [hrsp] at h1
+    have h2 := finrank_V0 (F := F) i0
+    omega
+  have hGnot : ¬ LinearIndependent F G := by
+    intro hG
+    have htop : Submodule.span F (Set.range G) = ⊤ := by
+      apply Submodule.eq_of_le_of_finrank_le le_top
+      rw [finrank_span_eq_card hG, finrank_top, Module.finrank_fin_fun, Fintype.card_option]
+      omega
+    exact hc0 ((span_range_eq_top_iff G).1 htop c hGperp)
+  rw [Fintype.linearIndependent_iff] at hGnot
+  push Not at hGnot
+  obtain ⟨g, hg, o0, ho0⟩ := hGnot
+  rw [Fintype.sum_option] at hg
+  have hG0 : G none i0 = 1 := by
+    show valL β (x + u) (y + v) i0 = 1
+    rw [hlast, huv]
+  have hnone : g none = 0 := by
+    have h := congrFun hg i0
+    simp only [Pi.add_apply, Finset.sum_apply, Pi.smul_apply, smul_eq_mul, Pi.zero_apply,
+      hG0, mul_one] at h
+    have hs : ∑ q, g (some q) * G (some q) i0 = 0 :=
+      Finset.sum_eq_zero (fun q _ => by rw [show G (some q) i0 = 0 from hrow0 q, mul_zero])
+    rw [hs, add_zero] at h
+    exact h
+  rw [hnone, zero_smul, zero_add] at hg
+  have hg2 : ∑ q, g (some q) • rowFam β z (x + u) (y + v) q = 0 := hg
+  -- `hg : ∑ q, g (some q) • rowFam β z (x + u) (y + v) q = 0`
+  -- a basis of `F^M` extending the rows
+  let K : Option (TPairs k ⊕ (Fin k ⊕ Fin k)) → (Fin M → F) := fun o =>
+    Option.elim o (Pi.single i0 1) (rowFam β z x y)
+  have hKsp : ⊤ ≤ Submodule.span F (Set.range K) := by
+    intro c' _
+    have h1 : c' - c' i0 • (Pi.single i0 1 : Fin M → F) ∈ V0 i0 := by
+      rw [mem_V0]
+      simp
+    rw [← hrsp] at h1
+    have h2 : Submodule.span F (Set.range (rowFam β z x y)) ≤ Submodule.span F (Set.range K) := by
+      apply Submodule.span_mono
+      rintro _ ⟨q, rfl⟩
+      exact ⟨some q, rfl⟩
+    have h3 : (Pi.single i0 1 : Fin M → F) ∈ Submodule.span F (Set.range K) :=
+      Submodule.subset_span ⟨none, rfl⟩
+    have := Submodule.add_mem _ (h2 h1) (Submodule.smul_mem _ (c' i0) h3)
+    rwa [sub_add_cancel] at this
+  have hKli : LinearIndependent F K :=
+    linearIndependent_of_top_le_span_of_card_eq_finrank hKsp
+      (by rw [Fintype.card_option, Module.finrank_fin_fun]; omega)
+  let bF := Basis.mk hKli hKsp
+  have hκ : ∀ o q, bF.coord o (rowFam β z x y q) = if some q = o then 1 else 0 := by
+    intro o q
+    have e : rowFam β z x y q = bF (some q) := (Basis.mk_apply hKli hKsp (some q)).symm
+    rw [e, Basis.coord_apply, Basis.repr_self, Finsupp.single_apply]
+  have hκW : ∀ t : Fin k ⊕ Fin k, ∀ w' ∈ Wsp β z, bF.coord (some (Sum.inr t)) w' = 0 := by
+    intro t w' hw'
+    have hle : Wsp β z ≤ LinearMap.ker (bF.coord (some (Sum.inr t))) := by
+      unfold Wsp
+      rw [Submodule.span_le]
+      rintro _ ⟨p, rfl⟩
+      rw [SetLike.mem_coe, LinearMap.mem_ker]
+      have := hκ (some (Sum.inr t)) (Sum.inl p)
+      rw [if_neg (by simp)] at this
+      exact this
+    exact LinearMap.mem_ker.1 (hle hw')
+  have ex : ∀ l, valL β (z l) x = rowFam β z x y (Sum.inr (Sum.inl l)) := fun l => rfl
+  have ey : ∀ l, valL β (z l) y = rowFam β z x y (Sum.inr (Sum.inr l)) := fun l => rfl
+  -- coordinates of `r(z_i, u')`
+  have hκv : ∀ i (u' : X0) j,
+      bF.coord (some (Sum.inr (Sum.inl j))) (valL β (z i) u') = P u' j i ∧
+      bF.coord (some (Sum.inr (Sum.inr j))) (valL β (z i) u') = Q u' j i := by
+    intro i u' j
+    rw [hrep i u']
+    constructor
+    all_goals simp only [ex, ey, map_add, map_sum, map_smul, smul_eq_mul, hκ,
+      hκW (Sum.inl j) _ (hw i u'), hκW (Sum.inr j) _ (hw i u'),
+      Option.some.injEq, Sum.inr.injEq, Sum.inl.injEq, reduceCtorEq, ↓reduceIte, mul_zero,
+      mul_ite, mul_one, Finset.sum_ite_eq', Finset.mem_univ, Finset.sum_const_zero,
+      zero_add, add_zero]
+  -- coordinates of the perturbed rows
+  have hrx : ∀ j q, bF.coord (some (Sum.inr (Sum.inl j))) (rowFam β z (x + u) (y + v) q) =
+      Sum.elim (fun _ => 0) (Sum.elim (fun i => (1 + P u) j i) (fun i => P v j i)) q := by
+    intro j q
+    rcases q with p | i | i
+    · show bF.coord _ (rowFam β z x y (Sum.inl p)) = 0
+      rw [hκ, if_neg (by simp)]
+    · show bF.coord _ (valL β (z i) (x + u)) = (1 + P u) j i
+      rw [map_add, map_add, ex, hκ, (hκv i u j).1, Matrix.add_apply, Matrix.one_apply]
+      by_cases hij : i = j
+      · subst hij
+        simp
+      · simp [hij, Ne.symm hij]
+    · show bF.coord _ (valL β (z i) (y + v)) = P v j i
+      rw [map_add, map_add, ey, hκ, (hκv i v j).1, if_neg (by simp), zero_add]
+  have hry : ∀ j q, bF.coord (some (Sum.inr (Sum.inr j))) (rowFam β z (x + u) (y + v) q) =
+      Sum.elim (fun _ => 0) (Sum.elim (fun i => Q u j i) (fun i => (1 + Q v) j i)) q := by
+    intro j q
+    rcases q with p | i | i
+    · show bF.coord _ (rowFam β z x y (Sum.inl p)) = 0
+      rw [hκ, if_neg (by simp)]
+    · show bF.coord _ (valL β (z i) (x + u)) = Q u j i
+      rw [map_add, map_add, ex, hκ, (hκv i u j).2, if_neg (by simp), zero_add]
+    · show bF.coord _ (valL β (z i) (y + v)) = (1 + Q v) j i
+      rw [map_add, map_add, ey, hκ, (hκv i v j).2, Matrix.add_apply, Matrix.one_apply]
+      by_cases hij : i = j
+      · subst hij
+        simp
+      · simp [hij, Ne.symm hij]
+  -- the kernel vector `(β, γ)`
+  let bv : Fin k → F := fun i => g (some (Sum.inr (Sum.inl i)))
+  let gv : Fin k → F := fun i => g (some (Sum.inr (Sum.inr i)))
+  have hx_eq : ∀ j, ((1 + P u) *ᵥ bv + P v *ᵥ gv) j = 0 := by
+    intro j
+    have h := congrArg (bF.coord (some (Sum.inr (Sum.inl j)))) hg2
+    rw [map_sum, map_zero] at h
+    simp only [map_smul, smul_eq_mul, hrx, Fintype.sum_sum_type, Sum.elim_inl, Sum.elim_inr,
+      mul_zero, Finset.sum_const_zero, zero_add] at h
+    show (∑ i, (1 + P u) j i * bv i) + (∑ i, P v j i * gv i) = 0
+    refine Eq.trans ?_ h
+    congr 1 <;> exact Finset.sum_congr rfl (fun i _ => mul_comm _ _)
+  have hy_eq : ∀ j, (Q u *ᵥ bv + (1 + Q v) *ᵥ gv) j = 0 := by
+    intro j
+    have h := congrArg (bF.coord (some (Sum.inr (Sum.inr j)))) hg2
+    rw [map_sum, map_zero] at h
+    simp only [map_smul, smul_eq_mul, hry, Fintype.sum_sum_type, Sum.elim_inl, Sum.elim_inr,
+      mul_zero, Finset.sum_const_zero, zero_add] at h
+    show (∑ i, Q u j i * bv i) + (∑ i, (1 + Q v) j i * gv i) = 0
+    refine Eq.trans ?_ h
+    congr 1 <;> exact Finset.sum_congr rfl (fun i _ => mul_comm _ _)
+  -- `(β, γ) ≠ 0`
+  have hne : (Sum.elim bv gv : Fin k ⊕ Fin k → F) ≠ 0 := by
+    intro h0
+    have hbv : ∀ i, bv i = 0 := fun i => congrFun h0 (Sum.inl i)
+    have hgv : ∀ i, gv i = 0 := fun i => congrFun h0 (Sum.inr i)
+    -- then the relation only involves the rows `r(z_i, z_j)`
+    have hrel : ∑ p : TPairs k, g (some (Sum.inl p)) • rowFam β z x y (Sum.inl p) = 0 := by
+      have hg3 := hg2
+      simp only [Fintype.sum_sum_type] at hg3
+      have e1 : ∑ i, g (some (Sum.inr (Sum.inl i))) •
+          rowFam β z (x + u) (y + v) (Sum.inr (Sum.inl i)) = 0 :=
+        Finset.sum_eq_zero (fun i _ => by rw [show g (some (Sum.inr (Sum.inl i))) = 0 from hbv i,
+          zero_smul])
+      have e2 : ∑ i, g (some (Sum.inr (Sum.inr i))) •
+          rowFam β z (x + u) (y + v) (Sum.inr (Sum.inr i)) = 0 :=
+        Finset.sum_eq_zero (fun i _ => by rw [show g (some (Sum.inr (Sum.inr i))) = 0 from hgv i,
+          zero_smul])
+      rw [e1, e2, add_zero, add_zero] at hg3
+      exact hg3
+    let g' : TPairs k ⊕ (Fin k ⊕ Fin k) → F := Sum.elim (fun p => g (some (Sum.inl p))) 0
+    have hg' : ∑ q, g' q • rowFam β z x y q = 0 := by
+      simp only [Fintype.sum_sum_type, g', Sum.elim_inl, Sum.elim_inr, Pi.zero_apply, zero_smul,
+        Finset.sum_const_zero, add_zero]
+      exact hrel
+    have hall := Fintype.linearIndependent_iff.1 hrli g' hg'
+    apply ho0
+    rcases o0 with _ | p | i | i
+    · exact hnone
+    · exact hall (Sum.inl p)
+    · exact hbv i
+    · exact hgv i
+  apply Matrix.exists_mulVec_eq_zero_iff.1
+  refine ⟨Sum.elim bv gv, hne, ?_⟩
+  rw [Matrix.fromBlocks_mulVec]
+  funext t
+  rcases t with j | j
+  · exact hx_eq j
+  · exact hy_eq j
+
+end Prop1010
+
 /-! ### Lemma 10.11 (Reed-Muller support) -/
 
 section ReedMuller
@@ -1038,5 +1277,15 @@ theorem rm_span (n d : ℕ) (f : (Fin n → ZMod 2) → ZMod 2) (hf : HasDeg f d
 
 end ReedMuller
 
+
+#print axioms prop102
+#print axioms prop105
+#print axioms exists_prop105_data
+#print axioms lemma107
+#print axioms lemma108
+#print axioms lemma109
+#print axioms prop1010
+#print axioms rm_support
+#print axioms rm_span
 
 end OMA.SimsLite.N2B
