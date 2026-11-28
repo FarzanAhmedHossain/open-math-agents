@@ -853,7 +853,7 @@ theorem SimsGenSet.lf_layer_equiv (S : SimsGenSet p a g) (hp : 0 < p) (i : Fin c
     rw [S.lf_pi_block i π hker1 (fun v => (S.nf.coord x ⟨i, v⟩).val)
       (deeper_mem g S.mem (fun h => (S.nf.coord x h).val) i) hx (S.lf_sims_lift i hx)]
     exact Subgroup.prod_mem _ fun v _ =>
-      Subgroup.pow_mem _ (Subgroup.subset_closure ⟨v, rfl⟩) _
+      Subgroup.pow_mem _ (Subgroup.subset_closure (Set.mem_range_self v)) _
   have hcard := S.lf_card_quotL hp i hlast π hπ hker
   have hrel : ∀ j, lfPsi (fun v => π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩)
       (lfRel p (fun v => a ⟨i, v⟩) b j) = 0 := by
@@ -920,7 +920,7 @@ theorem SimsGenSet.lf_abel_equiv [Finite G] (S : SimsGenSet p a g) (hp : 0 < p) 
     ∃ φ : ((Fin (r ⟨0, h0⟩) → ℤ) ⧸ lfSpan p (fun v => a ⟨⟨0, h0⟩, v⟩) b) ≃+
         Additive (Abelianization G),
       ∀ x, φ (QuotientAddGroup.mk x) = lfPsi (fun v =>
-        (Abelianization.of.comp (lcs G 0).subtype) ⟨g ⟨⟨0, h0⟩, v⟩, S.mem _⟩) x := by
+        (Abelianization.of.comp (lcs G 0).subtype) ⟨g ⟨⟨0, h0⟩, v⟩, S.mem ⟨⟨0, h0⟩, v⟩⟩) x := by
   refine S.lf_layer_equiv hp ⟨0, h0⟩ hlast (Abelianization.of.comp (lcs G 0).subtype)
     ?_ ?_ b hb
   · intro z
@@ -937,7 +937,7 @@ theorem SimsGenSet.lf_brL2_equiv [Finite G] (S : SimsGenSet p a g) (hp : 0 < p) 
     (hb : ∀ j v, (S.powerWords ⟨⟨1, h1⟩, j⟩ ⟨⟨1, h1⟩, v⟩).val = b j v) :
     ∃ φ : ((Fin (r ⟨1, h1⟩) → ℤ) ⧸ lfSpan p (fun v => a ⟨⟨1, h1⟩, v⟩) b) ≃+ Additive (brL2 G),
       ∀ x, φ (QuotientAddGroup.mk x) =
-        lfPsi (fun v => brq2 G ⟨g ⟨⟨1, h1⟩, v⟩, S.mem _⟩) x :=
+        lfPsi (fun v => brq2 G ⟨g ⟨⟨1, h1⟩, v⟩, S.mem ⟨⟨1, h1⟩, v⟩⟩) x :=
   S.lf_layer_equiv hp ⟨1, h1⟩ hlast (brq2 G) brq2_surjective (fun x => brq2_eq_one_iff x) b hb
 
 /-- `e_3` of (57): `L_3 = γ_3 / γ_4` (`brL3`) is the coordinate group of the third layer (for
@@ -947,7 +947,7 @@ theorem SimsGenSet.lf_brL3_equiv [Finite G] (S : SimsGenSet p a g) (hp : 0 < p) 
     (hb : ∀ j v, (S.powerWords ⟨⟨2, h2⟩, j⟩ ⟨⟨2, h2⟩, v⟩).val = b j v) :
     ∃ φ : ((Fin (r ⟨2, h2⟩) → ℤ) ⧸ lfSpan p (fun v => a ⟨⟨2, h2⟩, v⟩) b) ≃+ Additive (brL3 G),
       ∀ x, φ (QuotientAddGroup.mk x) =
-        lfPsi (fun v => brq3 G ⟨g ⟨⟨2, h2⟩, v⟩, S.mem _⟩) x :=
+        lfPsi (fun v => brq3 G ⟨g ⟨⟨2, h2⟩, v⟩, S.mem ⟨⟨2, h2⟩, v⟩⟩) x :=
   S.lf_layer_equiv hp ⟨2, h2⟩ hlast (brq3 G) (lf_brq3_surjective G) (fun x => brq3_eq_one_iff x)
     b hb
 
