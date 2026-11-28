@@ -152,7 +152,7 @@ lemma skew_of_alt (B : V →ₗ[F] V →ₗ[F] W) (hB : ∀ x, B x x = 0) (x y :
     B x y = - B y x := by
   have h := hB (x + y)
   simp only [map_add, LinearMap.add_apply, hB, zero_add, add_zero] at h
-  exact eq_neg_of_add_eq_zero_left h
+  exact eq_neg_of_add_eq_zero_right h
 
 /-- (150), first part: for a Sims-minimal `U` (`B(U, U)` spans `W` and no subspace of smaller
 dimension does), the core centraliser meets `U` trivially. -/
@@ -251,7 +251,7 @@ lemma card_le_card_range_mul {α β : Type*} [Finite α] (f : α → β) (M : �
     (h : ∀ a : α, Nat.card {a' : α // f a' = f a} ≤ M) :
     Nat.card α ≤ Nat.card (Set.range f) * M := by
   classical
-  haveI := Fintype.ofFinite α
+  have := Fintype.ofFinite α
   have h1 := Finset.card_le_mul_card_image (f := f) (Finset.univ : Finset α) M (by
     intro b hb
     obtain ⟨a, -, rfl⟩ := Finset.mem_image.mp hb
@@ -338,7 +338,7 @@ variable {F X Y : Type*} [Field F] [AddCommGroup X] [Module F X] [AddCommGroup Y
 /-- Remark 6.4 (linear-algebra core): an affine system `T x = c` of rank `ρ = dim (range T)` on
 an `n`-dimensional space of freely counted coefficients has at most `q^(n - ρ)` solutions, so `ρ`
 may be subtracted from the exponent. -/
-theorem rem_6_4_fiber [Finite F] [FiniteDimensional F X] (T : X →ₗ[F] Y) (c : Y) :
+theorem rem_6_4_fiber [Finite F] [Finite X] [FiniteDimensional F X] (T : X →ₗ[F] Y) (c : Y) :
     Nat.card {x : X // T x = c} ≤
       Nat.card F ^ (finrank F X - finrank F (LinearMap.range T)) := by
   by_cases hne : ∃ x0, T x0 = c
@@ -357,7 +357,7 @@ theorem rem_6_4_fiber [Finite F] [FiniteDimensional F X] (T : X →ₗ[F] Y) (c 
       _ = Nat.card F ^ (finrank F X - finrank F (LinearMap.range T)) := by
           congr 1
           omega
-  · push_neg at hne
+  · push Not at hne
     have : IsEmpty {x : X // T x = c} := ⟨fun x => hne x.1 x.2⟩
     rw [Nat.card_of_isEmpty]
     exact Nat.zero_le _
@@ -474,6 +474,8 @@ theorem mem_coreCent_lamLin_iff {k : ℕ} (u : Fin k → G) (g : G) :
       unfold coreImg
       rw [Submodule.span_le]
       rintro _ ⟨i, rfl⟩
+      show Additive.ofMul (piV p G (u i)) ∈
+        LinearMap.ker (lamLin (p := p) (G := G) (Additive.ofMul (piV p G g)))
       rw [LinearMap.mem_ker, lamLin_mk,
         piW_eq_one_of (a := cw g (u i)) (hg (u i) (Subgroup.subset_closure ⟨i, rfl⟩))]
       rfl
@@ -533,7 +535,87 @@ theorem group_finrank_coreCent_le [Finite G] (hG : IsPGroup p G) {k : ℕ} (u : 
   rw [finrank_V hG] at h2
   omega
 
+/-- The core centraliser as a subgroup of `V` (multiplicative form). -/
+def coreCentSub {k : ℕ} (u : Fin k → G) : Subgroup (VQ p G) where
+  carrier := {x | Additive.ofMul x ∈ coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)}
+  mul_mem' := fun ha hb => Submodule.add_mem _ ha hb
+  one_mem' := Submodule.zero_mem _
+  inv_mem' := fun ha => Submodule.neg_mem _ ha
+
+/-- The inline order condition of `mult3Set`:
+`|{g : [g, H] ⊆ γ_3 γ_2^p}| · p^r1 = p^(dim K) |G|`. -/
+theorem card_coreCent_pre [Finite G] (hG : IsPGroup p G) {k : ℕ} (u : Fin k → G) :
+    Nat.card {g : G // ∀ h ∈ Subgroup.closure (Set.range u), ⁅g, h⁆ ∈ pN p G} *
+        p ^ Group.rank G =
+      p ^ finrank (ZMod p) (coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)) *
+        Nat.card G := by
+  have : Finite (VQ p G) := Finite.of_surjective _ piV_surjective
+  have : Finite (Additive (VQ p G)) := inferInstance
+  have : Module.Finite (ZMod p) (Additive (VQ p G)) := inferInstance
+  set KS := coreCentSub (p := p) u
+  have e1 : Nat.card {g : G // ∀ h ∈ Subgroup.closure (Set.range u), ⁅g, h⁆ ∈ pN p G} =
+      Nat.card (KS.comap (piV p G)) :=
+    Nat.card_congr (Equiv.subtypeEquivRight (q := fun g => g ∈ KS.comap (piV p G))
+      (fun g => mem_coreCent_lamLin_iff u g))
+  have e2 := Subgroup.card_mul_index (KS.comap (piV p G))
+  have e3 : (KS.comap (piV p G)).index = KS.index :=
+    Subgroup.index_comap_of_surjective (H := KS) piV_surjective
+  have e4 := Subgroup.card_mul_index KS
+  rw [card_V hG] at e4
+  let eK : KS ≃ coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u) :=
+    { toFun := fun x => ⟨Additive.ofMul x.1, x.2⟩
+      invFun := fun x => ⟨Additive.toMul x.1, x.2⟩
+      left_inv := fun _ => rfl
+      right_inv := fun _ => rfl }
+  have e5 : Nat.card KS =
+      p ^ finrank (ZMod p) (coreCent (lamLin (p := p) (G := G)) (coreImg (p := p) u)) := by
+    rw [Nat.card_congr eK, Module.natCard_eq_pow_finrank (K := ZMod p), Nat.card_zmod]
+  rw [e1, ← e4, e5, ← e2, e3]
+  ring
+
 end GroupCore
+
+section Mult3Group
+
+variable {m r1 r2 s lam m2 m3 r3 z k : ℕ}
+
+/-- (150) on `mult3Set`: the parameter `k` is the dimension of the core centraliser of a Sims
+core, and `k + s ≤ r1`. -/
+theorem mult3_k_add_s_le {G : FiniteGrp.{0}} (hG : G ∈ mult3Set m r1 r2 s lam m2 m3 r3 z k) :
+    k + s ≤ r1 := by
+  have : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
+  obtain ⟨hc, H, hH, hrk, hK, -⟩ := hG
+  obtain ⟨hcard, -, -, hr1, -, hs, -⟩ := (mem_cnt3Set_iff G).mp hc
+  have hP : IsPGroup 2 G := IsPGroup.of_card hcard
+  obtain ⟨x, hx⟩ := exists_enum_closure H
+  let u : Fin s → G := fun i => x i.val
+  have hu : Subgroup.closure (Set.range u) = H := by
+    have e : Set.range u = x '' Set.Iio (Group.rank H) := by
+      rw [hrk]
+      ext y
+      constructor
+      · rintro ⟨i, rfl⟩
+        exact ⟨i.val, i.isLt, rfl⟩
+      · rintro ⟨i, hi, rfl⟩
+        exact ⟨⟨i, hi⟩, rfl⟩
+    rw [e, hx]
+  have hcore : lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔
+      lcs G 2 := by
+    rw [hu]
+    exact hH.le
+  have hk' := group_finrank_coreCent_le hP u hcore hs.symm
+  have hcardK := card_coreCent_pre hP u
+  rw [hu, hr1] at hcardK
+  have heq : 2 ^ k * Nat.card G = 2 ^ finrank (ZMod 2)
+      (coreCent (lamLin (p := 2) (G := G)) (coreImg (p := 2) u)) * Nat.card G :=
+    hK.symm.trans hcardK
+  have hpos : 0 < Nat.card G := Nat.card_pos
+  have h2 := Nat.eq_of_mul_eq_mul_right hpos heq
+  have h3 := Nat.pow_right_injective (le_refl 2) h2
+  rw [hr1, hs] at hk'
+  omega
+
+end Mult3Group
 
 end Mult3
 
