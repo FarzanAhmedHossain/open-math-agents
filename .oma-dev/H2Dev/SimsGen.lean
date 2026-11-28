@@ -1,4 +1,6 @@
 import H2Dev.Rigidity
+import H2Dev.CoreFlag
+import H2Dev.Burnside
 
 /-! Li-Qiao, Section 2.1: Sims generating sets and their relation arrays, and Proposition 2.4
 (rigidity, BNV Theorem 5.6).
@@ -1119,165 +1121,472 @@ theorem exists_arrays [Finite G] (hp : p.Prime) (hG : Nat.card G = p ^ m) (hd : 
 
 end Layers
 
-section Build
 
-/-! Existence of a Sims-type generating tuple. Given core generators `u` (of a subgroup `H`
-with `γ₂ = [H, H] γ₃`) and further generators `v`, the tuple lists `u, v` (weight 1), then the
-commutators `[u_a, u_b]` (weight 2), then recursively `[x, u_b]` for every weight-`i` entry `x`
-(weight `i + 1`), up to a weight past the nilpotency class. Redundant entries are allowed:
-their relative orders are `0`. -/
+section Frattini
+
+/-! The Frattini argument for an abelian section, and the Frattini subgroups `layK p G w` of the
+layers: `layK p G 0 = Φ(G) = G^p γ_2` and `layK p G w = γ_{w+2} γ_{w+1}^p` (0-based weights), so
+that `lcs G w / layK p G w = L_{w+1} / p L_{w+1}`. -/
 
 variable {G : Type u} [Group G]
 
-/-- Lengths of the layers. -/
-def bLen (s r : ℕ) : ℕ → ℕ
-  | 0 => s + r
-  | 1 => s * s
-  | w + 2 => bLen s r (w + 1) * s
+/-- The `p`-th powers of the image of `A` in `G ⧸ B`; a subgroup when the image is abelian. -/
+def powImg (A B : Subgroup G) [B.Normal] (p : ℕ)
+    (hc : ∀ x ∈ A, ∀ y ∈ A, QuotientGroup.mk' B x * QuotientGroup.mk' B y =
+      QuotientGroup.mk' B y * QuotientGroup.mk' B x) : Subgroup (G ⧸ B) where
+  carrier := {z | ∃ a ∈ A, z = QuotientGroup.mk' B a ^ p}
+  mul_mem' := by
+    rintro _ _ ⟨a, ha, rfl⟩ ⟨b, hb, rfl⟩
+    show ∃ c ∈ A, QuotientGroup.mk' B a ^ p * QuotientGroup.mk' B b ^ p =
+      QuotientGroup.mk' B c ^ p
+    refine ⟨a * b, A.mul_mem ha hb, ?_⟩
+    rw [map_mul, (hc a ha b hb : Commute _ _).mul_pow]
+  one_mem' := by
+    show ∃ c ∈ A, (1 : G ⧸ B) = QuotientGroup.mk' B c ^ p
+    exact ⟨1, A.one_mem, by rw [map_one, one_pow]⟩
+  inv_mem' := by
+    rintro _ ⟨a, ha, rfl⟩
+    show ∃ c ∈ A, (QuotientGroup.mk' B a ^ p)⁻¹ = QuotientGroup.mk' B c ^ p
+    exact ⟨a⁻¹, A.inv_mem ha, by rw [map_inv, inv_pow]⟩
 
-/-- Offsets of the layers. -/
-def bOff (s r : ℕ) : ℕ → ℕ
-  | 0 => 0
-  | w + 1 => bOff s r w + bLen s r w
-
-lemma bLen_pos {s r : ℕ} (hs : 2 ≤ s) : ∀ w, 0 < bLen s r w
-  | 0 => by
-    show 0 < s + r
-    omega
-  | 1 => by
-    show 0 < s * s
-    exact Nat.mul_pos (by omega) (by omega)
-  | w + 2 => by
-    show 0 < bLen s r (w + 1) * s
-    exact Nat.mul_pos (bLen_pos hs (w + 1)) (by omega)
-
-lemma bOff_succ (s r w : ℕ) : bOff s r (w + 1) = bOff s r w + bLen s r w := rfl
-
-lemma bOff_mono {s r : ℕ} {a b : ℕ} (h : a ≤ b) : bOff s r a ≤ bOff s r b := by
-  induction b with
-  | zero =>
-    obtain rfl : a = 0 := by omega
-    exact le_rfl
-  | succ b ih =>
-    rcases Nat.lt_or_ge a (b + 1) with h' | h'
-    · rw [bOff_succ]
-      exact le_trans (ih (by omega)) (Nat.le_add_right _ _)
-    · obtain rfl : a = b + 1 := by omega
-      exact le_rfl
-
-/-- The layer of position `t`. -/
-def bLv (s r L t : ℕ) : ℕ := Nat.findGreatest (fun w => bOff s r w ≤ t) L
-
-lemma bLv_eq {s r L t w : ℕ} (hw : w ≤ L) (h1 : bOff s r w ≤ t) (h2 : t < bOff s r (w + 1)) :
-    bLv s r L t = w := by
-  unfold bLv
-  have hle := Nat.le_findGreatest (P := fun w => bOff s r w ≤ t) hw h1
-  have hspec : bOff s r (Nat.findGreatest (fun w => bOff s r w ≤ t) L) ≤ t :=
-    Nat.findGreatest_spec (P := fun w => bOff s r w ≤ t) hw h1
+/-- The Frattini argument for an abelian section `A / B` of a finite `p`-group: if
+`A ≤ B A^p`, then `A ≤ B`. -/
+theorem frat_section [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
+    (A B : Subgroup G) [B.Normal] (hAB : ∀ x ∈ A, ∀ y ∈ A, ⁅x, y⁆ ∈ B)
+    (h : A ≤ B ⊔ Subgroup.closure (Set.range (fun g : A => (g : G) ^ p))) : A ≤ B := by
+  classical
+  have : Fact p.Prime := ⟨hp⟩
+  have : Finite (G ⧸ B) := Finite.of_surjective _ (QuotientGroup.mk'_surjective B)
+  have hker : ∀ g : G, QuotientGroup.mk' B g = 1 ↔ g ∈ B := fun g => by
+    rw [← MonoidHom.mem_ker, QuotientGroup.ker_mk']
+  have hc : ∀ x ∈ A, ∀ y ∈ A, QuotientGroup.mk' B x * QuotientGroup.mk' B y =
+      QuotientGroup.mk' B y * QuotientGroup.mk' B x := by
+    intro x hx y hy
+    have h1 : QuotientGroup.mk' B ⁅x, y⁆ = 1 := (hker _).mpr (hAB x hx y hy)
+    rw [map_commutatorElement] at h1
+    exact commutatorElement_eq_one_iff_mul_comm.mp h1
+  have hle : A ≤ (powImg A B p hc).comap (QuotientGroup.mk' B) := by
+    refine h.trans (sup_le ?_ ?_)
+    · intro b hb
+      show ∃ a' ∈ A, QuotientGroup.mk' B b = QuotientGroup.mk' B a' ^ p
+      exact ⟨1, A.one_mem, by rw [map_one, one_pow, (hker b).mpr hb]⟩
+    · rw [Subgroup.closure_le]
+      rintro _ ⟨g, rfl⟩
+      show ∃ a' ∈ A, QuotientGroup.mk' B ((g : G) ^ p) = QuotientGroup.mk' B a' ^ p
+      exact ⟨g, g.2, by rw [map_pow]⟩
+  have hAQ : ∀ a ∈ A, ∃ a' ∈ A, QuotientGroup.mk' B a = QuotientGroup.mk' B a' ^ p :=
+    fun a ha => hle ha
+  have hsurj : Function.Surjective (fun z : A.map (QuotientGroup.mk' B) =>
+      (⟨(z : G ⧸ B) ^ p, pow_mem z.2 p⟩ : A.map (QuotientGroup.mk' B))) := by
+    rintro ⟨y, hy⟩
+    obtain ⟨a, ha, rfl⟩ := Subgroup.mem_map.mp hy
+    obtain ⟨a', ha', he⟩ := hAQ a ha
+    exact ⟨⟨QuotientGroup.mk' B a', Subgroup.mem_map_of_mem _ ha'⟩, Subtype.ext he.symm⟩
+  have hinj := Finite.injective_iff_surjective.mpr hsurj
+  intro a ha
+  rw [← hker]
   by_contra hne
-  have hgt : w + 1 ≤ Nat.findGreatest (fun w => bOff s r w ≤ t) L := by omega
-  have := bOff_mono (s := s) (r := r) hgt
-  omega
+  obtain ⟨k, hk⟩ := (IsPGroup.of_card hG).to_quotient B (QuotientGroup.mk' B a)
+  have hex : ∃ k, QuotientGroup.mk' B a ^ p ^ k = 1 := ⟨k, hk⟩
+  obtain ⟨k0, hspec, hmin⟩ : ∃ k0, QuotientGroup.mk' B a ^ p ^ k0 = 1 ∧
+      ∀ j < k0, QuotientGroup.mk' B a ^ p ^ j ≠ 1 :=
+    ⟨Nat.find hex, Nat.find_spec hex, fun j hj => Nat.find_min hex hj⟩
+  have hk0 : k0 ≠ 0 := by
+    rintro rfl
+    rw [pow_zero, pow_one] at hspec
+    exact hne hspec
+  have hz : (QuotientGroup.mk' B a ^ p ^ (k0 - 1)) ^ p = 1 := by
+    rw [← pow_mul, ← pow_succ, show k0 - 1 + 1 = k0 by omega, hspec]
+  have hzA : QuotientGroup.mk' B a ^ p ^ (k0 - 1) ∈ A.map (QuotientGroup.mk' B) :=
+    pow_mem (Subgroup.mem_map_of_mem _ ha) _
+  have heq : (⟨_, hzA⟩ : A.map (QuotientGroup.mk' B)) = ⟨1, one_mem _⟩ := by
+    apply hinj
+    apply Subtype.ext
+    show (QuotientGroup.mk' B a ^ p ^ (k0 - 1)) ^ p = (1 : G ⧸ B) ^ p
+    rw [hz, one_pow]
+  exact hmin (k0 - 1) (by omega) (congrArg Subtype.val heq)
 
-lemma bLv_spec {s r L t : ℕ} (ht : t < bOff s r (L + 1)) :
-    bOff s r (bLv s r L t) ≤ t ∧ t < bOff s r (bLv s r L t + 1) ∧ bLv s r L t ≤ L := by
-  have h1 : bOff s r (bLv s r L t) ≤ t :=
-    Nat.findGreatest_spec (P := fun w => bOff s r w ≤ t) (Nat.zero_le L) (Nat.zero_le t)
-  have h3 : bLv s r L t ≤ L := Nat.findGreatest_le L
-  refine ⟨h1, ?_, h3⟩
-  by_cases hL : bLv s r L t = L
-  · rw [hL]
-    exact ht
-  · have h4 := Nat.findGreatest_is_greatest (P := fun w => bOff s r w ≤ t)
-      (n := L) (k := bLv s r L t + 1) (by unfold bLv; omega) (by omega)
-    exact not_le.mp h4
+/-- The Frattini subgroup of the layer of 0-based weight `w`. -/
+def layK (p : ℕ) (G : Type u) [Group G] : ℕ → Subgroup G
+  | 0 => pPhi p G
+  | w + 1 => lcs G (w + 2) ⊔ Subgroup.closure (Set.range (fun g : lcs G (w + 1) => (g : G) ^ p))
 
-lemma bLv_mono {s r L t t' : ℕ} (ht' : t' < bOff s r (L + 1)) (h : t ≤ t') :
-    bLv s r L t ≤ bLv s r L t' := by
-  have ht : t < bOff s r (L + 1) := lt_of_le_of_lt h ht'
-  obtain ⟨h1, -, -⟩ := bLv_spec ht
-  obtain ⟨-, h2', -⟩ := bLv_spec ht'
-  by_contra hc
-  have := bOff_mono (s := s) (r := r) (show bLv s r L t' + 1 ≤ bLv s r L t by omega)
-  omega
+lemma layK_one (p : ℕ) : layK p G 1 = pN p G := rfl
 
-/-- The core generator of index `k` (junk `1` out of range). -/
-def bCore {s : ℕ} (u : Fin s → G) (k : ℕ) : G := if h : k < s then u ⟨k, h⟩ else 1
+lemma lcs_succ_le_layK (p : ℕ) : ∀ w, lcs G (w + 1) ≤ layK p G w
+  | 0 => by
+    show lcs G 1 ≤ pPhi p G
+    rw [← commutator_eq_lcs_one]
+    exact le_sup_right
+  | _ + 1 => le_sup_left
 
-/-- The core pair of a weight-2 slot (`(0, 1)` for the redundant slots). -/
-def bPair (s i : ℕ) : ℕ × ℕ := if i / s < i % s then (i / s, i % s) else (0, 1)
+lemma layK_le_lcs (p : ℕ) (w : ℕ) : layK p G (w + 1) ≤ lcs G (w + 1) := by
+  show lcs G (w + 2) ⊔ Subgroup.closure (Set.range (fun g : lcs G (w + 1) => (g : G) ^ p)) ≤
+    lcs G (w + 1)
+  refine sup_le (lcs_antitone (by omega)) ?_
+  rw [Subgroup.closure_le]
+  rintro _ ⟨g, rfl⟩
+  exact pow_mem g.2 p
 
-/-- The value in slot `i` of layer `w`. -/
-def bVal {s r : ℕ} (u : Fin s → G) (v : Fin r → G) : ℕ → ℕ → G
-  | 0, i => if h : i < s then u ⟨i, h⟩ else if h' : i - s < r then v ⟨i - s, h'⟩ else 1
-  | 1, i => ⁅bCore u (bPair s i).1, bCore u (bPair s i).2⁆
-  | w + 2, i => ⁅bVal u v (w + 1) (i / s), bCore u (i % s)⁆
+lemma pow_mem_layK (p : ℕ) : ∀ (w : ℕ) (x : G), x ∈ lcs G w → x ^ p ∈ layK p G w
+  | 0, x, _ => pow_mem_pPhi p x
+  | w + 1, x, hx => Subgroup.mem_sup_right (Subgroup.subset_closure ⟨⟨x, hx⟩, rfl⟩)
 
-/-- `k` as an element of `Fin n` (junk `dflt` out of range). -/
-def bFin (n k : ℕ) (dflt : Fin n) : Fin n := if h : k < n then ⟨k, h⟩ else dflt
+lemma layK_normal_sup (p : ℕ) (w : ℕ) (T : Set G) (hT : T ⊆ lcs G w) :
+    (Subgroup.closure T ⊔ layK p G w).Normal := by
+  rcases w with _ | w
+  · exact normal_of_lcs_one_le ((lcs_succ_le_layK p 0).trans le_sup_right)
+  · exact normal_of_sandwich (n := w + 1) ((lcs_succ_le_layK p (w + 1)).trans le_sup_right)
+      (sup_le ((Subgroup.closure_le _).mpr hT) (layK_le_lcs p w))
 
-lemma bFin_val {n k : ℕ} (dflt : Fin n) (h : k < n) : (bFin n k dflt).val = k := by
-  unfold bFin
+/-- The Frattini argument for a layer. -/
+lemma frat_layer [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) (w : ℕ)
+    (T : Set G) (hT : T ⊆ lcs G (w + 1))
+    (h : lcs G (w + 1) ≤ Subgroup.closure T ⊔ layK p G (w + 1)) :
+    lcs G (w + 1) ≤ Subgroup.closure T ⊔ lcs G (w + 2) := by
+  have hN : (Subgroup.closure T ⊔ lcs G (w + 2)).Normal :=
+    normal_of_sandwich (n := w + 1) le_sup_right
+      (sup_le ((Subgroup.closure_le _).mpr hT) (lcs_antitone (by omega)))
+  refine frat_section hp hG (lcs G (w + 1)) _ ?_ ?_
+  · intro x hx y hy
+    have h1 := commElem_mem_lcs_add hx hy
+    exact Subgroup.mem_sup_right
+      (lcs_antitone (D := G) (show w + 2 ≤ w + 1 + (w + 1) + 1 by omega) h1)
+  · rw [sup_assoc]
+    exact h
+
+/-- `|⟨x_0, ..., x_{j-1}⟩ M| ≤ p ^ j |M|` when each `⟨x_0, ..., x_{j-1}⟩ M` is normal and
+`x_j ^ p ∈ M`. -/
+lemma card_closure_sup_le_of [Finite G] {p : ℕ} (hp : 0 < p) (M : Subgroup G) (x : ℕ → G)
+    (hN : ∀ j, (Subgroup.closure (x '' Set.Iio j) ⊔ M).Normal) (hMp : ∀ j, x j ^ p ∈ M) :
+    ∀ j, Nat.card (Subgroup.closure (x '' Set.Iio j) ⊔ M : Subgroup G) ≤ p ^ j * Nat.card M := by
+  intro j
+  induction j with
+  | zero =>
+    have hle : Subgroup.closure (x '' Set.Iio 0) ⊔ M ≤ M := by
+      refine sup_le ?_ le_rfl
+      rw [Subgroup.closure_le]
+      rintro _ ⟨i, hi, rfl⟩
+      exact absurd (Set.mem_Iio.mp hi) (Nat.not_lt_zero i)
+    rw [pow_zero, one_mul]
+    exact Subgroup.card_le_of_le hle
+  | succ j ih =>
+    have := hN j
+    have hle : Subgroup.closure (x '' Set.Iio (j + 1)) ⊔ M ≤
+        (Subgroup.closure (x '' Set.Iio j) ⊔ M) ⊔ Subgroup.zpowers (x j) := by
+      refine sup_le ?_ (le_sup_right.trans le_sup_left)
+      rw [Subgroup.closure_le]
+      rintro _ ⟨i, hi, rfl⟩
+      have hi' : i < j + 1 := Set.mem_Iio.mp hi
+      by_cases hij : i < j
+      · exact Subgroup.mem_sup_left (Subgroup.mem_sup_left
+          (Subgroup.subset_closure ⟨i, Set.mem_Iio.mpr hij, rfl⟩))
+      · rw [show i = j by omega]
+        exact Subgroup.mem_sup_right (Subgroup.mem_zpowers (x j))
+    have h1 := Subgroup.card_le_of_le hle
+    have h2 := card_sup_zpowers_le (K := Subgroup.closure (x '' Set.Iio j) ⊔ M) hp
+      (Subgroup.mem_sup_right (hMp j))
+    have h3 : p * Nat.card (Subgroup.closure (x '' Set.Iio j) ⊔ M : Subgroup G) ≤
+        p * (p ^ j * Nat.card M) := Nat.mul_le_mul le_rfl ih
+    have e : p * (p ^ j * Nat.card M) = p ^ (j + 1) * Nat.card M := by
+      rw [pow_succ]
+      ring
+    rw [← e]
+    exact h1.trans (h2.trans h3)
+
+end Frattini
+
+section Greedy
+
+/-! Greedy selection of a minimal generating sublist modulo a subgroup `K`, in the given order:
+`c j` is kept iff it is not in the subgroup generated by the kept earlier entries and `K`. -/
+
+variable {G : Type u} [Group G]
+
+open Classical in
+/-- The indices `< j` kept by the greedy selection. -/
+noncomputable def gsel (c : ℕ → G) (K : Subgroup G) : ℕ → Finset ℕ
+  | 0 => ∅
+  | j + 1 => if c j ∈ Subgroup.closure (c '' (gsel c K j : Set ℕ)) ⊔ K then gsel c K j
+      else insert j (gsel c K j)
+
+lemma gsel_cases (c : ℕ → G) (K : Subgroup G) (j : ℕ) :
+    (gsel c K (j + 1) = gsel c K j ∧
+      c j ∈ Subgroup.closure (c '' (gsel c K j : Set ℕ)) ⊔ K) ∨
+    (gsel c K (j + 1) = insert j (gsel c K j) ∧
+      c j ∉ Subgroup.closure (c '' (gsel c K j : Set ℕ)) ⊔ K) := by
+  by_cases h : c j ∈ Subgroup.closure (c '' (gsel c K j : Set ℕ)) ⊔ K
+  · left
+    refine ⟨?_, h⟩
+    simp only [gsel, if_pos h]
+  · right
+    refine ⟨?_, h⟩
+    simp only [gsel, if_neg h]
+
+lemma gsel_sub (c : ℕ → G) (K : Subgroup G) : ∀ j, ∀ i ∈ gsel c K j, i < j
+  | 0, i, hi => by simp [gsel] at hi
+  | j + 1, i, hi => by
+    rcases gsel_cases c K j with ⟨h, -⟩ | ⟨h, -⟩
+    · rw [h] at hi
+      exact Nat.lt_succ_of_lt (gsel_sub c K j i hi)
+    · rw [h, Finset.mem_insert] at hi
+      rcases hi with rfl | hi
+      · exact Nat.lt_succ_self _
+      · exact Nat.lt_succ_of_lt (gsel_sub c K j i hi)
+
+lemma gsel_mem_iff (c : ℕ → G) (K : Subgroup G) :
+    ∀ d j i, i < j → (i ∈ gsel c K (j + d) ↔ i ∈ gsel c K j)
+  | 0, _, _, _ => Iff.rfl
+  | d + 1, j, i, hij => by
+    rw [← gsel_mem_iff c K d j i hij, show j + (d + 1) = j + d + 1 by omega]
+    rcases gsel_cases c K (j + d) with ⟨h, -⟩ | ⟨h, -⟩
+    · rw [h]
+    · rw [h, Finset.mem_insert]
+      constructor
+      · rintro (h' | h')
+        · exact absurd h' (by omega)
+        · exact h'
+      · exact Or.inr
+
+lemma gsel_span (c : ℕ → G) (K : Subgroup G) :
+    ∀ j, ∀ i < j, c i ∈ Subgroup.closure (c '' (gsel c K j : Set ℕ)) ⊔ K
+  | 0, i, hi => absurd hi (Nat.not_lt_zero i)
+  | j + 1, i, hi => by
+    have hmono : Subgroup.closure (c '' (gsel c K j : Set ℕ)) ⊔ K ≤
+        Subgroup.closure (c '' (gsel c K (j + 1) : Set ℕ)) ⊔ K := by
+      refine sup_le_sup_right (Subgroup.closure_mono (Set.image_mono ?_)) K
+      intro x hx
+      rcases gsel_cases c K j with ⟨h, -⟩ | ⟨h, -⟩
+      · rw [h]
+        exact hx
+      · rw [h, Finset.coe_insert]
+        exact Set.mem_insert_of_mem _ hx
+    by_cases hij : i < j
+    · exact hmono (gsel_span c K j i hij)
+    · have hij' : i = j := by omega
+      subst hij'
+      rcases gsel_cases c K i with ⟨-, h'⟩ | ⟨h, -⟩
+      · exact hmono h'
+      · refine Subgroup.mem_sup_left (Subgroup.subset_closure ⟨i, ?_, rfl⟩)
+        rw [h, Finset.coe_insert]
+        exact Set.mem_insert _ _
+
+lemma gsel_indep (c : ℕ → G) (K : Subgroup G) {j i : ℕ} (hi : i ∈ gsel c K j) :
+    c i ∉ Subgroup.closure (c '' (gsel c K i : Set ℕ)) ⊔ K := by
+  have hij := gsel_sub c K j i hi
+  obtain ⟨d, rfl⟩ : ∃ d, j = i + 1 + d := ⟨j - (i + 1), by omega⟩
+  have h1 : i ∈ gsel c K (i + 1) :=
+    (gsel_mem_iff c K d (i + 1) i (Nat.lt_succ_self i)).mp hi
+  rcases gsel_cases c K i with ⟨h, -⟩ | ⟨-, h'⟩
+  · rw [h] at h1
+    exact absurd (gsel_sub c K i i h1) (lt_irrefl i)
+  · exact h'
+
+/-- The `i`-th element of `S` in increasing order (junk `0` out of range). -/
+noncomputable def genum (S : Finset ℕ) (i : ℕ) : ℕ :=
+  if h : i < S.card then S.orderEmbOfFin rfl ⟨i, h⟩ else 0
+
+lemma genum_mem (S : Finset ℕ) {i : ℕ} (h : i < S.card) : genum S i ∈ S := by
+  unfold genum
   rw [dif_pos h]
+  exact Finset.orderEmbOfFin_mem S rfl _
 
-/-- The commutator definitions. -/
-def bDf (s r L : ℕ) (t : Fin (bOff s r (L + 1))) :
-    Fin (bOff s r (L + 1)) × Fin (bOff s r (L + 1)) :=
-  match bLv s r L t.val with
-  | 0 => (t, t)
-  | 1 => (bFin _ (bPair s (t.val - bOff s r 1)).1 t, bFin _ (bPair s (t.val - bOff s r 1)).2 t)
-  | w + 2 => (bFin _ (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t,
-      bFin _ ((t.val - bOff s r (w + 2)) % s) t)
+lemma genum_lt (S : Finset ℕ) {i j : ℕ} (hij : i < j) (hj : j < S.card) :
+    genum S i < genum S j := by
+  unfold genum
+  rw [dif_pos (lt_trans hij hj), dif_pos hj]
+  exact (S.orderEmbOfFin rfl).strictMono (Fin.mk_lt_mk.mpr hij)
 
-lemma bDf_one {s r L : ℕ} (t : Fin (bOff s r (L + 1))) (h : bLv s r L t.val = 1) :
-    bDf s r L t = (bFin _ (bPair s (t.val - bOff s r 1)).1 t,
-      bFin _ (bPair s (t.val - bOff s r 1)).2 t) := by
-  unfold bDf
-  rw [h]
+lemma genum_le (S : Finset ℕ) {i j : ℕ} (hij : i ≤ j) (hj : j < S.card) :
+    genum S i ≤ genum S j := by
+  rcases Nat.lt_or_ge i j with h | h
+  · exact (genum_lt S h hj).le
+  · have hij' : i = j := by omega
+    subst hij'
+    exact le_rfl
 
-lemma bDf_two {s r L w : ℕ} (t : Fin (bOff s r (L + 1))) (h : bLv s r L t.val = w + 2) :
-    bDf s r L t = (bFin _ (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t,
-      bFin _ ((t.val - bOff s r (w + 2)) % s) t) := by
-  unfold bDf
-  rw [h]
+lemma genum_inj (S : Finset ℕ) {i j : ℕ} (hi : i < S.card) (hj : j < S.card)
+    (h : genum S i = genum S j) : i = j := by
+  rcases lt_trichotomy i j with h' | h' | h'
+  · exact absurd h (genum_lt S h' hj).ne
+  · exact h'
+  · exact absurd h (genum_lt S h' hi).ne'
 
-/-- The shape of the constructed tuple (the arrays are filled in by `exists_arrays`). -/
-def bData (s r L : ℕ) : SimsData where
-  n := bOff s r (L + 1)
-  s := s
-  lv := fun t => bLv s r L t.val
-  df := bDf s r L
-  a := fun _ => 0
-  b := fun _ _ => 0
-  c := fun _ _ _ => 0
+lemma genum_surj (S : Finset ℕ) {x : ℕ} (hx : x ∈ S) : ∃ i < S.card, genum S i = x := by
+  have hr : x ∈ Set.range (S.orderEmbOfFin rfl) := by
+    rw [Finset.range_orderEmbOfFin]
+    exact hx
+  obtain ⟨⟨i, hi⟩, rfl⟩ := hr
+  refine ⟨i, hi, ?_⟩
+  unfold genum
+  rw [dif_pos hi]
 
-/-- The constructed tuple. -/
-def bX {s r L : ℕ} (u : Fin s → G) (v : Fin r → G) (t : Fin (bData s r L).n) : G :=
-  bVal u v (bLv s r L t.val) (t.val - bOff s r (bLv s r L t.val))
+/-- A layer: `r` entries `x 0, ..., x (r - 1)` (junk `1` beyond), with the parent index `par` and
+core index `cor` of each entry (for weights `≥ 2`). -/
+structure SLay (G : Type u) where
+  r : ℕ
+  x : ℕ → G
+  par : ℕ → ℕ
+  cor : ℕ → ℕ
 
-lemma bX_eq {s r L : ℕ} (u : Fin s → G) (v : Fin r → G) (t : Fin (bData s r L).n) {w : ℕ}
-    (hw : bLv s r L t.val = w) : bX u v t = bVal u v w (t.val - bOff s r w) := by
-  unfold bX
-  rw [hw]
+/-- The greedy layer selected from the candidates `c 0, ..., c (N - 1)` modulo `K`. -/
+noncomputable def gLay (c : ℕ → G) (K : Subgroup G) (N : ℕ) (pa co : ℕ → ℕ) : SLay G where
+  r := (gsel c K N).card
+  x := fun i => if i < (gsel c K N).card then c (genum (gsel c K N) i) else 1
+  par := fun i => pa (genum (gsel c K N) i)
+  cor := fun i => co (genum (gsel c K N) i)
 
-lemma bLv_small {s r L k : ℕ} (hk : k < s + r) : bLv s r L k = 0 :=
-  bLv_eq (Nat.zero_le L) (Nat.zero_le k) (by show k < 0 + (s + r); omega)
+variable (c : ℕ → G) (K : Subgroup G) (N : ℕ) (pa co : ℕ → ℕ)
 
-lemma bX_core {s r L : ℕ} (u : Fin s → G) (v : Fin r → G) (t : Fin (bData s r L).n) {k : ℕ}
-    (hk : k < s) (htk : t.val = k) : bX u v t = bCore u k := by
-  rw [bX_eq u v t (bLv_small (by omega)), htk]
-  simp [bOff, bVal, bCore, hk]
+lemma gLay_x {i : ℕ} (hi : i < (gsel c K N).card) :
+    (gLay c K N pa co).x i = c (genum (gsel c K N) i) := if_pos hi
 
-lemma bX_v {s r L : ℕ} (u : Fin s → G) (v : Fin r → G) (t : Fin (bData s r L).n) (j : Fin r)
-    (htj : t.val = s + j.val) : bX u v t = v j := by
-  have hj := j.isLt
-  rw [bX_eq u v t (bLv_small (by omega)), htj]
-  have h1 : ¬ (s + j.val < s) := by omega
-  have h2 : s + j.val - s = j.val := by omega
-  simp [bOff, bVal, h1, h2]
+lemma gLay_x_cases (i : ℕ) :
+    (gLay c K N pa co).x i = c (genum (gsel c K N) i) ∨ (gLay c K N pa co).x i = 1 := by
+  by_cases hi : i < (gsel c K N).card
+  · exact Or.inl (if_pos hi)
+  · exact Or.inr (if_neg hi)
+
+lemma gsel_genum_earlier {i i' : ℕ} (hi : i < (gsel c K N).card) (hi' : i' < i) :
+    genum (gsel c K N) i' ∈ gsel c K (genum (gsel c K N) i) := by
+  have h1 := genum_lt (gsel c K N) hi' hi
+  have h2 := gsel_sub c K N _ (genum_mem _ hi)
+  have h3 := genum_mem (gsel c K N) (lt_trans hi' hi)
+  have h4 := gsel_mem_iff c K (N - genum (gsel c K N) i) (genum (gsel c K N) i) _ h1
+  rw [show genum (gsel c K N) i + (N - genum (gsel c K N) i) = N by omega] at h4
+  exact h4.mp h3
+
+/-- Independence of a greedy layer modulo `K`. -/
+lemma gLay_indep {i : ℕ} (hi : i < (gLay c K N pa co).r) :
+    (gLay c K N pa co).x i ∉ Subgroup.closure ((gLay c K N pa co).x '' Set.Iio i) ⊔ K := by
+  intro hmem
+  have hi' : i < (gsel c K N).card := hi
+  rw [gLay_x c K N pa co hi'] at hmem
+  apply gsel_indep c K (genum_mem (gsel c K N) hi')
+  refine (sup_le_sup_right (Subgroup.closure_mono ?_) K) hmem
+  rintro _ ⟨i', hi'', rfl⟩
+  have hi''' : i' < i := hi''
+  refine ⟨genum (gsel c K N) i', gsel_genum_earlier c K N hi' hi''', ?_⟩
+  exact (gLay_x c K N pa co (lt_trans hi''' hi')).symm
+
+/-- Prefix spanning of a greedy layer: the first `J` candidates are generated modulo `K` by the
+kept entries among them. -/
+lemma gLay_span {J : ℕ} (hJ : J ≤ N) {j : ℕ} (hj : j < J) :
+    c j ∈ Subgroup.closure ((gLay c K N pa co).x ''
+      {i | i < (gsel c K N).card ∧ genum (gsel c K N) i < J}) ⊔ K := by
+  refine (sup_le_sup_right (Subgroup.closure_mono ?_) K) (gsel_span c K J j hj)
+  rintro _ ⟨y, hy, rfl⟩
+  have hyJ : y < J := gsel_sub c K J y hy
+  have hyS : y ∈ gsel c K N := by
+    have h1 := gsel_mem_iff c K (N - J) J y hyJ
+    rw [show J + (N - J) = N by omega] at h1
+    exact h1.mpr hy
+  obtain ⟨i, hi, rfl⟩ := genum_surj _ hyS
+  exact ⟨i, ⟨hi, hyJ⟩, gLay_x c K N pa co hi⟩
+
+lemma gLay_span_all {j : ℕ} (hj : j < N) :
+    c j ∈ Subgroup.closure ((gLay c K N pa co).x '' Set.Iio (gLay c K N pa co).r) ⊔ K := by
+  refine (sup_le_sup_right (Subgroup.closure_mono ?_) K) (gLay_span c K N pa co le_rfl hj)
+  rintro _ ⟨i, ⟨hi, -⟩, rfl⟩
+  exact ⟨i, hi, rfl⟩
+
+end Greedy
+
+section TheoremL
+
+/-! Theorem L (BNV Prop 3.8 / LQ Lemma 2.2, eq (34)) for a core `u_0, ..., u_{s-1}`: with
+`E_1 = {[u_a, u_b] : a < b < s}` and `E_{w+1} = {[y, u_b] : y ∈ ⟨E_w⟩, b < s}`, each `γ_{w+1}` is
+generated by `E_w` modulo `γ_{w+2}`, provided `γ_2 ≤ ⟨E_1⟩ γ_3`. -/
+
+variable {G : Type u} [Group G]
+
+/-- The candidate sets of Theorem L. -/
+def lieE (s : ℕ) (u : ℕ → G) : ℕ → Set G
+  | 0 => ∅
+  | 1 => (fun ab : ℕ × ℕ => ⁅u ab.1, u ab.2⁆) '' {ab | ab.1 < ab.2 ∧ ab.2 < s}
+  | w + 2 => {x | ∃ y ∈ Subgroup.closure (lieE s u (w + 1)), ∃ b < s, x = ⁅y, u b⁆}
+
+lemma lieE_sub (s : ℕ) (u : ℕ → G) : ∀ w, lieE s u (w + 1) ⊆ (lcs G (w + 1) : Set G)
+  | 0 => by
+    rintro _ ⟨ab, -, rfl⟩
+    exact commElem_mem_lcs_one _ _
+  | w + 1 => by
+    rintro _ ⟨y, hy, b, -, rfl⟩
+    have hy' : y ∈ lcs G (w + 1) := (Subgroup.closure_le _).mpr (lieE_sub s u w) hy
+    exact commElem_mem_lcs_succ hy' _
+
+theorem theoremL (s : ℕ) (u : ℕ → G) (H1 : Set G)
+    (hL0 : Subgroup.closure H1 ⊔ lcs G 1 = ⊤)
+    (hcore : lcs G 1 ≤ Subgroup.closure (lieE s u 1) ⊔ lcs G 2) :
+    ∀ w, 1 ≤ w → lcs G w ≤ Subgroup.closure (lieE s u w) ⊔ lcs G (w + 1) := by
+  refine lie_lemma s u H1 {ab | ab.1 < ab.2 ∧ ab.2 < s} (lieE s u) (fun ab hab => hab) rfl
+    ?_ hL0 ?_ ?_ ?_
+  · intro w hw x hx
+    obtain ⟨w', rfl⟩ : ∃ w', w = w' + 1 := ⟨w - 1, by omega⟩
+    exact hx
+  · intro x _ y _
+    exact hcore (commElem_mem_lcs_one x y)
+  · intro ab hab k hk
+    have hk' : k < s := lt_of_le_of_lt hk hab.2
+    refine Subgroup.mem_sup_left (Subgroup.subset_closure ?_)
+    show ⁅⁅u ab.1, u ab.2⁆, u k⁆ ∈ lieE s u (0 + 2)
+    exact ⟨⁅u ab.1, u ab.2⁆, Subgroup.subset_closure ⟨ab, hab, rfl⟩, k, hk', rfl⟩
+  · intro w hw x hx k hk
+    obtain ⟨w', rfl⟩ : ∃ w', w = w' + 1 := ⟨w - 1, by omega⟩
+    refine Subgroup.mem_sup_left (Subgroup.subset_closure ?_)
+    show ⁅x, u k⁆ ∈ lieE s u (w' + 2)
+    exact ⟨x, Subgroup.subset_closure hx, k, hk, rfl⟩
+
+end TheoremL
+
+section Layers2
+
+/-! The layers of the Sims generating set. Layer `0` (weight 1) is the core `u_0, ..., u_{s-1}`
+followed by a greedy completion to a basis modulo `Φ(G)`; layer `1` (weight 2) is the greedy
+selection modulo `γ_3 γ_2^p` from the core commutators `[u_a, u_b]` (`a < b`), listed in the
+order `b`-major (blocks by `b`, as in (23)/(24)); layer `w + 1 ≥ 2` is the greedy selection
+modulo `γ_{w+3} γ_{w+2}^p` from the commutators `[x, u_b]` of the layer-`w` entries `x` with the
+core (index `a * s + b`). -/
+
+variable {G : Type u} [Group G]
+
+/-- Parent index of candidate `j` of layer `w + 1`. -/
+def cPar (s w j : ℕ) : ℕ := if w = 0 then j % s else j / s
+
+/-- Core index of candidate `j` of layer `w + 1`. -/
+def cCor (s w j : ℕ) : ℕ := if w = 0 then j / s else j % s
+
+/-- Candidate `j` of layer `w + 1` built from layer `w` (junk `1` for the pairs `a ≥ b` of
+layer 1). -/
+def cVal (s : ℕ) (u : ℕ → G) (w : ℕ) (L : SLay G) (j : ℕ) : G :=
+  if w = 0 ∧ ¬ cPar s w j < cCor s w j then 1 else ⁅L.x (cPar s w j), u (cCor s w j)⁆
+
+/-- Number of candidates of layer `w + 1`. -/
+def cN (s w : ℕ) (L : SLay G) : ℕ := if w = 0 then s * s else L.r * s
+
+lemma cPar_zero {s j : ℕ} : cPar s 0 j = j % s := if_pos rfl
+lemma cCor_zero {s j : ℕ} : cCor s 0 j = j / s := if_pos rfl
+lemma cN_zero {s : ℕ} {L : SLay G} : cN s 0 L = s * s := if_pos rfl
+lemma cPar_ne {s w j : ℕ} (hw : w ≠ 0) : cPar s w j = j / s := if_neg hw
+lemma cCor_ne {s w j : ℕ} (hw : w ≠ 0) : cCor s w j = j % s := if_neg hw
+lemma cN_ne {s w : ℕ} {L : SLay G} (hw : w ≠ 0) : cN s w L = L.r * s := if_neg hw
+
+lemma cVal_succ (s : ℕ) (u : ℕ → G) (w : ℕ) (L : SLay G) (j : ℕ) :
+    cVal s u (w + 1) L j = ⁅L.x (j / s), u (j % s)⁆ := by
+  unfold cVal
+  rw [if_neg (show ¬ (w + 1 = 0 ∧ ¬ cPar s (w + 1) j < cCor s (w + 1) j) from
+    fun h => absurd h.1 (by omega)), cPar_ne (show w + 1 ≠ 0 by omega),
+    cCor_ne (show w + 1 ≠ 0 by omega)]
+
+lemma cVal_zero_of_lt (s : ℕ) (u : ℕ → G) (L : SLay G) {j : ℕ} (h : j % s < j / s) :
+    cVal s u 0 L j = ⁅L.x (j % s), u (j / s)⁆ := by
+  unfold cVal
+  rw [if_neg (show ¬ ((0 : ℕ) = 0 ∧ ¬ cPar s 0 j < cCor s 0 j) from
+    fun h' => h'.2 (by rw [cPar_zero, cCor_zero]; exact h)), cPar_zero, cCor_zero]
 
 lemma slot_lt {s A a b : ℕ} (ha : a < A) (hb : b < s) : a * s + b < A * s :=
-  lt_of_lt_of_le (Nat.add_lt_add_left hb _) (by rw [← Nat.succ_mul]; exact Nat.mul_le_mul_right _ ha)
+  lt_of_lt_of_le (Nat.add_lt_add_left hb _)
+    (by rw [← Nat.succ_mul]; exact Nat.mul_le_mul_right _ ha)
 
 lemma slot_div {s a b : ℕ} (hb : b < s) : (a * s + b) / s = a := by
   rw [add_comm, Nat.add_mul_div_right _ _ (by omega : 0 < s), Nat.div_eq_of_lt hb, zero_add]
@@ -1285,390 +1594,189 @@ lemma slot_div {s a b : ℕ} (hb : b < s) : (a * s + b) / s = a := by
 lemma slot_mod {s a b : ℕ} (hb : b < s) : (a * s + b) % s = b := by
   rw [add_comm, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt hb]
 
-lemma bData_s_le {s r L : ℕ} : s ≤ bOff s r (L + 1) := by
-  have := bOff_mono (s := s) (r := r) (show 1 ≤ L + 1 by omega)
-  have h1 : bOff s r 1 = 0 + (s + r) := rfl
-  omega
-
-lemma bData_struct {s r L : ℕ} (hs : 2 ≤ s) : (bData s r L).Struct := by
-  have hspos : 0 < s := by omega
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro t u htu
-    exact bLv_mono u.isLt (Fin.le_def.mp htu)
-  · exact bData_s_le
-  · intro t ht
-    have ht' : t.val < s := ht
-    exact bLv_small (by omega)
-  · intro t ht
-    have hsp := bLv_spec t.isLt
-    show bLv s r L ((bDf s r L t).1).val + 1 = bLv s r L t.val
-    have ht' : 1 ≤ bLv s r L t.val := ht
-    rcases hw : bLv s r L t.val with _ | _ | w
-    · rw [hw] at ht'
-      exact absurd ht' (by decide)
-    · rw [bDf_one t hw]
-      have hp2 : (bPair s (t.val - bOff s r 1)).1 < s := by
-        unfold bPair
-        split_ifs with h
-        · exact lt_trans h (Nat.mod_lt _ hspos)
-        · exact hspos
-      have hn : (bPair s (t.val - bOff s r 1)).1 < bOff s r (L + 1) := by
-        have := (bData_s_le : s ≤ bOff s r (L + 1))
-        omega
-      show bLv s r L (bFin (bOff s r (L + 1)) (bPair s (t.val - bOff s r 1)).1 t).val + 1 = 1
-      rw [bFin_val (n := bOff s r (L + 1)) t hn, bLv_small (by omega)]
-    · rw [bDf_two t hw]
-      rw [hw] at hsp
-      obtain ⟨h1, h2, h3⟩ := hsp
-      have h1' : bOff s r (w + 2) ≤ t.val := h1
-      have h2' : t.val < bOff s r (w + 2) + bLen s r (w + 1) * s := h2
-      have h3' : w + 2 ≤ L := h3
-      have hi : t.val - bOff s r (w + 2) < bLen s r (w + 1) * s := by
-        omega
-      have hdiv : (t.val - bOff s r (w + 2)) / s < bLen s r (w + 1) :=
-        (Nat.div_lt_iff_lt_mul hspos).mpr hi
-      have hoff : bOff s r (w + 2) = bOff s r (w + 1) + bLen s r (w + 1) := rfl
-      have hoff' : bOff s r (w + 1 + 1) = bOff s r (w + 1) + bLen s r (w + 1) := rfl
-      have hle := bOff_mono (s := s) (r := r) (show w + 2 ≤ L + 1 by omega)
-      have hn : bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s < bOff s r (L + 1) := by
-        omega
-      show bLv s r L (bFin (bOff s r (L + 1))
-        (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val + 1 = w + 2
-      rw [bFin_val (n := bOff s r (L + 1)) t hn,
-        bLv_eq (w := w + 1) (by omega) (Nat.le_add_right _ _)
-          (by rw [hoff']; exact Nat.add_lt_add_left hdiv _)]
-  · intro t ht
-    show ((bDf s r L t).2).val < s
-    have hsl : s ≤ bOff s r (L + 1) := bData_s_le
-    rcases hw : bLv s r L t.val with _ | _ | w
-    · have ht' : 1 ≤ bLv s r L t.val := ht
-      rw [hw] at ht'
-      exact absurd ht' (by decide)
-    · rw [bDf_one t hw]
-      have hp2 : (bPair s (t.val - bOff s r 1)).2 < s := by
-        unfold bPair
-        split_ifs with h
-        · exact Nat.mod_lt _ hspos
-        · omega
-      show (bFin (bOff s r (L + 1)) (bPair s (t.val - bOff s r 1)).2 t).val < s
-      rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
-      exact hp2
-    · rw [bDf_two t hw]
-      have hp2 : (t.val - bOff s r (w + 2)) % s < s := Nat.mod_lt _ hspos
-      show (bFin (bOff s r (L + 1)) ((t.val - bOff s r (w + 2)) % s) t).val < s
-      rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
-      exact hp2
-  · intro t ht
-    have ht' : bLv s r L t.val = 1 := ht
-    show (bDf s r L t).1 < (bDf s r L t).2
-    rw [bDf_one t ht', Fin.lt_def]
-    have hsl : s ≤ bOff s r (L + 1) := bData_s_le
-    have hp1 : (bPair s (t.val - bOff s r 1)).1 < (bPair s (t.val - bOff s r 1)).2 := by
-      unfold bPair
-      split_ifs with h
-      · exact h
-      · exact zero_lt_one
-    have hp2 : (bPair s (t.val - bOff s r 1)).2 < s := by
-      unfold bPair
-      split_ifs with h
-      · exact Nat.mod_lt _ hspos
-      · omega
-    rw [bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le (lt_trans hp1 hp2) hsl),
-      bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl)]
-    exact hp1
-
-
-lemma bCore_lt {s : ℕ} (u : Fin s → G) {k : ℕ} (hk : k < s) : bCore u k = u ⟨k, hk⟩ := by
-  unfold bCore
-  rw [dif_pos hk]
-
-/-- The constructed tuple realises a Sims-type shape whose tails generate the lower central
-series. -/
-theorem bX_tail [Finite G] {s r L : ℕ} (hs : 2 ≤ s) (hL1 : 1 ≤ L) (u : Fin s → G) (v : Fin r → G)
-    (hUV : Subgroup.closure (Set.range u ∪ Set.range v) = ⊤)
-    (hSims : lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔ lcs G 2)
-    (hL : lcs G (L + 1) = ⊥) :
-    Subgroup.closure (Set.range (bX (L := L) u v)) = ⊤ ∧
-    (∀ t, 1 ≤ (bData s r L).lv t →
-      bX u v t = ⁅bX u v ((bData s r L).df t).1, bX u v ((bData s r L).df t).2⁆) ∧
-    (∀ w, 1 ≤ w → lcs G w ≤
-      Subgroup.closure (bX u v '' {t | w ≤ (bData s r L).lv t})) := by
-  have hspos : 0 < s := by omega
-  have hd := bData_struct (r := r) (L := L) hs
-  have hsl : s ≤ bOff s r (L + 1) := bData_s_le
-  -- the core positions
-  have hXc : ∀ k (hk : k < s), bX (L := L) u v ⟨k, lt_of_lt_of_le hk hsl⟩ = u ⟨k, hk⟩ := by
-    intro k hk
-    rw [bX_core u v _ hk rfl, bCore_lt u hk]
-  have hgen : Subgroup.closure (Set.range (bX (L := L) u v)) = ⊤ := by
-    rw [eq_top_iff, ← hUV, Subgroup.closure_le]
-    rintro _ (⟨a, rfl⟩ | ⟨j, rfl⟩)
-    · exact Subgroup.subset_closure ⟨⟨a.val, lt_of_lt_of_le a.isLt hsl⟩, by rw [hXc a.val a.isLt]⟩
-    · have hj := j.isLt
-      have hn : s + j.val < (bData s r L).n := by
-        have := bOff_mono (s := s) (r := r) (show 1 ≤ L + 1 by omega)
-        have h1 : bOff s r 1 = 0 + (s + r) := rfl
-        show s + j.val < bOff s r (L + 1)
-        omega
-      exact Subgroup.subset_closure ⟨⟨s + j.val, hn⟩, bX_v u v _ j rfl⟩
-  have hdf : ∀ t, 1 ≤ (bData s r L).lv t →
-      bX u v t = ⁅bX u v ((bData s r L).df t).1, bX u v ((bData s r L).df t).2⁆ := by
-    intro t ht
-    have ht' : 1 ≤ bLv s r L t.val := ht
-    have hsp := bLv_spec t.isLt
-    show bX u v t = ⁅bX u v (bDf s r L t).1, bX u v (bDf s r L t).2⁆
-    rcases hw : bLv s r L t.val with _ | _ | w
-    · rw [hw] at ht'
-      exact absurd ht' (by decide)
-    · rw [bDf_one t hw, bX_eq u v t hw]
-      have hp1 : (bPair s (t.val - bOff s r 1)).1 < s := by
-        unfold bPair
-        split_ifs with h
-        · exact lt_trans h (Nat.mod_lt _ hspos)
-        · exact hspos
-      have hp2 : (bPair s (t.val - bOff s r 1)).2 < s := by
-        unfold bPair
-        split_ifs with h
-        · exact Nat.mod_lt _ hspos
-        · omega
-      rw [bX_core u v _ hp1 (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp1 hsl)),
-        bX_core u v _ hp2 (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hp2 hsl))]
-      rfl
-    · rw [bDf_two t hw, bX_eq u v t hw]
-      rw [hw] at hsp
-      obtain ⟨h1, h2, h3⟩ := hsp
-      have h1' : bOff s r (w + 2) ≤ t.val := h1
-      have h2' : t.val < bOff s r (w + 2) + bLen s r (w + 1) * s := h2
-      have h3' : w + 2 ≤ L := h3
-      have hi : t.val - bOff s r (w + 2) < bLen s r (w + 1) * s := by
-        omega
-      have hdiv : (t.val - bOff s r (w + 2)) / s < bLen s r (w + 1) :=
-        (Nat.div_lt_iff_lt_mul hspos).mpr hi
-      have hoff : bOff s r (w + 2) = bOff s r (w + 1) + bLen s r (w + 1) := rfl
-      have hoff' : bOff s r (w + 1 + 1) = bOff s r (w + 1) + bLen s r (w + 1) := rfl
-      have hle := bOff_mono (s := s) (r := r) (show w + 2 ≤ L + 1 by omega)
-      have hn : bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s < bOff s r (L + 1) := by
-        omega
-      have hm : (t.val - bOff s r (w + 2)) % s < s := Nat.mod_lt _ hspos
-      have hlv1 : bLv s r L (bFin (bOff s r (L + 1))
-          (bOff s r (w + 1) + (t.val - bOff s r (w + 2)) / s) t).val = w + 1 := by
-        rw [bFin_val (n := bOff s r (L + 1)) t hn]
-        exact bLv_eq (by omega) (Nat.le_add_right _ _)
-          (by rw [hoff']; exact Nat.add_lt_add_left hdiv _)
-      rw [bX_eq u v _ hlv1, bFin_val (n := bOff s r (L + 1)) t hn, Nat.add_sub_cancel_left,
-        bX_core u v _ hm (bFin_val (n := bOff s r (L + 1)) t (lt_of_lt_of_le hm hsl))]
-      rfl
-  have hlv := lv_mem_lcs (bData s r L) hd (bX u v) hdf
-  -- weight-1 commutators of core generators are weight-2 entries
-  have hpair : ∀ a b : Fin s, a < b →
-      ⁅u a, u b⁆ ∈ levSet (bData s r L) (bX u v) 1 := by
-    intro a b hab
-    have hi : a.val * s + b.val < s * s := slot_lt a.isLt b.isLt
-    have h2 : bOff s r 2 = bOff s r 1 + s * s := rfl
-    have h2' : bOff s r (1 + 1) = bOff s r 1 + s * s := rfl
-    have hle := bOff_mono (s := s) (r := r) (show 2 ≤ L + 1 by omega)
-    have hlt2 : bOff s r 1 + (a.val * s + b.val) < bOff s r (1 + 1) := by
-      rw [h2']
-      exact Nat.add_lt_add_left hi _
-    have hn : bOff s r 1 + (a.val * s + b.val) < (bData s r L).n :=
-      lt_of_lt_of_le hlt2 hle
-    have hlv1 : bLv s r L (bOff s r 1 + (a.val * s + b.val)) = 1 :=
-      bLv_eq hL1 (Nat.le_add_right _ _) hlt2
-    refine ⟨⟨_, hn⟩, hlv1, ?_⟩
-    rw [bX_eq u v ⟨_, hn⟩ hlv1]
-    show bVal u v 1 (bOff s r 1 + (a.val * s + b.val) - bOff s r 1) = ⁅u a, u b⁆
-    rw [Nat.add_sub_cancel_left]
-    have hpr : bPair s (a.val * s + b.val) = (a.val, b.val) := by
-      unfold bPair
-      rw [slot_div b.isLt, slot_mod b.isLt, if_pos (Fin.lt_def.mp hab)]
-    show ⁅bCore u (bPair s (a.val * s + b.val)).1, bCore u (bPair s (a.val * s + b.val)).2⁆ = _
-    rw [hpr, bCore_lt u a.isLt, bCore_lt u b.isLt]
-  have hN1 : (Subgroup.closure (levSet (bData s r L) (bX u v) 1) ⊔ lcs G 2).Normal := by
-    refine normal_of_sandwich (n := 1) le_sup_right (sup_le ?_ (lcs_antitone (by omega)))
-    rw [Subgroup.closure_le]
-    rintro _ ⟨t, ht, rfl⟩
-    have ht' : (bData s r L).lv t = 1 := ht
-    have := hlv t
-    rwa [ht'] at this
-  have hH1' : ∀ i k, (bData s r L).lv i = 0 → (bData s r L).lv k = 0 →
-      ⁅bX u v i, bX u v k⁆ ∈ Subgroup.closure (levSet (bData s r L) (bX u v) 1) ⊔ lcs G 2 := by
-    intro i k _ _
-    have hcomm : ∀ a ∈ Set.range u, ∀ b ∈ Set.range u, ⁅a, b⁆ ∈
-        Subgroup.closure (levSet (bData s r L) (bX u v) 1) ⊔ lcs G 2 := by
-      rintro _ ⟨a, rfl⟩ _ ⟨b, rfl⟩
-      rcases lt_trichotomy a b with hab | rfl | hab
-      · exact Subgroup.mem_sup_left (Subgroup.subset_closure (hpair a b hab))
-      · rw [commutatorElement_self]
-        exact one_mem _
-      · rw [← commutatorElement_inv]
-        exact inv_mem (Subgroup.mem_sup_left (Subgroup.subset_closure (hpair b a hab)))
-    have hHH := commutator_closure_le (N := Subgroup.closure (levSet (bData s r L) (bX u v) 1) ⊔
-      lcs G 2) hcomm
-    have h1 : ⁅bX u v i, bX u v k⁆ ∈ lcs G 1 :=
-      commElem_mem_lcs_succ (n := 0) (Subgroup.mem_top _) _
-    exact sup_le hHH le_sup_right (hSims h1)
-  have hnext : ∀ t : Fin (bData s r L).n, 1 ≤ (bData s r L).lv t → ∀ k : Fin (bData s r L).n,
-      k.val < s → ⁅bX u v t, bX u v k⁆ ∈
-        Subgroup.closure (levSet (bData s r L) (bX u v) ((bData s r L).lv t + 1)) ⊔
-          lcs G ((bData s r L).lv t + 2) := by
-    intro t ht k hk
-    have ht' : 1 ≤ bLv s r L t.val := ht
-    obtain ⟨h1, h2, h3⟩ := bLv_spec t.isLt
-    obtain ⟨w, hw⟩ : ∃ w, bLv s r L t.val = w + 1 := ⟨bLv s r L t.val - 1, by omega⟩
-    show _ ∈ Subgroup.closure (levSet (bData s r L) (bX u v) (bLv s r L t.val + 1)) ⊔
-      lcs G (bLv s r L t.val + 2)
-    rw [hw] at h1 h2 h3 ⊢
-    by_cases hwL : w + 2 ≤ L
-    · -- the commutator is the next-weight entry in slot `i * s + k`
-      have hi : t.val - bOff s r (w + 1) < bLen s r (w + 1) := by
-        have : bOff s r (w + 1 + 1) = bOff s r (w + 1) + bLen s r (w + 1) := rfl
-        omega
-      have hslot : (t.val - bOff s r (w + 1)) * s + k.val < bLen s r (w + 1) * s :=
-        slot_lt hi hk
-      have hoff : bOff s r (w + 2 + 1) = bOff s r (w + 2) + bLen s r (w + 1) * s := rfl
-      have hle := bOff_mono (s := s) (r := r) (show w + 2 + 1 ≤ L + 1 by omega)
-      have hlt3 : bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) <
-          bOff s r (w + 2 + 1) := by
-        rw [hoff]
-        exact Nat.add_lt_add_left hslot _
-      have hn : bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) <
-          (bData s r L).n := lt_of_lt_of_le hlt3 hle
-      have hlv2 : bLv s r L (bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val)) =
-          w + 2 := bLv_eq hwL (Nat.le_add_right _ _) hlt3
-      refine Subgroup.mem_sup_left (Subgroup.subset_closure ⟨⟨_, hn⟩, hlv2, ?_⟩)
-      rw [bX_eq u v ⟨_, hn⟩ hlv2, bX_eq u v t hw, bX_core u v k hk rfl]
-      show bVal u v (w + 2) (bOff s r (w + 2) + ((t.val - bOff s r (w + 1)) * s + k.val) -
-        bOff s r (w + 2)) = _
-      rw [Nat.add_sub_cancel_left]
-      show ⁅bVal u v (w + 1) (((t.val - bOff s r (w + 1)) * s + k.val) / s),
-        bCore u (((t.val - bOff s r (w + 1)) * s + k.val) % s)⁆ = _
-      rw [slot_div hk, slot_mod hk]
-    · -- past the class the commutator is trivial
-      have hmem := commElem_mem_lcs_succ (hlv t) (bX u v k)
-      have hle : lcs G ((bData s r L).lv t + 1) ≤ lcs G (L + 1) :=
-        lcs_antitone (show L + 1 ≤ (bData s r L).lv t + 1 by
-          have : (bData s r L).lv t = w + 1 := hw
-          omega)
-      have h1 : ⁅bX u v t, bX u v k⁆ = 1 := by
-        have := hle hmem
-        rw [hL] at this
-        exact (Subgroup.mem_bot).mp this
-      rw [h1]
-      exact one_mem _
-  have hH2' : ∀ t k : Fin (bData s r L).n, (bData s r L).lv t = 1 →
-      k.val ≤ ((bData s r L).df t).2.val →
-      ⁅bX u v t, bX u v k⁆ ∈ Subgroup.closure (levSet (bData s r L) (bX u v) 2) ⊔ lcs G 3 := by
-    intro t k ht hk
-    have hks : k.val < s := lt_of_le_of_lt hk (hd.df_core t (by omega))
-    have := hnext t (by omega) k hks
-    rwa [ht] at this
-  have hH3' : ∀ t k : Fin (bData s r L).n, 2 ≤ (bData s r L).lv t → k.val < (bData s r L).s →
-      ⁅bX u v t, bX u v k⁆ ∈
-        Subgroup.closure (levSet (bData s r L) (bX u v) ((bData s r L).lv t + 1)) ⊔
-          lcs G ((bData s r L).lv t + 2) :=
-    fun t k ht hk => hnext t (by omega) k hk
-  exact ⟨hgen, hdf, sims_lcs_tail (bData s r L) hd (bX u v) hgen ⟨L + 1, hL⟩ hdf hH1' hH2' hH3'⟩
-
-/-- Existence of Sims data (Section 2.1): for every finite group of order `p ^ m`, every list
-`u` of `s ≥ 2` elements generating a subgroup `H` with `γ₂ = [H, H] γ₃` (a Sims core when `s` is
-the Sims rank) and every list `v` completing `u` to a generating set, there is a generating tuple
-`X` whose first `s` entries are `u`, whose weight-1 entries are `u, v`, whose higher entries are
-the iterated commutators with the core, realising valid bounded Sims data with these
-generators. -/
-theorem exists_sims_data [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
-    {s r : ℕ} (hs : 2 ≤ s) (u : Fin s → G) (v : Fin r → G)
-    (hUV : Subgroup.closure (Set.range u ∪ Set.range v) = ⊤)
-    (hSims : lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔
-      lcs G 2) :
-    ∃ d : SimsData, d.Valid ∧ d.Bounded p ∧ d.s = s ∧
-      (∀ t : Fin d.n, d.lv t = 0 ↔ t.val < s + r) ∧
-      ∃ X : Fin d.n → G, SimsRealizes p d X ∧ ∀ (t : Fin d.n) (h : t.val < s), X t = u ⟨t.val, h⟩ := by
-  have : Fact p.Prime := ⟨hp⟩
-  have : Group.IsNilpotent G := (IsPGroup.of_card hG).isNilpotent
-  obtain ⟨N, hN⟩ : ∃ N, lcs G N = ⊥ := Subgroup.nilpotent_iff_lowerCentralSeries.mp inferInstance
-  have hL : lcs G (N + 1 + 1) = ⊥ :=
-    le_bot_iff.mp (hN ▸ lcs_antitone (D := G) (show N ≤ N + 1 + 1 by omega))
-  obtain ⟨hgen, hdf, hdeep⟩ := bX_tail (r := r) hs (show 1 ≤ N + 1 by omega) u v hUV hSims hL
-  obtain ⟨b, c, hv, hb, hr⟩ := exists_arrays (bData s r (N + 1)) (bX u v) hp hG
-    (bData_struct hs) hgen hdf hdeep
-  refine ⟨_, hv, hb, rfl, ?_, bX u v, hr, ?_⟩
-  · intro t
-    show bLv s r (N + 1) t.val = 0 ↔ t.val < s + r
-    constructor
-    · intro h0
-      have htn : t.val < bOff s r (N + 1 + 1) := t.isLt
-      obtain ⟨-, h2, -⟩ := bLv_spec htn
-      rw [h0] at h2
-      have h2' : t.val < 0 + (s + r) := h2
+/-- The genuine form of the entries of a candidate-built greedy layer. -/
+lemma gLay_cVal_gen (s : ℕ) (u : ℕ → G) (hs : 0 < s) (w : ℕ) (L : SLay G)
+    (hr : w = 0 → s ≤ L.r) (K : Subgroup G) {i : ℕ}
+    (hi : i < (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).r) :
+    (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).par i < L.r ∧
+    (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).cor i < s ∧
+    (w = 0 → (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).par i <
+      (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).cor i) ∧
+    (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).x i =
+      ⁅L.x ((gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).par i),
+        u ((gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).cor i)⁆ := by
+  have hind := gLay_indep (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w) hi
+  have hi' : i < (gsel (cVal s u w L) K (cN s w L)).card := hi
+  have hj := gsel_sub (cVal s u w L) K (cN s w L) _ (genum_mem _ hi')
+  have hx := gLay_x (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w) hi'
+  have hne : cVal s u w L (genum (gsel (cVal s u w L) K (cN s w L)) i) ≠ 1 := by
+    intro h1
+    apply hind
+    rw [hx, h1]
+    exact one_mem _
+  have e1 : (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).par i =
+      cPar s w (genum (gsel (cVal s u w L) K (cN s w L)) i) := rfl
+  have e2 : (gLay (cVal s u w L) K (cN s w L) (cPar s w) (cCor s w)).cor i =
+      cCor s w (genum (gsel (cVal s u w L) K (cN s w L)) i) := rfl
+  rw [e1, e2, hx]
+  generalize genum (gsel (cVal s u w L) K (cN s w L)) i = j at hj hne ⊢
+  have hcv : ¬ (w = 0 ∧ ¬ cPar s w j < cCor s w j) := by
+    intro hc
+    apply hne
+    unfold cVal
+    rw [if_pos hc]
+  have hval : cVal s u w L j = ⁅L.x (cPar s w j), u (cCor s w j)⁆ := by
+    unfold cVal
+    rw [if_neg hcv]
+  refine ⟨?_, ?_, ?_, hval⟩
+  · by_cases hw : w = 0
+    · subst hw
+      rw [cPar_zero]
+      have h1 : j % s < s := Nat.mod_lt _ hs
+      have h2 := hr rfl
       omega
-    · exact bLv_small
-  · intro t h
-    rw [bX_core u v t h rfl, bCore_lt u h]
+    · rw [cN_ne hw] at hj
+      rw [cPar_ne hw]
+      exact (Nat.div_lt_iff_lt_mul hs).mpr hj
+  · by_cases hw : w = 0
+    · subst hw
+      rw [cN_zero] at hj
+      rw [cCor_zero]
+      exact (Nat.div_lt_iff_lt_mul hs).mpr hj
+    · rw [cCor_ne hw]
+      exact Nat.mod_lt _ hs
+  · intro hw
+    by_contra hc
+    exact hcv ⟨hw, hc⟩
 
-end Build
+/-- The layers after layer `0`. -/
+noncomputable def sLay (p s : ℕ) (u : ℕ → G) (L0 : SLay G) : ℕ → SLay G
+  | 0 => L0
+  | w + 1 => gLay (cVal s u w (sLay p s u L0 w)) (layK p G (w + 1)) (cN s w (sLay p s u L0 w))
+      (cPar s w) (cCor s w)
 
-section SimsCore
+variable (p s : ℕ) (u : ℕ → G) (L0 : SLay G)
 
-variable {G : Type u} [Group G]
+lemma sLay_zero : sLay p s u L0 0 = L0 := rfl
 
-/-- The Sims rank (17)/(20): the least number of generators of a subgroup `H` with
-`γ₂ = [H, H] γ₃` (the inclusion `⊇` is automatic). -/
-noncomputable def simsRank (G : Type u) [Group G] : ℕ :=
-  sInf {k | ∃ u : Fin k → G,
-    lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔ lcs G 2}
+lemma sLay_succ (w : ℕ) :
+    sLay p s u L0 (w + 1) = gLay (cVal s u w (sLay p s u L0 w)) (layK p G (w + 1))
+      (cN s w (sLay p s u L0 w)) (cPar s w) (cCor s w) := rfl
 
-/-- Section 2.1 with a Sims core: every nonabelian group of order `p ^ m` has a Sims core
-generated by `s(G)` elements `u` (`s(G) ≥ 2`), and Sims data with `d.s = s(G)` realised by a
-generating tuple whose core entries are `u`. -/
-theorem exists_sims_data_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m)
-    (hna : lcs G 1 ≠ ⊥) :
-    2 ≤ simsRank G ∧ ∃ u : Fin (simsRank G) → G,
-      lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔ lcs G 2 ∧
-      ∃ d : SimsData, d.Valid ∧ d.Bounded p ∧ d.s = simsRank G ∧
-        ∃ X : Fin d.n → G, SimsRealizes p d X ∧
-          ∀ (t : Fin d.n) (h : t.val < simsRank G), X t = u ⟨t.val, h⟩ := by
-  have : Fact p.Prime := ⟨hp⟩
-  have : Group.IsNilpotent G := (IsPGroup.of_card hG).isNilpotent
-  obtain ⟨N, hN⟩ : ∃ N, lcs G N = ⊥ := Subgroup.nilpotent_iff_lowerCentralSeries.mp inferInstance
-  let e : Fin (Nat.card G) → G := (Finite.equivFin G).symm
-  have he : Set.range e = Set.univ := Equiv.range_eq_univ _
-  have hne : {k | ∃ u : Fin k → G,
-      lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔
-        lcs G 2}.Nonempty := by
-    refine ⟨Nat.card G, e, ?_⟩
-    rw [he, Subgroup.closure_univ]
-    exact le_sup_left
-  obtain ⟨u, hu⟩ : ∃ u : Fin (simsRank G) → G,
-      lcs G 1 ≤ ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ⊔ lcs G 2 :=
-    Nat.sInf_mem hne
-  have hs : 2 ≤ simsRank G := by
-    by_contra hlt
-    have hk : simsRank G ≤ 1 := by omega
-    have hHH : ⁅Subgroup.closure (Set.range u), Subgroup.closure (Set.range u)⁆ ≤ ⊥ := by
-      refine commutator_closure_le ?_
-      rintro _ ⟨i, rfl⟩ _ ⟨j, rfl⟩
-      have hij : i = j := Fin.ext (by have := i.isLt; have := j.isLt; omega)
-      rw [hij, commutatorElement_self]
+lemma sLay_one :
+    sLay p s u L0 1 = gLay (cVal s u 0 L0) (layK p G 1) (cN s 0 L0) (cPar s 0) (cCor s 0) := rfl
+
+lemma sLay_mem : ∀ w i, (sLay p s u L0 w).x i ∈ lcs G w
+  | 0, i => by
+    rw [lcs_zero]
+    exact Subgroup.mem_top _
+  | w + 1, i => by
+    rw [sLay_succ]
+    rcases gLay_x_cases (cVal s u w (sLay p s u L0 w)) (layK p G (w + 1))
+        (cN s w (sLay p s u L0 w)) (cPar s w) (cCor s w) i with h | h
+    · rw [h]
+      unfold cVal
+      split_ifs
+      · exact one_mem _
+      · exact commElem_mem_lcs_succ (sLay_mem w _) _
+    · rw [h]
       exact one_mem _
-    have h12 : lcs G 1 ≤ lcs G 2 := le_trans hu (sup_le (le_trans hHH bot_le) le_rfl)
-    have hall : ∀ n, lcs G 1 ≤ lcs G (n + 1) := by
-      intro n
-      induction n with
-      | zero => exact le_rfl
-      | succ n ih =>
-        refine le_trans h12 ?_
-        rw [lcs_succ 1, lcs_succ (n + 1)]
-        exact Subgroup.commutator_mono ih le_rfl
-    have hbot : lcs G 1 ≤ ⊥ := by
-      rw [← hN]
-      exact le_trans (hall N) (lcs_antitone (by omega))
-    exact hna (le_bot_iff.mp hbot)
-  have hUV : Subgroup.closure (Set.range u ∪ Set.range e) = ⊤ := by
-    rw [he, Set.union_univ, Subgroup.closure_univ]
-  obtain ⟨d, hv, hb, hds, -, X, hr, hX⟩ := exists_sims_data hp hG hs u e hUV hu
-  exact ⟨hs, u, hu, d, hv, hb, hds, X, hr, hX⟩
 
-end SimsCore
+lemma sLay_indep (w : ℕ) {i : ℕ} (hi : i < (sLay p s u L0 (w + 1)).r) :
+    (sLay p s u L0 (w + 1)).x i ∉
+      Subgroup.closure ((sLay p s u L0 (w + 1)).x '' Set.Iio i) ⊔ layK p G (w + 1) := by
+  rw [sLay_succ] at hi ⊢
+  exact gLay_indep _ _ _ _ _ hi
 
+lemma sLay_gen (hs : 0 < s) (hr0 : s ≤ L0.r) (w : ℕ) {i : ℕ}
+    (hi : i < (sLay p s u L0 (w + 1)).r) :
+    (sLay p s u L0 (w + 1)).par i < (sLay p s u L0 w).r ∧ (sLay p s u L0 (w + 1)).cor i < s ∧
+    (w = 0 → (sLay p s u L0 (w + 1)).par i < (sLay p s u L0 (w + 1)).cor i) ∧
+    (sLay p s u L0 (w + 1)).x i = ⁅(sLay p s u L0 w).x ((sLay p s u L0 (w + 1)).par i),
+      u ((sLay p s u L0 (w + 1)).cor i)⁆ := by
+  rw [sLay_succ] at hi ⊢
+  exact gLay_cVal_gen s u hs w (sLay p s u L0 w) (fun hw => by subst hw; exact hr0) _ hi
+
+/-- Spanning for the layers of weight `≥ 3`. -/
+lemma sLay_span_succ (hs : 0 < s) (w : ℕ) {a b : ℕ} (ha : a < (sLay p s u L0 (w + 1)).r)
+    (hb : b < s) :
+    ⁅(sLay p s u L0 (w + 1)).x a, u b⁆ ∈ Subgroup.closure ((sLay p s u L0 (w + 1 + 1)).x ''
+      Set.Iio (sLay p s u L0 (w + 1 + 1)).r) ⊔ layK p G (w + 1 + 1) := by
+  have hj : a * s + b < cN s (w + 1) (sLay p s u L0 (w + 1)) := by
+    rw [cN_ne (show w + 1 ≠ 0 by omega)]
+    exact slot_lt ha hb
+  have hv : cVal s u (w + 1) (sLay p s u L0 (w + 1)) (a * s + b) =
+      ⁅(sLay p s u L0 (w + 1)).x a, u b⁆ := by
+    rw [cVal_succ, slot_div hb, slot_mod hb]
+  rw [← hv, sLay_succ p s u L0 (w + 1)]
+  exact gLay_span_all _ _ _ _ _ hj
+
+/-- Prefix spanning for layer `1` (the subspaces `W_k` of BNV Prop 5.2). -/
+lemma sLay_span_one (hs : 0 < s) (hx0 : ∀ a < s, L0.x a = u a) {k : ℕ} (hk : k ≤ s)
+    {a b : ℕ} (hab : a < b) (hb : b < k) :
+    ⁅u a, u b⁆ ∈ Subgroup.closure ((sLay p s u L0 1).x ''
+      {i | i < (sLay p s u L0 1).r ∧ (sLay p s u L0 1).cor i < k}) ⊔ layK p G 1 := by
+  have hbs : b < s := lt_of_lt_of_le hb hk
+  have has : a < s := lt_trans hab hbs
+  have hJ : k * s ≤ cN s 0 L0 := by
+    rw [cN_zero]
+    exact Nat.mul_le_mul_right s hk
+  have hj : b * s + a < k * s := slot_lt hb has
+  have hv : cVal s u 0 L0 (b * s + a) = ⁅u a, u b⁆ := by
+    rw [cVal_zero_of_lt s u L0 (j := b * s + a) (by rw [slot_mod has, slot_div has]; exact hab),
+      slot_mod has,
+      slot_div has, hx0 a has]
+  rw [← hv, sLay_one]
+  refine (sup_le_sup_right (Subgroup.closure_mono ?_) _)
+    (gLay_span _ _ _ _ _ hJ hj)
+  rintro _ ⟨i, ⟨hi, hik⟩, rfl⟩
+  refine ⟨i, ⟨hi, ?_⟩, rfl⟩
+  show cCor s 0 (genum _ i) < k
+  rw [cCor_zero]
+  exact (Nat.div_lt_iff_lt_mul hs).mpr hik
+
+/-- The layers generate the lower central series: `γ_{w+2} ≤ ⟨layer w + 1⟩ γ_{w+3}`. -/
+theorem sLay_lcs [Finite G] {m : ℕ} (hp : p.Prime) (hG : Nat.card G = p ^ m) (hs : 0 < s)
+    (hx0 : ∀ a < s, L0.x a = u a)
+    (hL0 : Subgroup.closure (L0.x '' Set.Iio L0.r) ⊔ lcs G 1 = ⊤)
+    (hcore : lcs G 1 ≤ Subgroup.closure (lieE s u 1) ⊔ lcs G 2) :
+    ∀ w, lcs G (w + 1) ≤ Subgroup.closure ((sLay p s u L0 (w + 1)).x ''
+      Set.Iio (sLay p s u L0 (w + 1)).r) ⊔ lcs G (w + 2) := by
+  have hT := theoremL s u (L0.x '' Set.Iio L0.r) hL0 hcore
+  have hsub : ∀ w, (sLay p s u L0 (w + 1)).x '' Set.Iio (sLay p s u L0 (w + 1)).r ⊆
+      (lcs G (w + 1) : Set G) := by
+    rintro w _ ⟨i, -, rfl⟩
+    exact sLay_mem p s u L0 (w + 1) i
+  intro w
+  induction w with
+  | zero =>
+    apply frat_layer hp hG 0 _ (hsub 0)
+    refine (hT 1 le_rfl).trans (sup_le ?_ ((lcs_succ_le_layK p 1).trans le_sup_right))
+    rw [Subgroup.closure_le]
+    rintro _ ⟨ab, hab, rfl⟩
+    have h1 := sLay_span_one p s u L0 hs hx0 le_rfl hab.1 hab.2
+    exact (sup_le_sup_right (Subgroup.closure_mono (Set.image_mono (fun i hi => hi.1))) _) h1
+  | succ w ih =>
+    apply frat_layer hp hG (w + 1) _ (hsub (w + 1))
+    have hN := layK_normal_sup p (w + 1 + 1)
+      ((sLay p s u L0 (w + 1 + 1)).x '' Set.Iio (sLay p s u L0 (w + 1 + 1)).r) (hsub (w + 1))
+    refine (hT (w + 1 + 1) (by omega)).trans
+      (sup_le ?_ ((lcs_succ_le_layK p (w + 1 + 1)).trans le_sup_right))
+    rw [Subgroup.closure_le]
+    rintro _ ⟨y, hy, b, hb, rfl⟩
+    have hy1 := ih ((Subgroup.closure_le _).mpr (lieE_sub s u w) hy)
+    have hle : Subgroup.closure ((sLay p s u L0 (w + 1)).x '' Set.Iio (sLay p s u L0 (w + 1)).r) ⊔
+        lcs G (w + 2) ≤ zn (Subgroup.closure ((sLay p s u L0 (w + 1 + 1)).x ''
+          Set.Iio (sLay p s u L0 (w + 1 + 1)).r) ⊔ layK p G (w + 1 + 1)) (u b) := by
+      refine sup_le ?_ ?_
+      · rw [Subgroup.closure_le]
+        rintro _ ⟨a, ha, rfl⟩
+        exact mem_zn.mpr (commElem_mem_symm (sLay_span_succ p s u L0 hs w ha hb))
+      · intro g hg
+        exact mem_zn.mpr (Subgroup.mem_sup_right
+          ((lcs_succ_le_layK p (w + 1 + 1)) (commElem_mem_lcs_succ' (u b) hg)))
+    exact commElem_mem_symm (mem_zn.mp (hle hy1))
+
+end Layers2
 
 end OMA.SimsLite
