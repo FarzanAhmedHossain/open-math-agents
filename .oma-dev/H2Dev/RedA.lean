@@ -441,10 +441,10 @@ lemma small_core_size : ∃ m0 : ℕ, ∀ m s r1 r2 : ℕ, m0 ≤ m → (s - 1).
     s * r2 < 2 * r1 → r1 ≤ m → 12 * s ^ 2 ≤ m := by
   refine ⟨31212, fun m s r1 r2 hm hc hsr hr1 => ?_⟩
   by_contra hlt
-  push_neg at hlt
+  rw [not_le] at hlt
   have hs : 52 ≤ s := by
     by_contra h
-    push_neg at h
+    rw [not_le] at h
     have h51 : s ^ 2 ≤ 2601 :=
       calc s ^ 2 ≤ 51 ^ 2 := Nat.pow_le_pow_left (by omega) 2
         _ = 2601 := by norm_num
