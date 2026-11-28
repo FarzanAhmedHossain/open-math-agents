@@ -1,5 +1,6 @@
 import H2Dev.CNT3Stmt
 import H2Dev.Lift
+import H2Dev.LiftStrat
 
 /-! # CNT3: the final assembly, conditional on the power word and term-B inputs
 
@@ -19,21 +20,33 @@ array, with Theorem 3.1), the data count (Prop 2.5) and the commutator coefficie
   `2 ^ cnt3A`, `2 ^ cnt3B`.
 * `HypPW` : every group of `cnt3Set` has a Sims code whose recorded data satisfies
   `cnt3Layers` and `pwBound2 (fibAk D) ≤ cnt3PW` (the identification of Theorem 3.1's exponent).
+  `cnt3Layers` does not record the third layer rank: the identification `fibRk D (lfI2 h2) = r3`
+  (and `D.2.1.val = s` via `simsRankInl_eq` for the code of `exists_sims_gen`) is part of the
+  obligation of proving `pwBound2 (fibAk D) ≤ cnt3PW`.
 * `HypData` : the Prop 2.5 data count `|RecData m| ≤ 2 ^ (C0 m (log_2 m + 1))`; PROVED here
   (`hypData`, `C0 = 7`, from `card_recData_le_pow`).
-* `HypB` : the term-B commutator count, summed over the admissible breadths, for each recorded
-  data with `cnt3Layers` and each power word array.
+* `HypBStrat` (THE term-B target): the per-breadth term-B count on the canonical strata
+  `realizedCBb ... b2` (commutator arrays of codes whose Sims generators have core breadth `b2`,
+  `H2Dev.LiftStrat`): `|realizedCBb ... b2| ≤ cnt3Bterm b2` for each admissible `b2`.
 * `HypStrat` : the breadth-stratified count: the realised commutator arrays are covered by sets
-  `S b2` (`b2` admissible), each bounded by BOTH the term-A summand and the term-B summand.
+  `S b2` (`b2` admissible), each bounded by BOTH the term-A summand and the term-B summand;
+  `hypStrat_of_B : HypBStrat → HypStrat` (proved, `S = realizedCBb`, term A from
+  `lf_realizedCBb_ncard_le`, the cover from `lf_realizedCB_subset_strata`).
+* `HypB` (auxiliary): the term-B count summed over the admissible breadths; it only yields the
+  weaker `CNT3StmtMM`, not `CNT3Stmt`.
 
 ## Results
 
 * `cnt3_cfactor_A` (proved): the term-A commutator count from `lf_realizedCB_ncard_le`.
-* `cnt3_main_mm (hPW) (hD) (hB) : CNT3StmtMM` (proved): CNT3 (b) in the plan's form
-  `min (max_b A b) (max_b B b)` (two independently chosen admissible breadths).
-* `cnt3_main (hPW) (hD) (hS) : CNT3Stmt` (proved): CNT3 (b) exactly as stated, from the
+* `cnt3_cfactor_A_strat` (proved): the term-A count of one stratum `realizedCBb ... b2`.
+* `cnt3_main_strat (hPW) (hB : HypBStrat) : CNT3Stmt` (proved): the milestone CNT3 (b) from the
+  power word input and the per-breadth term-B input (the data count is `hypData`).
+* `cnt3_main (hPW) (hS : HypStrat) : CNT3Stmt` (proved): CNT3 (b) exactly as stated, from the
   stratified hypothesis.
-* `cnt3Stmt_imp_mm` : `CNT3Stmt → CNT3StmtMM`.
+* `cnt3_main_mm (hPW) (hB) : CNT3StmtMM` (proved, AUXILIARY ONLY): the plan's weaker form
+  `min (max_b A b) (max_b B b)` with two independently chosen breadths; it does NOT close CNT3
+  (`CNT3Stmt` remains the milestone target; consumers need the per-breadth form).
+* `cnt3Stmt_imp_mm` : `CNT3Stmt → CNT3StmtMM` (the easy direction only).
 
 ## Why `CNT3Stmt` needs the stratified hypothesis
 
@@ -93,7 +106,8 @@ def HypData : Prop :=
   ∃ C0 : ℝ, ∀ m : ℕ, 1 ≤ m →
     (Fintype.card (RecData m) : ℝ) ≤ (2 : ℝ) ^ (C0 * m * ((Nat.log 2 m : ℝ) + 1))
 
-/-- Term-B input: for recorded data with the class-3 layer identifications and any power word
+/-- Term-B input, summed form (AUXILIARY: it only gives `CNT3StmtMM`; the milestone target is
+`HypBStrat`): for recorded data with the class-3 layer identifications and any power word
 array, the commutator arrays of the realised codes of `cnt3Set` number at most the sum over the
 admissible breadths of the term-B summand. -/
 def HypB : Prop :=
@@ -114,7 +128,18 @@ def HypStrat : Prop :=
           ∀ β ∈ cnt3Adm s m2 m3,
             (S β).ncard ≤ cnt3Aterm r1 r2 s m2 m3 β ∧ (S β).ncard ≤ cnt3Bterm r1 r2 s m2 m3 β
 
-/-- CNT3 (b) in the plan's form `min (max_b A b) (max_b B b)`. -/
+/-- Per-breadth term-B input on the canonical strata (the term-B deliverable for CNT3): for
+recorded data with the class-3 layer identifications, any power word array and any admissible
+breadth `b2`, the commutator arrays of realised codes whose Sims generators have core breadth
+`b2` number at most the term-B summand of breadth `b2` (Remark 4.4 / (54) at fixed breadth). -/
+def HypBStrat : Prop :=
+  ∀ m r1 r2 s lam m2 m3 r3 : ℕ, ∀ D : RecData m, cnt3Layers r1 r2 s m2 m3 D →
+    ∀ B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m), ∀ β ∈ cnt3Adm s m2 m3,
+      (realizedCBb Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D B β).ncard ≤
+        cnt3Bterm r1 r2 s m2 m3 β
+
+/-- CNT3 (b) in the plan's form `min (max_b A b) (max_b B b)`: strictly weaker than
+`CNT3Stmt` (two independent breadths); auxiliary only. -/
 def CNT3StmtMM : Prop :=
   ∃ C : ℝ, ∀ m r1 r2 s lam m2 m3 r3 : ℕ, (cnt3Set m r1 r2 s lam m2 m3 r3).Nonempty →
     ∃ b2 b2' : ℕ, m3 ≤ s * b2 ∧ b2 ≤ m2 - m3 ∧ b2 ≤ m3 ∧
@@ -283,6 +308,30 @@ theorem cnt3_cfactor_A (D : RecData m) (hL : cnt3Layers r1 r2 s m2 m3 D)
   rw [hs, Finset.sum_mul]
   rfl
 
+/-- The term-A count of one stratum (`lf_realizedCBb_ncard_le` after the layer
+identifications). -/
+theorem cnt3_cfactor_A_strat (D : RecData m) (hL : cnt3Layers r1 r2 s m2 m3 D)
+    (B : Fin D.2.2.1.tot → Fin D.2.2.1.tot → Fin (2 ^ m)) (β : ℕ) :
+    (realizedCBb Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D B β).ncard ≤
+      cnt3Aterm r1 r2 s m2 m3 β := by
+  obtain ⟨h2, h3, hs, hr1, hr2, hs2, hs3⟩ := hL
+  have h := lf_realizedCBb_ncard_le Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D h2 h3 B β
+  rw [hs2, hs3, hr1, hr2] at h
+  refine h.trans (le_of_eq ?_)
+  rw [hs]
+  rfl
+
+/-- The canonical strata satisfy `HypStrat` given the per-breadth term-B count. -/
+theorem hypStrat_of_B (hB : HypBStrat) : HypStrat := by
+  intro m r1 r2 s lam m2 m3 r3 D hL B
+  refine ⟨realizedCBb Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D B, ?_, fun β hβ =>
+    ⟨cnt3_cfactor_A_strat (lam := lam) (r3 := r3) D hL B β,
+      hB m r1 r2 s lam m2 m3 r3 D hL B β hβ⟩⟩
+  obtain ⟨h2, h3, hs, -, -, hs2, hs3⟩ := hL
+  have h := lf_realizedCB_subset_strata Nat.prime_two (cnt3Set m r1 r2 s lam m2 m3 r3) D h2 h3 B
+  rw [hs2, hs3, hs] at h
+  exact h
+
 /-- The facts used by the assembly, for a nonempty parameter set. -/
 theorem cnt3_setup (hPW : HypPW) (hne : (cnt3Set m r1 r2 s lam m2 m3 r3).Nonempty) :
     1 ≤ m ∧ s ≤ r1 ∧ r2 ≤ s.choose 2 ∧ m3 ≤ m2 ∧ r2 ≤ m2 - m3 ∧
@@ -365,10 +414,10 @@ end CNT3MainCount
 
 section CNT3MainThm
 
-/-- CNT3 (b) in the plan's `min (max A) (max B)` form, from the power word and term-B inputs
-(the data count is `hD`, provable as `hypData`; term A is proved, `cnt3_cfactor_A`). -/
-theorem cnt3_main_mm (hPW : HypPW) (hD : HypData) (hB : HypB) : CNT3StmtMM := by
-  obtain ⟨C0, hC0⟩ := hD
+/-- AUXILIARY (does not close CNT3): the plan's weaker `min (max A) (max B)` form, from the power
+word and summed term-B inputs (the data count is `hypData`; term A is `cnt3_cfactor_A`). -/
+theorem cnt3_main_mm (hPW : HypPW) (hB : HypB) : CNT3StmtMM := by
+  obtain ⟨C0, hC0⟩ := hypData
   refine ⟨C0 + 1, fun m r1 r2 s lam m2 m3 r3 hne => ?_⟩
   obtain ⟨hm, hsr, hr2C, h32, hr2s2, hadm, hN⟩ := cnt3_setup hPW hne
   obtain ⟨b2, hb2, hmax⟩ :=
@@ -416,9 +465,9 @@ theorem cnt3_main_mm (hPW : HypPW) (hD : HypData) (hB : HypB) : CNT3StmtMM := by
   exact cnt3_final hC0 hm hnm hN hcount
 
 /-- CNT3 (b) exactly as stated in `CNT3Stmt`, from the power word input and the
-breadth-stratified commutator count (the data count is `hD`, provable as `hypData`). -/
-theorem cnt3_main (hPW : HypPW) (hD : HypData) (hS : HypStrat) : CNT3Stmt := by
-  obtain ⟨C0, hC0⟩ := hD
+breadth-stratified commutator count (the data count is `hypData`, proved). -/
+theorem cnt3_main (hPW : HypPW) (hS : HypStrat) : CNT3Stmt := by
+  obtain ⟨C0, hC0⟩ := hypData
   refine ⟨C0 + 1, fun m r1 r2 s lam m2 m3 r3 hne => ?_⟩
   obtain ⟨hm, hsr, hr2C, h32, hr2s2, hadm, hN⟩ := cnt3_setup hPW hne
   obtain ⟨b2, hb2, hmax⟩ := Finset.exists_max_image (cnt3Adm s m2 m3)
@@ -458,6 +507,11 @@ theorem cnt3_main (hPW : HypPW) (hD : HypData) (hS : HypStrat) : CNT3Stmt := by
     have := cnt3_m_eq hne.some_mem
     omega
   exact cnt3_final hC0 hm hnm hN hcount
+
+/-- CNT3 (b), the milestone statement, from the power word input and the per-breadth term-B
+count on the canonical strata (term A at fixed breadth and the data count are proved). -/
+theorem cnt3_main_strat (hPW : HypPW) (hB : HypBStrat) : CNT3Stmt :=
+  cnt3_main hPW (hypStrat_of_B hB)
 
 /-- The exact statement implies the plan's form. -/
 theorem cnt3Stmt_imp_mm (h : CNT3Stmt) : CNT3StmtMM := by
