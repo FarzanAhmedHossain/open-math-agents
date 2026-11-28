@@ -640,7 +640,7 @@ lemma rank_closure_image_Iio_le (v : ℕ → G) (t : ℕ) :
   classical
   have e : v '' Set.Iio t = (((Finset.range t).image v : Finset G) : Set G) := by
     rw [Finset.coe_image, Finset.coe_range]
-  rw [e]
+  rw [Subgroup.rank_congr (congrArg Subgroup.closure e)]
   exact (Subgroup.rank_closure_finset_le_card _).trans
     (Finset.card_image_le.trans (Finset.card_range t).le)
 
