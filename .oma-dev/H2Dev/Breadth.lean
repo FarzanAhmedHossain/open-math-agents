@@ -333,7 +333,7 @@ theorem br_card_subgroups_le {p : ℕ} (hp : p.Prime) (e : ℕ) :
       rw [← hc2, hL] at hc1
       have hi : H.index ≠ 0 := Subgroup.index_ne_zero_of_finite
       have e1 : (Nat.card ↥(M ⊓ H) * p) * H.index = (p ^ c * p) * H.index := by
-        rw [← pow_succ, hc3, ← hc1]
+        rw [← pow_succ, hc3, hL, ← hc1]
         ring
       have e2 := Nat.eq_of_mul_eq_mul_right (Nat.pos_of_ne_zero hi) e1
       exact Nat.eq_of_mul_eq_mul_right hp.pos e2
@@ -478,8 +478,7 @@ theorem br_card_subgroups_le {p : ℕ} (hp : p.Prime) (e : ℕ) :
           · rw [add_mul, one_mul]
             omega
           · rw [← pow_add]
-            congr 1
-            ring
+            congr 1 <;> ring
       _ = 2 * p ^ (c * d + c + d) := by ring
       _ ≤ p * p ^ (c * d + c + d) := Nat.mul_le_mul_right _ hp.two_le
       _ = p ^ ((c + 1) * (d + 1)) := by
@@ -1384,7 +1383,7 @@ theorem br_eq53_breadth [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : �
         ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q}.ncard ≤
       p ^ (s * (b * (n + s3 + 1 - b))) *
         p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
-  haveI := br_finite_pairs (L1 := L1) (L2 := L2) (L3 := L3)
+  have := br_finite_pairs (L1 := L1) (L2 := L2) (L3 := L3)
   refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _))
     (br_eq53 hp hsr hL2 hL3 y hy g hg D hD v)
   rintro β ⟨hA, hgen, hJ, hb, hDv⟩
@@ -1422,7 +1421,7 @@ theorem br_eq53_sum [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n : ℕ}
         p ^ (s * (b * (n + s3 + 1 - b))) *
           p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
   classical
-  haveI := br_finite_pairs (L1 := L1) (L2 := L2) (L3 := L3)
+  have := br_finite_pairs (L1 := L1) (L2 := L2) (L3 := L3)
   set I := (Finset.range (min s2 s3 + 1)).filter (fun b => s3 ≤ s * b) with hI
   obtain ⟨T, hT⟩ : ∃ T : ℕ → Set ((L1 →* L1 →* L2) × (L2 →* L1 →* L3)), T = fun b =>
     {β | brAlt β.1 ∧
@@ -1454,7 +1453,7 @@ theorem br_eq53_sum [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n : ℕ}
 /-- The deeper commutator coefficients on the non-defining pairs: coefficient arrays
 `ι × ι → Γ` (e.g. the `γ_3`-coefficients `c(1, j, k, 3, v)` of `[g_{1,j}, g_{1,k}]`), prescribed
 outside `P \ D`, number at most `p ^ ((|P| - |D|) m_3)` when `|Γ| = p ^ m_3`. -/
-theorem br_deeper_count {Γ : Type*} [Finite Γ] {ι : Type*} {p m3 : ℕ}
+theorem br_deeper_count {Γ : Type*} [Finite Γ] {ι : Type*} [DecidableEq ι] {p m3 : ℕ}
     (hΓ : Nat.card Γ = p ^ m3) (P D : Finset (ι × ι)) (hDP : D ⊆ P) (c0 : ι × ι → Γ) :
     {c : ι × ι → Γ | ∀ q, q ∉ P \ D → c q = c0 q}.ncard ≤ p ^ ((P.card - D.card) * m3) := by
   classical
@@ -1506,8 +1505,8 @@ theorem br_finite_hom_of_gen {A B : Type*} [Group A] [Group B] [Finite B] {ι : 
 
 theorem br_bracket_set_finite [Finite L2] {ι : Type*} [Finite ι] (g : ι → L1)
     (hg : Subgroup.closure (Set.range g) = ⊤) (S : Set (L1 →* L1 →* L2)) : S.Finite := by
-  haveI := br_finite_hom_of_gen (B := L2) g hg
-  haveI := br_finite_hom_of_gen (B := L1 →* L2) g hg
+  have := br_finite_hom_of_gen (B := L2) g hg
+  have := br_finite_hom_of_gen (B := L1 →* L2) g hg
   exact Set.toFinite S
 
 end BrBreadth
