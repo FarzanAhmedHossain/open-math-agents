@@ -250,7 +250,7 @@ lemma isoQ_ge (hx0 : 0 ≤ x) (hx12 : x ≤ 1 / 2) {R : ℕ} :
     simp only [isoQ, Finset.range_zero, Finset.prod_empty]
     linarith [pow_nonneg hx0 (R - 0)]
   | h + 1, hh => by
-    have ih := isoQ_ge hx0 hx12 h (by omega)
+    have ih := isoQ_ge (R := R) hx0 hx12 h (by omega)
     have hp : isoQ x R (h + 1) = isoQ x R h * (1 - x ^ (R - h)) := Finset.prod_range_succ _ _
     rw [hp]
     have e : R - h = (R - (h + 1)) + 1 := by omega
