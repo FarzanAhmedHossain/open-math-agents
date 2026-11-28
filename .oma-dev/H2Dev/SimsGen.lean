@@ -1670,8 +1670,5 @@ theorem exists_sims_data_core [Finite G] {p m : ℕ} (hp : p.Prime) (hG : Nat.ca
 
 end SimsCore
 
-#print axioms prop_2_4
-#print axioms exists_sims_data
-#print axioms exists_sims_data_core
 
 end OMA.SimsLite
