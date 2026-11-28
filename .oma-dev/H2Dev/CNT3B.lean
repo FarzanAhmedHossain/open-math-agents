@@ -552,7 +552,7 @@ theorem SimsGenSet.cbt_basisW [hp : Fact p.Prime] [Finite G] (S : SimsGenSet p a
       rw [hx]
       rfl
     rw [e, key x hxm]
-    exact sum_mem fun v _ => smul_mem _ (Submodule.subset_span ⟨v, rfl⟩)
+    exact sum_mem fun v _ => Submodule.smul_mem _ _ (Submodule.subset_span ⟨v, rfl⟩)
   have hcard : Fintype.card (Fin (r ⟨1, h1⟩)) = Module.finrank (ZMod p) (Additive (WQ p G)) := by
     rw [Fintype.card_fin]
     have h := card_lcs_one_eq (p := p) (G := G)
@@ -601,7 +601,8 @@ theorem SimsGenSet.cbt_basisV [hp : Fact p.Prime] [Finite G] (S : SimsGenSet p a
             rw [ofMul_prod]
             exact Finset.sum_congr rfl fun v _ => ofMul_pow _ _
     rw [e]
-    exact sum_mem fun v _ => nsmul_mem (Submodule.subset_span ⟨v, rfl⟩) _
+    exact sum_mem fun v _ => nsmul_mem (Submodule.subset_span (Set.mem_range_self (f := w) v) :
+      w v ∈ Submodule.span (ZMod p) (Set.range w)) _
   have hspan : ⊤ ≤ Submodule.span (ZMod p) (Set.range w) := by
     intro y _
     obtain ⟨x, hx⟩ := piV_surjective (p := p) (G := G) (Additive.toMul y)
@@ -684,7 +685,7 @@ theorem SimsGen.cbt_tuple [Fact p.Prime] (hp : p.Prime) (hS : SimsGen p u d X r)
     rfl
   refine ⟨by rw [heq]; exact hM, fun j v => ?_⟩
   have hmem : g' ⟨lfI1 h2, j⟩ ^ p ^ fibAk D ⟨lfI1 h2, j⟩ ∈ lcs G 1 :=
-    Subgroup.pow_mem _ (S.mem _) _
+    Subgroup.pow_mem _ (S.mem ⟨lfI1 h2, j⟩) _
   have hone : piW p G ⟨g' ⟨lfI1 h2, j⟩ ^ p ^ fibAk D ⟨lfI1 h2, j⟩, hmem⟩ = 1 := by
     have e1 : (⟨g' ⟨lfI1 h2, j⟩ ^ p ^ fibAk D ⟨lfI1 h2, j⟩, hmem⟩ : lcs G 1) =
         (⟨g' ⟨lfI1 h2, j⟩, S.mem ⟨lfI1 h2, j⟩⟩ : lcs G 1) ^ (p ^ fibAk D ⟨lfI1 h2, j⟩) :=
