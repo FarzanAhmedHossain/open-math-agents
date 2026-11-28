@@ -73,7 +73,7 @@ lemma nfw_mem {n : ℕ} (X : Fin n → D) (e : Fin n → ℕ) (T : Set (Fin n))
   by_cases ht : e t = 0
   · rw [ht, pow_zero]
     exact one_mem _
-  · exact pow_mem (Subgroup.subset_closure ⟨t, h t ht, rfl⟩) _
+  · exact pow_mem (Subgroup.subset_closure (⟨t, h t ht, rfl⟩ : X t ∈ X '' T)) _
 
 end SProd
 
@@ -182,9 +182,9 @@ theorem card_le_of_prec [Finite D] {n : ℕ} (X : Fin n → D) (q : Fin n → �
     have hsucc : Subgroup.closure (X '' {u | prec t u}) ≤
         Subgroup.closure (X '' ((S.erase t : Finset (Fin n)) : Set (Fin n))) := by
       apply Subgroup.closure_mono
-      apply Set.image_subset
-      intro u hu
+      rintro _ ⟨u, hu, rfl⟩
       have hu' : prec t u := hu
+      refine ⟨u, ?_, rfl⟩
       rw [Finset.mem_coe]
       refine Finset.mem_erase.mpr ⟨?_, hup t htS u hu'⟩
       rintro rfl
@@ -290,7 +290,7 @@ end SimsData
 /-- `(G, X)` realises the Sims data `d` at the prime `p`: `|G| = p ^ (∑ a)`, `X` generates `G`,
 the commutator definitions hold, and the power and (recorded) commutator relations hold with the
 arrays of `d` as Sims normal-form coordinates. -/
-structure Realizes (p : ℕ) (d : SimsData) {G : Type u} [Group G] (X : Fin d.n → G) : Prop where
+structure SimsRealizes (p : ℕ) (d : SimsData) {G : Type u} [Group G] (X : Fin d.n → G) : Prop where
   card : Nat.card G = p ^ (∑ t, d.a t)
   gen : Subgroup.closure (Set.range X) = ⊤
   dfeq : ∀ t, 1 ≤ d.lv t → X t = ⁅X (d.df t).1, X (d.df t).2⁆
@@ -359,7 +359,7 @@ theorem card_le_of_sims [Finite D] {p : ℕ} (hp : 0 < p) (d : SimsData) (hd : d
       exact commElem_mem_lcs_succ hprev _
   have hmono : ∀ (P Q : Fin d.n → Prop), (∀ u, P u → Q u) →
       Subgroup.closure (Z '' {u | P u}) ≤ Subgroup.closure (Z '' {u | Q u}) :=
-    fun P Q h => Subgroup.closure_mono (Set.image_subset Z (fun u hu => h u hu))
+    fun P Q h => Subgroup.closure_mono (by rintro _ ⟨u, hu, rfl⟩; exact ⟨u, h u hu, rfl⟩)
   -- the tail from weight `w` lies in the weight-`w` generators modulo the next term
   have hdrop : ∀ w, 1 ≤ w → Subgroup.closure (Z '' {u | w ≤ d.lv u}) ≤
       Subgroup.closure (levSet d Z w) ⊔ lcs D (w + 1) := by
@@ -480,7 +480,7 @@ variable {G G' : Type u} [Group G] [Group G']
 elements. -/
 theorem diag_card_le_sims [Finite G] [Finite G'] [Group.IsNilpotent G] [Group.IsNilpotent G']
     {p : ℕ} (hp : 0 < p) (d : SimsData) (hd : d.Valid) (X : Fin d.n → G) (X' : Fin d.n → G')
-    (h : Realizes p d X) (h' : Realizes p d X') :
+    (h : SimsRealizes p d X) (h' : SimsRealizes p d X') :
     Nat.card (diagSub X X') ≤ p ^ (∑ t, d.a t) := by
   have hF : ∀ e, diagFst X X' (nfw (diagGen X X') e) = nfw X e := fun e => map_nfw _ _ _
   have hS : ∀ e, diagSnd X X' (nfw (diagGen X X') e) = nfw X' e := fun e => map_nfw _ _ _
@@ -518,8 +518,8 @@ theorem diag_card_le_sims [Finite G] [Finite G'] [Group.IsNilpotent G] [Group.Is
 /-- Rigidity for Sims data: two finite groups realising the same valid Sims data are
 isomorphic. -/
 theorem sims_rigidity {p : ℕ} (hp : p.Prime) [Finite G] [Finite G'] (d : SimsData)
-    (hd : d.Valid) (X : Fin d.n → G) (X' : Fin d.n → G') (h : Realizes p d X)
-    (h' : Realizes p d X') : Nonempty (G ≃* G') := by
+    (hd : d.Valid) (X : Fin d.n → G) (X' : Fin d.n → G') (h : SimsRealizes p d X)
+    (h' : SimsRealizes p d X') : Nonempty (G ≃* G') := by
   have : Fact p.Prime := ⟨hp⟩
   have : Group.IsNilpotent G := (IsPGroup.of_card h.card).isNilpotent
   have : Group.IsNilpotent G' := (IsPGroup.of_card h'.card).isNilpotent
@@ -532,9 +532,9 @@ theorem sims_rigidity {p : ℕ} (hp : p.Prime) [Finite G] [Finite G'] (d : SimsD
     (MulEquiv.ofBijective (diagSnd X X') hb2)⟩
 
 /-- Realising data only reads the commutator coefficients on the recorded index ranges. -/
-lemma Realizes.of_rec {p : ℕ} (d : SimsData) (c' : Fin d.n → Fin d.n → Fin d.n → ℕ)
+lemma SimsRealizes.of_rec {p : ℕ} (d : SimsData) (c' : Fin d.n → Fin d.n → Fin d.n → ℕ)
     (hc : ∀ t k u, d.Rec t k → c' t k u = d.c t k u) (X : Fin d.n → G)
-    (h : Realizes p { d with c := c' } X) : Realizes p d X where
+    (h : SimsRealizes p { d with c := c' } X) : SimsRealizes p d X where
   card := h.card
   gen := h.gen
   dfeq := h.dfeq
@@ -565,9 +565,9 @@ generator definitions (all encoded in `d`), the relative order array `a`, the po
 agree wherever `d.Rec` holds). Then `G ≅ G'`. -/
 theorem prop_2_4 {p : ℕ} (hp : p.Prime) [Finite G] [Finite G'] (d : SimsData) (hd : d.Valid)
     (c' : Fin d.n → Fin d.n → Fin d.n → ℕ) (hc : ∀ t k u, d.Rec t k → c' t k u = d.c t k u)
-    (X : Fin d.n → G) (X' : Fin d.n → G') (h : Realizes p d X)
-    (h' : Realizes p { d with c := c' } X') : Nonempty (G ≃* G') :=
-  sims_rigidity hp d hd X X' h (Realizes.of_rec d c' hc X' h')
+    (X : Fin d.n → G) (X' : Fin d.n → G') (h : SimsRealizes p d X)
+    (h' : SimsRealizes p { d with c := c' } X') : Nonempty (G ≃* G') :=
+  sims_rigidity hp d hd X X' h (SimsRealizes.of_rec d c' hc X' h')
 
 end Rigid
 
