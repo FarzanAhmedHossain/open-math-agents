@@ -229,10 +229,10 @@ variable {m r1 r2 s lam m2 m3 r3 : ℕ}
 /-- Membership in `cnt3Set` in terms of the library definitions. -/
 theorem mem_cnt3Set_iff [Fact (Nat.Prime 2)] (G : FiniteGrp.{0}) :
     G ∈ cnt3Set m r1 r2 s lam m2 m3 r3 ↔
-      Nat.card G = 2 ^ m ∧ lcs G 2 ≠ ⊥ ∧ lcs G 3 = ⊥ ∧ Group.rank G = r1 ∧ r2 2 G = r2 ∧
+      Nat.card G = 2 ^ m ∧ lcs G 2 ≠ ⊥ ∧ lcs G 3 = ⊥ ∧ Group.rank G = r1 ∧ OMA.SimsLite.r2 2 G = r2 ∧
         simsRank G = s ∧ lambdaPar 2 G = lam ∧ Nat.card (lcs G 1) = 2 ^ m2 ∧
         Nat.card (lcs G 2) = 2 ^ m3 ∧ Group.rank (lcs G 2) = r3 := by
-  rw [cnt3Set, Set.mem_setOf_eq]
+  unfold cnt3Set
   constructor
   · rintro ⟨hc, h3, h4, hr1, hr2, hs, hidx, hm2, hm3, hr3⟩
     have hp : IsPGroup 2 G := IsPGroup.of_card hc
@@ -262,7 +262,7 @@ theorem cnt3_m_eq {G : FiniteGrp.{0}} (hG : G ∈ cnt3Set m r1 r2 s lam m2 m3 r3
 /-- The class set is finite. -/
 theorem cnt3Classes_finite : (cnt3Classes m r1 r2 s lam m2 m3 r3).Finite := by
   unfold cnt3Classes
-  refine classes_finite Nat.prime_two _ ?_
+  refine classes_finite (m := m) Nat.prime_two _ ?_
   intro G hG
   refine ⟨hG.1, ?_⟩
   intro h
@@ -298,7 +298,7 @@ variable {m r1 r2 s lam m2 m3 r3 : ℕ}
 /-- CNT3 (a) for a member of `cnt3Set`. -/
 theorem cnt3_constraints_of_mem {G : FiniteGrp.{0}} (hG : G ∈ cnt3Set m r1 r2 s lam m2 m3 r3) :
     cnt3Constraints r1 r2 s lam m2 m3 := by
-  haveI : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
+  have : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
   have hG' := (mem_cnt3Set_iff G).mp hG
   obtain ⟨hc, h3, -, hr1, hr2, hs, hl, hm2, hm3, -⟩ := hG'
   obtain ⟨c1, c2, c3, c4, c5, c6⟩ := cnt3_group_constraints hc h3
