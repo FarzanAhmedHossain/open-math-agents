@@ -13,3 +13,6 @@ H2Dev.CNT3Stmt
 H2Dev.Lift
 H2Dev.Isotropic
 H2Dev.CNT3PW
+H2Dev.CNT3B
+H2Dev.LiftStrat
+H2Dev.CNT3Main
