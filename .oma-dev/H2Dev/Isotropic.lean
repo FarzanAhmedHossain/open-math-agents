@@ -525,7 +525,7 @@ lemma span_cons {i : ℕ} (y : Fin R → F) (u : Fin i → (Fin R → F)) :
   rw [Fin.range_cons, Submodule.span_insert]
 
 /-- Analysis of a one-vector extension `cons y u` of an isotropic tuple. -/
-lemma cons_iso {A : Matrix (Fin R) (Fin R) F} (hA : IsAltMat A) {r0 : ℕ}
+lemma cons_iso {A : Matrix (Fin R) (Fin R) F} (_hA : IsAltMat A) {r0 : ℕ}
     (hr : finrank F (rad A) = r0) {i J : ℕ} {u : Fin i → (Fin R → F)} {y : Fin R → F}
     (h : IsoTup A (i + 1) J (Fin.cons y u)) :
     LinearIndependent F u ∧ PairOrth A u ∧ y ∉ Submodule.span F (Set.range u) ∧
@@ -994,6 +994,28 @@ lemma isoE_two_mul {a h J : ℕ} (hJ : J ≤ h) (hl : h - J ≤ 2 * a) :
   have hc' : J * (2 * a) = J * (c + l) := by rw [hc]
   apply le_antisymm <;> nlinarith [hc']
 
+/-- `kappaH` is the paper's `κ_h(a) = a_h (2h - a_h - 1) / 2`, eq. (94), `a_h = min(a, h - 1)`. -/
+lemma two_mul_kappaH (h a : ℕ) :
+    2 * kappaH h a = min a (h - 1) * (2 * h - min a (h - 1) - 1) := by
+  unfold kappaH
+  rcases Nat.eq_zero_or_pos h with rfl | hpos
+  · simp
+  · obtain ⟨b, hb⟩ : ∃ b, min a (h - 1) = b := ⟨_, rfl⟩
+    rw [hb]
+    have hbh : b + 1 ≤ h := by omega
+    obtain ⟨d, rfl⟩ : ∃ d, h = b + d := ⟨h - b, by omega⟩
+    rw [show b + d - b = d by omega, show 2 * (b + d) - b - 1 = b + 2 * d - 1 by omega]
+    have T1 := two_mul_choose_two_add (b + d)
+    have T2 := two_mul_choose_two_add d
+    have hle : d.choose 2 ≤ (b + d).choose 2 := Nat.choose_le_choose 2 (by omega)
+    have h1 : b + 2 * d - 1 + 1 = b + 2 * d := by omega
+    have hP : b * (b + 2 * d - 1) + b = b * (b + 2 * d) := by
+      calc b * (b + 2 * d - 1) + b = b * (b + 2 * d - 1 + 1) := by ring
+        _ = b * (b + 2 * d) := by rw [h1]
+    have H : 2 * (b + d).choose 2 + b = b * (b + 2 * d) + 2 * d.choose 2 := by
+      apply le_antisymm <;> nlinarith [T1, T2]
+    omega
+
 lemma kappaH_of_le {h a : ℕ} (hah : h ≤ a + 1) : kappaH h a = h.choose 2 := by
   unfold kappaH
   rw [show min a (h - 1) = h - 1 by omega,
@@ -1268,7 +1290,3 @@ theorem isoCount_saturated_two {A : Matrix (Fin R) (Fin R) (ZMod 2)} (hA : IsAlt
 end Final
 
 end OMA.SimsLite.Alt2
-
-#print axioms OMA.SimsLite.Alt2.isoCount_mul_isoQ_le
-#print axioms OMA.SimsLite.Alt2.isoCount_uniform
-#print axioms OMA.SimsLite.Alt2.isoCount_saturated_two
