@@ -17,6 +17,16 @@ Abstract layer (commutative groups written multiplicatively, brackets as `L →*
   `((r_1 choose 2) - |D|) s_2 - (r_1 - s choose 2) b_2` for generators `Fin r_1` with core the first
   `s`; `br_eq53` is the class-3 case of (53), Props 4.2 and 4.3 combined through Lemma 4.1;
 * `br_rem44_lift` : the second alternative of Remark 4.4 (lifts of a reduction mod `p`);
+* `br_card_subgroups_le` : Lemma 2.7(iii), at most `p ^ (b (e - b + 1))` subgroups of order
+  `p ^ b` in a commutative group of order `p ^ e`; `br_card_homs_le_sharp`, `br_prop42` : the
+  sharp Proposition 4.2 at `i = 2`, at most `p ^ (s b (r_2 + s_3 - b + 1))` core slice families;
+* `brBreadth` : the breadth (48); `brBreadth_spec`, `br_card_range_le_breadth`,
+  `brBreadth_le_s2`, `brBreadth_le_s3`, `br_s3_le_breadth` (eq. (51), `s_3 ≤ s b_2`) and
+  `br_breadth_range`; `br_eq53_breadth` (fixed `b_2`) and `br_eq53_sum` (summed over the
+  admissible `b_2` with `s_3 ≤ s b_2`, `b_2 ≤ min(s_2, s_3)`);
+* `br_deeper_count`, `br_deeper_count_fin` : the deeper coefficients on the non-defining pairs,
+  at most `p ^ (((r_1 choose 2) - r_2) m_3)`;
+* `br_finite_hom_of_gen`, `br_bracket_set_finite` : finiteness of the counted bracket sets;
 * `br_lemma61` : Lemma 6.1, `log_p |p L_2| ≤ (δ choose 2)` where `|p L_1| = p ^ δ`;
 * `br_card_le_of_exp`, `br_s2_le` : the bound `s_2 ≤ r_2 (δ + 1)` of (126).
 
@@ -26,7 +36,11 @@ sections `γ_2/γ_3` and `γ_3/γ_4`):
 * `brB1 G`, `brB2 G` : the commutator brackets, `brB1_of`, `brB2_mk_of`;
 * `brB1_alt`, `brB1_closure`, `brB_jacobi` (the Jacobi identity from the Hall-Witt identity);
 * `br_lemma61_group` : `|γ_2| ≤ |γ_3| p ^ (r_2 + (λ choose 2))`, i.e. `e = m_2 - m_3 - r_2 ≤ (λ choose 2)`;
-* `br_s2_le_group` : `|γ_2| ≤ |γ_3| p ^ (r_2 (λ + 1))`, i.e. `m_2 - m_3 ≤ r_2 (λ + 1)`. -/
+* `br_s2_le_group` : `|γ_2| ≤ |γ_3| p ^ (r_2 (λ + 1))`, i.e. `m_2 - m_3 ≤ r_2 (λ + 1)`;
+* `brT1`, `brT2` : the brackets transported to fixed layers along identifications
+  `G^ab ≃ L_1`, `γ_2/γ_3 ≃ L_2`, `γ_3/γ_4 ≃ L_3`, with `brT1_alt`, `brT_jacobi`, `brT1_closure`,
+  the leading-coefficient formulas `brT1_of`, `brT2_of`, and `brT1_coeff_eq`, `brT2_coeff_eq`
+  (equal transported brackets give equal transported leading commutators). -/
 
 namespace OMA.SimsLite
 
@@ -221,6 +235,260 @@ theorem br_exists_tuple_closure_eq [Finite L] {p n b : ℕ} (hp : p.Prime)
 
 end BrSub
 
+section BrSubCount
+
+/-! ### Lemma 2.7(iii): counting subgroups of order `p ^ b` -/
+
+lemma br_ncard_subgroups_one {L : Type*} [Group L] [Finite L] :
+    {H : Subgroup L | Nat.card H = 1}.ncard ≤ 1 := by
+  have hsub : {H : Subgroup L | Nat.card H = 1} ⊆ {⊥} := by
+    intro H hH
+    exact Subgroup.eq_bot_of_card_eq H hH
+  calc _ ≤ ({⊥} : Set (Subgroup L)).ncard := Set.ncard_le_ncard hsub (Set.finite_singleton _)
+    _ = 1 := Set.ncard_singleton _
+
+lemma br_ncard_subgroups_big {L : Type*} [Group L] [Finite L] {p e b : ℕ} (hp : p.Prime)
+    (hL : Nat.card L = p ^ e) (hb : e < b) : {H : Subgroup L | Nat.card H = p ^ b}.ncard = 0 := by
+  have he : {H : Subgroup L | Nat.card H = p ^ b} = ∅ := by
+    ext H
+    simp only [Set.mem_setOf_eq, Set.mem_empty_iff_false, iff_false]
+    intro hH
+    have h := Subgroup.card_subgroup_dvd_card H
+    rw [hH, hL] at h
+    have := (Nat.pow_dvd_pow_iff_le_right hp.one_lt).1 h
+    omega
+  rw [he, Set.ncard_empty]
+
+/-- Lemma 2.7(iii) ([BNV07, Lemma 20.15]): a commutative group of order `p ^ e` has at most
+`p ^ (b (e - b + 1))` subgroups of order `p ^ b`. Proof by induction on `e` through a maximal
+subgroup `M`: the subgroups inside `M` are counted by induction, and a subgroup `H ⊄ M` is
+determined by `M ⊓ H` (of order `p ^ (b - 1)`) and the coset `t⁻¹ (H ∩ t M)` in `M / (M ⊓ H)`. -/
+theorem br_card_subgroups_le {p : ℕ} (hp : p.Prime) (e : ℕ) :
+    ∀ (L : Type u) [CommGroup L] [Finite L], Nat.card L = p ^ e → ∀ b : ℕ,
+      {H : Subgroup L | Nat.card H = p ^ b}.ncard ≤ p ^ (b * (e + 1 - b)) := by
+  haveI := Fact.mk hp
+  induction e with
+  | zero =>
+    intro L _ _ hL b
+    rcases Nat.eq_zero_or_pos b with rfl | hb
+    · simpa using br_ncard_subgroups_one (L := L)
+    · rw [br_ncard_subgroups_big hp hL hb]
+      exact Nat.zero_le _
+  | succ e ih =>
+    intro L _ _ hL b
+    rcases Nat.eq_zero_or_pos b with rfl | hb0
+    · simpa using br_ncard_subgroups_one (L := L)
+    rcases Nat.lt_or_ge (e + 1) b with hbe | hbe
+    · rw [br_ncard_subgroups_big hp hL hbe]
+      exact Nat.zero_le _
+    obtain ⟨c, rfl⟩ : ∃ c, b = c + 1 := ⟨b - 1, by omega⟩
+    obtain ⟨d, rfl⟩ : ∃ d, e = c + d := ⟨e - c, by omega⟩
+    classical
+    haveI : Finite (Subgroup L) :=
+      Finite.of_injective (fun H : Subgroup L => (H : Set L)) SetLike.coe_injective
+    obtain ⟨M, hM⟩ := Sylow.exists_subgroup_card_pow_prime p
+      (show p ^ (c + d) ∣ Nat.card L by rw [hL]; exact pow_dvd_pow p (Nat.le_succ _))
+    haveI : Finite (Subgroup M) :=
+      Finite.of_injective (fun H : Subgroup M => (H : Set M)) SetLike.coe_injective
+    have hMi : M.index = p := by
+      have h := Subgroup.card_mul_index M
+      rw [hM, hL, pow_succ] at h
+      exact Nat.eq_of_mul_eq_mul_left (pow_pos hp.pos _) h
+    have hMtop : M ≠ ⊤ := by
+      intro h
+      rw [h, Subgroup.index_top] at hMi
+      exact hp.one_lt.ne hMi
+    obtain ⟨t, htM⟩ : ∃ t, t ∉ M := by
+      by_contra hne
+      push_neg at hne
+      exact hMtop (eq_top_iff.2 fun x _ => hne x)
+    set S1 := {H : Subgroup L | Nat.card H = p ^ (c + 1) ∧ H ≤ M} with hS1
+    set S2 := {H : Subgroup L | Nat.card H = p ^ (c + 1) ∧ ¬ H ≤ M} with hS2
+    have hsplit : {H : Subgroup L | Nat.card H = p ^ (c + 1)} = S1 ∪ S2 := by
+      ext H
+      simp only [hS1, hS2, Set.mem_union, Set.mem_setOf_eq]
+      tauto
+    -- subgroups inside `M`
+    have h1 : S1.ncard ≤ p ^ ((c + 1) * (c + d + 1 - (c + 1))) := by
+      refine le_trans ?_ (ih M hM (c + 1))
+      refine Set.ncard_le_ncard_of_injOn (fun H => H.subgroupOf M) ?_ ?_ (Set.toFinite _)
+      · rintro H ⟨hH, hHM⟩
+        show Nat.card (H.subgroupOf M) = p ^ (c + 1)
+        rw [← hH]
+        exact Nat.card_congr (Subgroup.subgroupOfEquivOfLe hHM).toEquiv
+      · rintro H ⟨-, hHM⟩ H' ⟨-, hH'M⟩ he
+        have := Subgroup.subgroupOf_inj.1 he
+        rwa [inf_of_le_left hHM, inf_of_le_left hH'M] at this
+    -- subgroups not inside `M`
+    have hS2card : ∀ H ∈ S2, Nat.card ↥(M ⊓ H) = p ^ c := by
+      rintro H ⟨hH, hHM⟩
+      have hdvd : M.relIndex H ∣ p := hMi ▸ Subgroup.relIndex_dvd_index_of_normal (H := M) (K := H)
+      have hne : M.relIndex H ≠ 1 := fun h1 => hHM (Subgroup.relIndex_eq_one.1 h1)
+      have hrel : M.relIndex H = p := ((Nat.dvd_prime hp).1 hdvd).resolve_left hne
+      have hc1 := Subgroup.card_mul_index (M ⊓ H)
+      have hc2 := Subgroup.relIndex_mul_index (inf_le_right : M ⊓ H ≤ H)
+      rw [Subgroup.inf_relIndex_right (H := M) (K := H), hrel] at hc2
+      have hc3 := Subgroup.card_mul_index H
+      rw [hH] at hc3
+      rw [← hc2, hL] at hc1
+      have hi : H.index ≠ 0 := Subgroup.index_ne_zero_of_finite
+      have e1 : (Nat.card ↥(M ⊓ H) * p) * H.index = (p ^ c * p) * H.index := by
+        rw [← pow_succ, hc3, ← hc1]
+        ring
+      have e2 := Nat.eq_of_mul_eq_mul_right (Nat.pos_of_ne_zero hi) e1
+      exact Nat.eq_of_mul_eq_mul_right hp.pos e2
+    have hex : ∀ H ∈ S2, ∃ y, y ∈ H ∧ t⁻¹ * y ∈ M := by
+      rintro H ⟨hH, hHM⟩
+      have hle : M ≤ H ⊔ M := le_sup_right
+      have hne : M ≠ H ⊔ M := fun h => hHM (le_sup_left.trans h.symm.le)
+      have hcne : Nat.card M ≠ Nat.card ↥(H ⊔ M) := fun h =>
+        hne (Subgroup.eq_of_le_of_card_ge hle h.symm.le)
+      have hp1 := br_pmul_le_of_dvd hp (n := c + d + 1)
+        (by rw [← hL]; exact Subgroup.card_subgroup_dvd_card _)
+        (by rw [← hL]; exact Subgroup.card_subgroup_dvd_card _) (Subgroup.card_dvd_of_le hle) hcne
+      have htop : H ⊔ M = ⊤ := by
+        refine Subgroup.eq_of_le_of_card_ge le_top ?_
+        rw [Subgroup.card_top, hL, pow_succ, ← hM, mul_comm]
+        exact hp1
+      have ht : t ∈ H ⊔ M := by
+        rw [htop]
+        exact Subgroup.mem_top t
+      obtain ⟨y, hy, z, hz, hyz⟩ := Subgroup.mem_sup.1 ht
+      refine ⟨y, hy, ?_⟩
+      have e : t⁻¹ * y = z⁻¹ := by
+        rw [← hyz]
+        group
+      rw [e]
+      exact inv_mem hz
+    let ch : Subgroup L → L := fun H => Classical.epsilon (fun y => y ∈ H ∧ t⁻¹ * y ∈ M)
+    have hch : ∀ H ∈ S2, ch H ∈ H ∧ t⁻¹ * ch H ∈ M := fun H hH =>
+      Classical.epsilon_spec (hex H hH)
+    let f : Subgroup L → Subgroup M := fun H => (M ⊓ H).subgroupOf M
+    have hfib : ∀ a : Subgroup M, (S2 ∩ f ⁻¹' {a}).ncard ≤ p ^ d := by
+      intro a
+      rcases (S2 ∩ f ⁻¹' {a}).eq_empty_or_nonempty with he | ⟨H0, hH0, hH0a⟩
+      · rw [he, Set.ncard_empty]
+        exact Nat.zero_le _
+      obtain ⟨K, hK⟩ : ∃ K : Subgroup L, K = M ⊓ H0 := ⟨_, rfl⟩
+      have hKc : Nat.card K = p ^ c := by
+        rw [hK]
+        exact hS2card H0 hH0
+      have hKM : K ≤ M := by
+        rw [hK]
+        exact inf_le_left
+      have hfK : ∀ H ∈ S2 ∩ f ⁻¹' {a}, M ⊓ H = K := by
+        rintro H ⟨-, hHa⟩
+        have e : f H = f H0 := (show f H = a from hHa).trans (show f H0 = a from hH0a).symm
+        have e2 := Subgroup.subgroupOf_inj.1 e
+        rw [inf_of_le_left inf_le_left, inf_of_le_left inf_le_left] at e2
+        rw [hK]
+        exact e2
+      have hmap : Nat.card ↥(M.map (QuotientGroup.mk' K)) = p ^ d := by
+        have e := Subgroup.relIndex_ker (K := M) (f := QuotientGroup.mk' K)
+        rw [QuotientGroup.ker_mk'] at e
+        have hc2 := Subgroup.relIndex_mul_index hKM
+        rw [e, hMi] at hc2
+        have hc1 := Subgroup.card_mul_index K
+        rw [hKc, ← hc2, hL] at hc1
+        have h3 : p ^ c * (Nat.card ↥(M.map (QuotientGroup.mk' K)) * p) = p ^ c * (p ^ d * p) := by
+          rw [hc1]
+          ring
+        exact Nat.eq_of_mul_eq_mul_right hp.pos (Nat.eq_of_mul_eq_mul_left (pow_pos hp.pos c) h3)
+      let Φ : Subgroup L → L ⧸ K := fun H => ((t⁻¹ * ch H : L) : L ⧸ K)
+      have hmaps : ∀ H ∈ S2 ∩ f ⁻¹' {a},
+          Φ H ∈ ((M.map (QuotientGroup.mk' K) : Subgroup (L ⧸ K)) : Set (L ⧸ K)) := by
+        intro H hH
+        exact Subgroup.mem_map.2 ⟨t⁻¹ * ch H, (hch H hH.1).2, rfl⟩
+      have hinj : Set.InjOn Φ (S2 ∩ f ⁻¹' {a}) := by
+        intro H hH H' hH' hΦ
+        obtain ⟨hy1, -⟩ := hch H hH.1
+        obtain ⟨hy1', hy2'⟩ := hch H' hH'.1
+        have hcardH : Nat.card H = p ^ (c + 1) := hH.1.1
+        have hcardH' : Nat.card H' = p ^ (c + 1) := hH'.1.1
+        have hKH : K ≤ H := by
+          rw [← hfK H hH]
+          exact inf_le_right
+        have hKH' : K ≤ H' := by
+          rw [← hfK H' hH']
+          exact inf_le_right
+        have hq : (ch H)⁻¹ * ch H' ∈ K := by
+          have h0 := QuotientGroup.eq.1 hΦ
+          have e : (t⁻¹ * ch H)⁻¹ * (t⁻¹ * ch H') = (ch H)⁻¹ * ch H' := by group
+          rwa [e] at h0
+        have hcH : ch H' ∈ H := by
+          have e : ch H' = ch H * ((ch H)⁻¹ * ch H') := by group
+          rw [e]
+          exact mul_mem hy1 (hKH hq)
+        have hnotK : ch H' ∉ K := by
+          intro hc
+          have hcM : ch H' ∈ M := hKM hc
+          apply htM
+          have e : t = ch H' * (t⁻¹ * ch H')⁻¹ := by group
+          rw [e]
+          exact mul_mem hcM (inv_mem hy2')
+        obtain ⟨J, hJ⟩ : ∃ J : Subgroup L, J = K ⊔ Subgroup.zpowers (ch H') := ⟨_, rfl⟩
+        have hJH : J ≤ H := by
+          rw [hJ]
+          exact sup_le hKH (Subgroup.zpowers_le.2 hcH)
+        have hJH' : J ≤ H' := by
+          rw [hJ]
+          exact sup_le hKH' (Subgroup.zpowers_le.2 hy1')
+        have hKJ : K ≤ J := by
+          rw [hJ]
+          exact le_sup_left
+        have hKne : Nat.card K ≠ Nat.card J := by
+          intro h
+          have h' := Subgroup.eq_of_le_of_card_ge hKJ h.symm.le
+          apply hnotK
+          rw [h', hJ]
+          exact Subgroup.mem_sup_right (Subgroup.mem_zpowers _)
+        have hpJ := br_pmul_le_of_dvd hp (n := c + d + 1)
+          (by rw [← hL]; exact Subgroup.card_subgroup_dvd_card _)
+          (by rw [← hL]; exact Subgroup.card_subgroup_dvd_card _) (Subgroup.card_dvd_of_le hKJ) hKne
+        have hJeq : J = H' := by
+          refine Subgroup.eq_of_le_of_card_ge hJH' ?_
+          rw [hcardH', pow_succ, ← hKc, mul_comm]
+          exact hpJ
+        have hH'H : H' ≤ H := by
+          rw [← hJeq]
+          exact hJH
+        exact (Subgroup.eq_of_le_of_card_ge hH'H (by rw [hcardH, hcardH'])).symm
+      calc (S2 ∩ f ⁻¹' {a}).ncard
+          ≤ ((M.map (QuotientGroup.mk' K) : Subgroup (L ⧸ K)) : Set (L ⧸ K)).ncard :=
+            Set.ncard_le_ncard_of_injOn Φ hmaps hinj (Set.toFinite _)
+        _ = p ^ d := by rw [← Nat.card_coe_set_eq]; exact hmap
+    have himg : (f '' S2).ncard ≤ p ^ (c * (c + d + 1 - c)) := by
+      refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _)) (ih M hM c)
+      rintro _ ⟨H, hH, rfl⟩
+      show Nat.card ((M ⊓ H).subgroupOf M) = p ^ c
+      rw [← hS2card H hH]
+      exact Nat.card_congr (Subgroup.subgroupOfEquivOfLe inf_le_left).toEquiv
+    have h2 : S2.ncard ≤ (f '' S2).ncard * p ^ d := br_ncard_le_image_mul S2 f _ hfib
+    have e1 : c + d + 1 - (c + 1) = d := by omega
+    have e2 : c + d + 1 - c = d + 1 := by omega
+    have e3 : c + d + 1 + 1 - (c + 1) = d + 1 := by omega
+    rw [e1] at h1
+    rw [e2] at himg
+    rw [e3, hsplit]
+    calc (S1 ∪ S2).ncard ≤ S1.ncard + S2.ncard := Set.ncard_union_le _ _
+      _ ≤ p ^ ((c + 1) * d) + p ^ (c * (d + 1)) * p ^ d :=
+          Nat.add_le_add h1 (h2.trans (Nat.mul_le_mul_right _ himg))
+      _ ≤ p ^ (c * d + c + d) + p ^ (c * d + c + d) := by
+          refine Nat.add_le_add (Nat.pow_le_pow_right hp.pos ?_) (le_of_eq ?_)
+          · rw [add_mul, one_mul]
+            omega
+          · rw [← pow_add]
+            congr 1
+            ring
+      _ = 2 * p ^ (c * d + c + d) := by ring
+      _ ≤ p * p ^ (c * d + c + d) := Nat.mul_le_mul_right _ hp.two_le
+      _ = p ^ ((c + 1) * (d + 1)) := by
+          rw [← pow_succ']
+          congr 1
+          ring
+
+end BrSubCount
+
 section BrProp42
 
 /-! ### Proposition 4.2 at `i = 2`, crude subgroup bound -/
@@ -332,6 +600,118 @@ theorem br_prop42_restrict [Finite L2] [Finite L3] {p s3 n b : ℕ} (hp : p.Prim
   refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _)) (br_prop42_crude hp hL3 y hy s)
   rintro _ ⟨β, hβ, rfl⟩
   exact hB β hβ
+
+/-- Tuples with entries in a set `T` of a finite type: at most `|T| ^ s`. -/
+theorem br_ncard_tuples_le {X : Type*} [Finite X] (T : Set X) (x0 : X) (hx0 : x0 ∈ T) (s : ℕ) :
+    {κ : Fin s → X | ∀ k, κ k ∈ T}.ncard ≤ T.ncard ^ s := by
+  classical
+  let F : (Fin s → X) → (Fin s → T) := fun κ k => if h : κ k ∈ T then ⟨κ k, h⟩ else ⟨x0, hx0⟩
+  have hinj : Set.InjOn F {κ : Fin s → X | ∀ k, κ k ∈ T} := by
+    intro κ hκ κ' hκ' he
+    funext k
+    have hk1 : κ k ∈ T := hκ k
+    have hk2 : κ' k ∈ T := hκ' k
+    have e := congrArg Subtype.val (congrFun he k)
+    have e1 : ((F κ k : T) : X) = κ k := by
+      show ((if h : κ k ∈ T then (⟨κ k, h⟩ : T) else ⟨x0, hx0⟩ : T) : X) = κ k
+      rw [dif_pos hk1]
+    have e2 : ((F κ' k : T) : X) = κ' k := by
+      show ((if h : κ' k ∈ T then (⟨κ' k, h⟩ : T) else ⟨x0, hx0⟩ : T) : X) = κ' k
+      rw [dif_pos hk2]
+    rw [← e1, ← e2]
+    exact e
+  calc _ ≤ Nat.card (Fin s → T) := br_ncard_le_card_of_injOn _ F hinj
+    _ = T.ncard ^ s := by rw [Nat.card_fun, Nat.card_fin, Nat.card_coe_set_eq]
+
+/-- Homomorphisms `L_2 → L_3` with image of order `≤ p ^ b`, where `L_2` is generated by `n`
+elements, `|L_3| = p ^ s_3` and `b ≤ s_3`: at most `p ^ (b (n + s_3 - b + 1))`. The image is
+extended to a subgroup of order exactly `p ^ b` (Sylow), there are at most `p ^ (b (s_3 - b + 1))`
+of these (Lemma 2.7(iii), `br_card_subgroups_le`), and then the images of the `n` generators have
+at most `p ^ (b n)` possibilities. -/
+theorem br_card_homs_le_sharp [Finite L2] [Finite L3] {p s3 n b : ℕ} (hp : p.Prime)
+    (hL3 : Nat.card L3 = p ^ s3) (hb : b ≤ s3) (y : Fin n → L2)
+    (hy : Subgroup.closure (Set.range y) = ⊤) :
+    {φ : L2 →* L3 | Nat.card φ.range ≤ p ^ b}.ncard ≤ p ^ (b * (n + s3 + 1 - b)) := by
+  classical
+  haveI := Fact.mk hp
+  haveI : Finite (Subgroup L3) :=
+    Finite.of_injective (fun H : Subgroup L3 => (H : Set L3)) SetLike.coe_injective
+  set S := {φ : L2 →* L3 | Nat.card φ.range ≤ p ^ b} with hSdef
+  have hext : ∀ φ ∈ S, ∃ K : Subgroup L3, Nat.card K = p ^ b ∧ φ.range ≤ K := by
+    intro φ hφ
+    have hφ' : Nat.card φ.range ≤ p ^ b := hφ
+    obtain ⟨k, -, hk⟩ := (Nat.dvd_prime_pow hp).1
+      (show Nat.card φ.range ∣ p ^ s3 by rw [← hL3]; exact Subgroup.card_subgroup_dvd_card _)
+    rw [hk] at hφ'
+    have hkb : k ≤ b := br_pow_le_cancel hp.one_lt hφ'
+    exact Sylow.exists_subgroup_card_pow_prime_le p
+      (show p ^ b ∣ Nat.card L3 by rw [hL3]; exact pow_dvd_pow p hb) φ.range hk hkb
+  let f : (L2 →* L3) → Subgroup L3 := fun φ =>
+    Classical.epsilon (fun K : Subgroup L3 => Nat.card K = p ^ b ∧ φ.range ≤ K)
+  have hf : ∀ φ ∈ S, Nat.card (f φ) = p ^ b ∧ φ.range ≤ f φ := fun φ hφ =>
+    Classical.epsilon_spec (hext φ hφ)
+  have hM : ∀ K : Subgroup L3, (S ∩ f ⁻¹' {K}).ncard ≤ (p ^ b) ^ n := by
+    intro K
+    rcases (S ∩ f ⁻¹' {K}).eq_empty_or_nonempty with he | ⟨φ0, hφ0S, hφ0K⟩
+    · rw [he, Set.ncard_empty]
+      exact Nat.zero_le _
+    · have hK : Nat.card K = p ^ b := by
+        have h0 := (hf φ0 hφ0S).1
+        rwa [show f φ0 = K from hφ0K] at h0
+      have hmem : ∀ φ ∈ S ∩ f ⁻¹' {K}, ∀ i, φ (y i) ∈ K := by
+        rintro φ ⟨hφS, hφK⟩ i
+        have hφK' : f φ = K := hφK
+        rw [← hφK']
+        exact (hf φ hφS).2 ⟨y i, rfl⟩
+      let F : (L2 →* L3) → (Fin n → K) := fun φ i =>
+        if h : φ (y i) ∈ K then ⟨φ (y i), h⟩ else 1
+      have hinj : Set.InjOn F (S ∩ f ⁻¹' {K}) := by
+        intro φ hφ ψ hψ hFeq
+        apply MonoidHom.eq_of_eqOn_dense hy
+        rintro _ ⟨i, rfl⟩
+        have h1 := congrFun hFeq i
+        have h2 : ((F φ i : K) : L3) = φ (y i) := by
+          show ((if h : φ (y i) ∈ K then (⟨φ (y i), h⟩ : K) else 1 : K) : L3) = φ (y i)
+          rw [dif_pos (hmem φ hφ i)]
+        have h3 : ((F ψ i : K) : L3) = ψ (y i) := by
+          show ((if h : ψ (y i) ∈ K then (⟨ψ (y i), h⟩ : K) else 1 : K) : L3) = ψ (y i)
+          rw [dif_pos (hmem ψ hψ i)]
+        rw [← h2, ← h3, h1]
+      calc (S ∩ f ⁻¹' {K}).ncard ≤ Nat.card (Fin n → K) := br_ncard_le_card_of_injOn _ F hinj
+        _ = Nat.card K ^ n := by rw [Nat.card_fun, Nat.card_fin]
+        _ = (p ^ b) ^ n := by rw [hK]
+  have himg : (f '' S).ncard ≤ p ^ (b * (s3 + 1 - b)) := by
+    refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _)) (br_card_subgroups_le hp s3 L3 hL3 b)
+    rintro _ ⟨φ, hφ, rfl⟩
+    exact (hf φ hφ).1
+  calc S.ncard ≤ (f '' S).ncard * (p ^ b) ^ n := br_ncard_le_image_mul S f _ hM
+    _ ≤ p ^ (b * (s3 + 1 - b)) * (p ^ b) ^ n := Nat.mul_le_mul_right _ himg
+    _ = p ^ (b * (n + s3 + 1 - b)) := by
+      rw [← pow_mul, ← pow_add]
+      congr 1
+      obtain ⟨d, rfl⟩ : ∃ d, s3 = b + d := ⟨s3 - b, by omega⟩
+      rw [show b + d + 1 - b = d + 1 by omega, show n + (b + d) + 1 - b = n + d + 1 by omega]
+      ring
+
+/-- Proposition 4.2 at `i = 2` with Lemma 2.7(iii) (the paper's sharp form): the families of `s`
+core slices `ad(g_{1,k}) : L_2 → L_3` of breadth `≤ b` (with `b ≤ s_3`) number at most
+`p ^ (s · b · (r_2 + s_3 - b + 1))`, where `L_2` is generated by `n = r_2` elements. -/
+theorem br_prop42 [Finite L2] [Finite L3] {p s3 n b : ℕ} (hp : p.Prime)
+    (hL3 : Nat.card L3 = p ^ s3) (hb : b ≤ s3) (y : Fin n → L2)
+    (hy : Subgroup.closure (Set.range y) = ⊤) (s : ℕ) :
+    {κ : Fin s → (L2 →* L3) | ∀ k, Nat.card (κ k).range ≤ p ^ b}.ncard ≤
+      p ^ (s * (b * (n + s3 + 1 - b))) := by
+  haveI : Finite (L2 →* L3) :=
+    Finite.of_injective (fun f : L2 →* L3 => (f : L2 → L3)) DFunLike.coe_injective
+  have h1 : (1 : L2 →* L3) ∈ {φ : L2 →* L3 | Nat.card φ.range ≤ p ^ b} := by
+    show Nat.card (1 : L2 →* L3).range ≤ p ^ b
+    rw [MonoidHom.range_one, Subgroup.card_bot]
+    exact Nat.one_le_pow _ _ hp.pos
+  calc _ ≤ {φ : L2 →* L3 | Nat.card φ.range ≤ p ^ b}.ncard ^ s :=
+        br_ncard_tuples_le {φ : L2 →* L3 | Nat.card φ.range ≤ p ^ b} 1 h1 s
+    _ ≤ (p ^ (b * (n + s3 + 1 - b))) ^ s :=
+        Nat.pow_le_pow_left (br_card_homs_le_sharp hp hL3 hb y hy) s
+    _ = p ^ (s * (b * (n + s3 + 1 - b))) := by rw [← pow_mul, mul_comm]
 
 end BrProp42
 
@@ -693,8 +1073,10 @@ theorem br_prop43_fin [Finite L2] {p r s s2 b : ℕ} (hp : p.Prime)
 /-- Eq. (53) at `c = 3`, with Remark 4.4 (first alternative): the graded brackets
 `(β_1, β_2)` (`L_1 × L_1 → L_2` and `L_2 × L_1 → L_3`) with the Jacobi identity, generation of
 `L_2` by the core, core slices of breadth `≤ b` attained at some `h ∈ C_core`, and prescribed
-values on `D`, number at most `p ^ (s b (n + s_3)) · p ^ (((r_1 choose 2) - |D|) s_2 -
-((r_1 - s) choose 2) b)`, where `L_2` is generated by `n` elements (`n = r_2`). -/
+values on `D`, number at most `p ^ (s b (n + s_3 - b + 1)) · p ^ (((r_1 choose 2) - |D|) s_2 -
+((r_1 - s) choose 2) b)`, where `L_2` is generated by `n` elements (`n = r_2`). The first factor is
+the sharp Proposition 4.2 (`br_prop42`, through Lemma 2.7(iii)); `b ≤ s_3` is automatic here
+since some slice has breadth `≥ b`. -/
 theorem br_eq53 [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : ℕ} (hp : p.Prime)
     (hsr : s ≤ r) (hL2 : Nat.card L2 = p ^ s2) (hL3 : Nat.card L3 = p ^ s3) (y : Fin n → L2)
     (hy : Subgroup.closure (Set.range y) = ⊤) (g : Fin r → L1)
@@ -707,7 +1089,8 @@ theorem br_eq53 [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : ℕ} (hp 
         (∀ j : Fin r, (j : ℕ) < s → Nat.card (β.2.flip (g j)).range ≤ p ^ b) ∧
         (∃ h ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), p ^ b ≤ Nat.card (β.2.flip h).range) ∧
         ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q}.ncard ≤
-      p ^ (s * (b * (n + s3))) * p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
+      p ^ (s * (b * (n + s3 + 1 - b))) *
+        p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
   classical
   haveI : Finite (L2 →* L3) :=
     Finite.of_injective (fun f : L2 →* L3 => (f : L2 → L3)) DFunLike.coe_injective
@@ -723,11 +1106,19 @@ theorem br_eq53 [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : ℕ} (hp 
         (∀ j : Fin r, (j : ℕ) < s → Nat.card (β.2.flip (g j)).range ≤ p ^ b) ∧
         (∃ h ∈ C, p ^ b ≤ Nat.card (β.2.flip h).range) ∧
         ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q} with hBR
+  rcases BR.eq_empty_or_nonempty with hBe | ⟨β1, hβ1⟩
+  · rw [hBe, Set.ncard_empty]
+    exact Nat.zero_le _
+  have hbs3 : b ≤ s3 := by
+    obtain ⟨-, -, -, -, ⟨h1, -, hb1⟩, -⟩ := id hβ1
+    have hr : Nat.card (β1.2.flip h1).range ≤ Nat.card L3 :=
+      Subgroup.card_le_card_group (H := (β1.2.flip h1).range)
+    exact br_pow_le_cancel hp.one_lt (hb1.trans (hr.trans hL3.le))
   let ρ : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) → (Fin s → (L2 →* L3)) :=
     fun β k => β.2.flip (c k)
-  have himg : (ρ '' BR).ncard ≤ p ^ (s * (b * (n + s3))) := by
+  have himg : (ρ '' BR).ncard ≤ p ^ (s * (b * (n + s3 + 1 - b))) := by
     refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _))
-      (br_prop42_crude hp hL3 y hy s (b := b))
+      (br_prop42 hp hL3 hbs3 y hy s (b := b))
     rintro _ ⟨β, hβ, rfl⟩ k
     obtain ⟨-, -, -, hsl0, -⟩ := id hβ
     exact hsl0 (Fin.castLE hsr k) (by simp)
@@ -777,7 +1168,8 @@ theorem br_eq53 [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : ℕ} (hp 
         _ ≤ _ := br_prop43_fin hp hL2 g hg β0.2 hh0 hb0 D hD v
   calc BR.ncard ≤ (ρ '' BR).ncard * p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) :=
         br_ncard_le_image_mul BR ρ _ hfib
-    _ ≤ p ^ (s * (b * (n + s3))) * p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) :=
+    _ ≤ p ^ (s * (b * (n + s3 + 1 - b))) *
+          p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) :=
         Nat.mul_le_mul_right _ himg
 
 /-- Remark 4.4, second alternative: counting alternating brackets through a reduction
@@ -843,6 +1235,282 @@ theorem br_rem44_lift [Finite L2] {W : Type*} [Group W] {ι : Type*} [DecidableE
           rw [Nat.card_fun, Nat.card_eq_fintype_card (α := ↥(P \ D)), Fintype.card_coe]
 
 end BrBracket
+
+section BrBreadth
+
+/-! ### The breadth (48) and the breadth relations (49)-(51) -/
+
+variable {L1 L2 L3 : Type*} [CommGroup L1] [CommGroup L2] [CommGroup L3]
+
+/-- Eq. (48): the breadth `b = max_{u ∈ C} log_p |im ad(u)|` of a core bracket map
+`κ : L_2 × C → L_3`, as the largest `k` with `p ^ k ≤ |im ad(u)|` for some `u ∈ C`. -/
+noncomputable def brBreadth (p : ℕ) (κ : L2 →* L1 →* L3) (C : Subgroup L1) : ℕ :=
+  sSup {k | ∃ u ∈ C, p ^ k ≤ Nat.card (κ.flip u).range}
+
+lemma brBreadth_nonempty [Finite L3] (p : ℕ) (κ : L2 →* L1 →* L3) (C : Subgroup L1) :
+    {k | ∃ u ∈ C, p ^ k ≤ Nat.card (κ.flip u).range}.Nonempty :=
+  ⟨0, show ∃ u ∈ C, p ^ 0 ≤ Nat.card (κ.flip u).range from
+    ⟨1, C.one_mem, by rw [pow_zero]; exact Nat.card_pos⟩⟩
+
+lemma brBreadth_bdd [Finite L3] {p s3 : ℕ} (hp : p.Prime) (hL3 : Nat.card L3 = p ^ s3)
+    (κ : L2 →* L1 →* L3) (C : Subgroup L1) :
+    ∀ k ∈ {k | ∃ u ∈ C, p ^ k ≤ Nat.card (κ.flip u).range}, k ≤ s3 := by
+  rintro k ⟨u, -, hk⟩
+  exact br_pow_le_cancel hp.one_lt
+    (hk.trans ((Subgroup.card_le_card_group (H := (κ.flip u).range)).trans hL3.le))
+
+/-- The breadth is attained (`h*` in (48)). -/
+theorem brBreadth_spec [Finite L3] {p s3 : ℕ} (hp : p.Prime) (hL3 : Nat.card L3 = p ^ s3)
+    (κ : L2 →* L1 →* L3) (C : Subgroup L1) :
+    ∃ h ∈ C, p ^ brBreadth p κ C ≤ Nat.card (κ.flip h).range :=
+  Nat.sSup_mem (brBreadth_nonempty p κ C) ⟨s3, brBreadth_bdd hp hL3 κ C⟩
+
+/-- `b ≤ s_3`. -/
+theorem brBreadth_le_s3 [Finite L3] {p s3 : ℕ} (hp : p.Prime) (hL3 : Nat.card L3 = p ^ s3)
+    (κ : L2 →* L1 →* L3) (C : Subgroup L1) : brBreadth p κ C ≤ s3 :=
+  csSup_le (brBreadth_nonempty p κ C) (brBreadth_bdd hp hL3 κ C)
+
+/-- Every slice of the core bracket map has breadth at most `b`. -/
+theorem br_card_range_le_breadth [Finite L3] {p s3 : ℕ} (hp : p.Prime)
+    (hL3 : Nat.card L3 = p ^ s3) (κ : L2 →* L1 →* L3) (C : Subgroup L1) {u : L1} (hu : u ∈ C) :
+    Nat.card (κ.flip u).range ≤ p ^ brBreadth p κ C := by
+  obtain ⟨k, -, hk⟩ := (Nat.dvd_prime_pow hp).1
+    (show Nat.card (κ.flip u).range ∣ p ^ s3 by
+      rw [← hL3]; exact Subgroup.card_subgroup_dvd_card _)
+  rw [hk]
+  exact Nat.pow_le_pow_right hp.pos
+    (le_csSup ⟨s3, brBreadth_bdd hp hL3 κ C⟩
+      (show ∃ v ∈ C, p ^ k ≤ Nat.card (κ.flip v).range from ⟨u, hu, hk.ge⟩))
+
+/-- `b ≤ s_2`. -/
+theorem brBreadth_le_s2 [Finite L2] [Finite L3] {p s2 s3 : ℕ} (hp : p.Prime)
+    (hL2 : Nat.card L2 = p ^ s2) (hL3 : Nat.card L3 = p ^ s3) (κ : L2 →* L1 →* L3)
+    (C : Subgroup L1) : brBreadth p κ C ≤ s2 := by
+  obtain ⟨h, -, hh⟩ := brBreadth_spec hp hL3 κ C
+  have hr : Nat.card (κ.flip h).range ≤ Nat.card L2 :=
+    Nat.card_le_card_of_surjective _ (κ.flip h).rangeRestrict_surjective
+  exact br_pow_le_cancel hp.one_lt (hh.trans (hr.trans hL2.le))
+
+/-- `|⨆_{i ∈ I} H_i| ≤ M ^ |I|` when each `|H_i| ≤ M`, in a commutative group. -/
+theorem br_card_finset_sup_le {L : Type*} [CommGroup L] [Finite L] {ι : Type*}
+    (H : ι → Subgroup L) (M : ℕ) :
+    ∀ I : Finset ι, (∀ i ∈ I, Nat.card (H i) ≤ M) → Nat.card ↥(I.sup H) ≤ M ^ I.card := by
+  classical
+  intro I
+  refine Finset.induction_on I ?_ ?_
+  · intro _
+    rw [Finset.sup_empty, Subgroup.card_bot, Finset.card_empty, pow_zero]
+  · intro a I ha ih hM
+    rw [Finset.sup_insert, Finset.card_insert_eq_ite, if_neg ha, pow_succ, mul_comm]
+    exact (br_card_sup_le _ _).trans (Nat.mul_le_mul (hM a (Finset.mem_insert_self a I))
+      (ih fun i hi => hM i (Finset.mem_insert_of_mem hi)))
+
+/-- Eq. (51): if `L_3 = [L_2, C_core]`, with `C_core` generated by the `s` core generators
+`g_{1,1}, ..., g_{1,s}`, then `s_3 ≤ s b`. -/
+theorem br_s3_le_breadth [Finite L3] {p r s s3 : ℕ} (hp : p.Prime) (hsr : s ≤ r)
+    (hL3 : Nat.card L3 = p ^ s3) (κ : L2 →* L1 →* L3) (g : Fin r → L1)
+    (hgen3 : Subgroup.closure
+      {w | ∃ z, ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), κ z u = w} = ⊤) :
+    s3 ≤ s * brBreadth p κ (Subgroup.closure (g '' {j | (j : ℕ) < s})) := by
+  classical
+  let c : Fin s → L1 := fun k => g (Fin.castLE hsr k)
+  have hc : ∀ j : Fin r, ∀ hj : (j : ℕ) < s, c ⟨(j : ℕ), hj⟩ = g j := fun j hj =>
+    congrArg g (Fin.ext rfl)
+  have hsup : (⊤ : Subgroup L3) ≤ Finset.univ.sup (fun k => (κ.flip (c k)).range) := by
+    rw [← hgen3, Subgroup.closure_le]
+    rintro _ ⟨z, u, hu, rfl⟩
+    have hle : Subgroup.closure (g '' {j | (j : ℕ) < s}) ≤
+        (Finset.univ.sup (fun k => (κ.flip (c k)).range)).comap (κ z) := by
+      rw [Subgroup.closure_le]
+      rintro _ ⟨j, hj, rfl⟩
+      rw [SetLike.mem_coe, Subgroup.mem_comap]
+      have hj' : (j : ℕ) < s := hj
+      have hmem : κ z (g j) ∈ (κ.flip (c ⟨(j : ℕ), hj'⟩)).range := by
+        rw [hc j hj']
+        exact ⟨z, MonoidHom.flip_apply _ _ _⟩
+      exact Finset.le_sup (f := fun k => (κ.flip (c k)).range) (b := ⟨(j : ℕ), hj'⟩)
+        (Finset.mem_univ _) hmem
+    exact hle hu
+  have hcard : Nat.card L3 ≤
+      (p ^ brBreadth p κ (Subgroup.closure (g '' {j | (j : ℕ) < s}))) ^ s := by
+    have h1 := br_card_finset_sup_le (fun k => (κ.flip (c k)).range)
+      (p ^ brBreadth p κ (Subgroup.closure (g '' {j | (j : ℕ) < s}))) Finset.univ
+      (fun k _ => br_card_range_le_breadth hp hL3 κ _
+        (Subgroup.subset_closure ⟨Fin.castLE hsr k, by simp, rfl⟩))
+    rw [Finset.card_univ, Fintype.card_fin] at h1
+    rw [← Subgroup.card_top (G := L3)]
+    exact (Subgroup.card_le_of_le hsup).trans h1
+  rw [hL3, ← pow_mul] at hcard
+  have h2 := br_pow_le_cancel hp.one_lt hcard
+  rw [mul_comm] at h2
+  exact h2
+
+/-- The breadth relations (48)-(51) together: `s_3 ≤ s b_2` and `b_2 ≤ min(s_2, s_3)`, so that
+`b_2 ∈ [⌈s_3 / s⌉, min(s_2, s_3)]`. -/
+theorem br_breadth_range [Finite L2] [Finite L3] {p r s s2 s3 : ℕ} (hp : p.Prime) (hsr : s ≤ r)
+    (hL2 : Nat.card L2 = p ^ s2) (hL3 : Nat.card L3 = p ^ s3) (κ : L2 →* L1 →* L3)
+    (g : Fin r → L1)
+    (hgen3 : Subgroup.closure
+      {w | ∃ z, ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), κ z u = w} = ⊤) :
+    s3 ≤ s * brBreadth p κ (Subgroup.closure (g '' {j | (j : ℕ) < s})) ∧
+      brBreadth p κ (Subgroup.closure (g '' {j | (j : ℕ) < s})) ≤ min s2 s3 :=
+  ⟨br_s3_le_breadth hp hsr hL3 κ g hgen3,
+    le_min (brBreadth_le_s2 hp hL2 hL3 κ _) (brBreadth_le_s3 hp hL3 κ _)⟩
+
+lemma br_finite_pairs [Finite L1] [Finite L2] [Finite L3] :
+    Finite ((L1 →* L1 →* L2) × (L2 →* L1 →* L3)) := by
+  haveI : Finite (L1 →* L2) :=
+    Finite.of_injective (fun f : L1 →* L2 => (f : L1 → L2)) DFunLike.coe_injective
+  haveI : Finite (L1 →* L3) :=
+    Finite.of_injective (fun f : L1 →* L3 => (f : L1 → L3)) DFunLike.coe_injective
+  haveI : Finite (L1 →* L1 →* L2) :=
+    Finite.of_injective (fun f : L1 →* L1 →* L2 => (f : L1 → (L1 →* L2))) DFunLike.coe_injective
+  haveI : Finite (L2 →* L1 →* L3) :=
+    Finite.of_injective (fun f : L2 →* L1 →* L3 => (f : L2 → (L1 →* L3))) DFunLike.coe_injective
+  infer_instance
+
+/-- Eq. (53) at `c = 3` for a fixed breadth `b_2 = b` in the sense of (48): the paper's
+fixed-breadth set of graded brackets. -/
+theorem br_eq53_breadth [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n b : ℕ}
+    (hp : p.Prime) (hsr : s ≤ r) (hL2 : Nat.card L2 = p ^ s2) (hL3 : Nat.card L3 = p ^ s3)
+    (y : Fin n → L2) (hy : Subgroup.closure (Set.range y) = ⊤) (g : Fin r → L1)
+    (hg : Subgroup.closure (Set.range g) = ⊤) (D : Finset (Fin r × Fin r))
+    (hD : ∀ q ∈ D, q.1 < q.2 ∧ (q.1 : ℕ) < s) (v : Fin r × Fin r → L2) :
+    {β : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) | brAlt β.1 ∧
+        Subgroup.closure {w | ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}),
+          ∃ u' ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.1 u u' = w} = ⊤ ∧
+        brJacobi β.1 β.2 ∧
+        brBreadth p β.2 (Subgroup.closure (g '' {j | (j : ℕ) < s})) = b ∧
+        ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q}.ncard ≤
+      p ^ (s * (b * (n + s3 + 1 - b))) *
+        p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
+  haveI := br_finite_pairs (L1 := L1) (L2 := L2) (L3 := L3)
+  refine le_trans (Set.ncard_le_ncard ?_ (Set.toFinite _))
+    (br_eq53 hp hsr hL2 hL3 y hy g hg D hD v)
+  rintro β ⟨hA, hgen, hJ, hb, hDv⟩
+  refine ⟨hA, hgen, hJ, ?_, ?_, hDv⟩
+  · intro j hj
+    rw [← hb]
+    exact br_card_range_le_breadth hp hL3 β.2 _ (Subgroup.subset_closure ⟨j, hj, rfl⟩)
+  · rw [← hb]
+    exact brBreadth_spec hp hL3 β.2 _
+
+lemma br_ncard_biUnion_le {ι α : Type*} [DecidableEq ι] (I : Finset ι) (T : ι → Set α) :
+    (⋃ i ∈ I, T i).ncard ≤ ∑ i ∈ I, (T i).ncard := by
+  refine Finset.induction_on I ?_ ?_
+  · simp
+  · intro a J ha ih
+    rw [Finset.set_biUnion_insert, Finset.sum_insert ha]
+    exact (Set.ncard_union_le _ _).trans (Nat.add_le_add_left ih _)
+
+/-- Eq. (53) at `c = 3` summed over the breadth: if moreover `L_3 = [L_2, C_core]` (the
+generation property used for (51)), the breadth `b_2` ranges over `s_3 ≤ s b_2 ≤ s min(s_2, s_3)`,
+and the graded brackets number at most the sum over these `b_2` of the fixed-breadth bound. -/
+theorem br_eq53_sum [Finite L1] [Finite L2] [Finite L3] {p r s s2 s3 n : ℕ}
+    (hp : p.Prime) (hsr : s ≤ r) (hL2 : Nat.card L2 = p ^ s2) (hL3 : Nat.card L3 = p ^ s3)
+    (y : Fin n → L2) (hy : Subgroup.closure (Set.range y) = ⊤) (g : Fin r → L1)
+    (hg : Subgroup.closure (Set.range g) = ⊤) (D : Finset (Fin r × Fin r))
+    (hD : ∀ q ∈ D, q.1 < q.2 ∧ (q.1 : ℕ) < s) (v : Fin r × Fin r → L2) :
+    {β : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) | brAlt β.1 ∧
+        Subgroup.closure {w | ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}),
+          ∃ u' ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.1 u u' = w} = ⊤ ∧
+        brJacobi β.1 β.2 ∧
+        Subgroup.closure
+          {w | ∃ z, ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.2 z u = w} = ⊤ ∧
+        ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q}.ncard ≤
+      ∑ b ∈ (Finset.range (min s2 s3 + 1)).filter (fun b => s3 ≤ s * b),
+        p ^ (s * (b * (n + s3 + 1 - b))) *
+          p ^ ((r.choose 2 - D.card) * s2 - (r - s).choose 2 * b) := by
+  classical
+  haveI := br_finite_pairs (L1 := L1) (L2 := L2) (L3 := L3)
+  set I := (Finset.range (min s2 s3 + 1)).filter (fun b => s3 ≤ s * b) with hI
+  obtain ⟨T, hT⟩ : ∃ T : ℕ → Set ((L1 →* L1 →* L2) × (L2 →* L1 →* L3)), T = fun b =>
+    {β | brAlt β.1 ∧
+        Subgroup.closure {w | ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}),
+          ∃ u' ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.1 u u' = w} = ⊤ ∧
+        brJacobi β.1 β.2 ∧
+        brBreadth p β.2 (Subgroup.closure (g '' {j | (j : ℕ) < s})) = b ∧
+        ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q} := ⟨_, rfl⟩
+  have hsub : {β : (L1 →* L1 →* L2) × (L2 →* L1 →* L3) | brAlt β.1 ∧
+        Subgroup.closure {w | ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}),
+          ∃ u' ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.1 u u' = w} = ⊤ ∧
+        brJacobi β.1 β.2 ∧
+        Subgroup.closure
+          {w | ∃ z, ∃ u ∈ Subgroup.closure (g '' {j | (j : ℕ) < s}), β.2 z u = w} = ⊤ ∧
+        ∀ q ∈ D, β.1 (g q.1) (g q.2) = v q} ⊆ ⋃ b ∈ I, T b := by
+    rintro β ⟨hA, hgen, hJ, hgen3, hDv⟩
+    obtain ⟨h51, hmin⟩ := br_breadth_range hp hsr hL2 hL3 β.2 g hgen3
+    refine Set.mem_iUnion₂.2 ⟨brBreadth p β.2 (Subgroup.closure (g '' {j | (j : ℕ) < s})), ?_, ?_⟩
+    · rw [hI, Finset.mem_filter, Finset.mem_range]
+      exact ⟨Nat.lt_succ_of_le hmin, h51⟩
+    · rw [hT]
+      exact ⟨hA, hgen, hJ, rfl, hDv⟩
+  calc _ ≤ (⋃ b ∈ I, T b).ncard := Set.ncard_le_ncard hsub (Set.toFinite _)
+    _ ≤ ∑ b ∈ I, (T b).ncard := br_ncard_biUnion_le I T
+    _ ≤ _ := Finset.sum_le_sum fun b _ => by
+      rw [hT]
+      exact br_eq53_breadth hp hsr hL2 hL3 y hy g hg D hD v
+
+/-- The deeper commutator coefficients on the non-defining pairs: coefficient arrays
+`ι × ι → Γ` (e.g. the `γ_3`-coefficients `c(1, j, k, 3, v)` of `[g_{1,j}, g_{1,k}]`), prescribed
+outside `P \ D`, number at most `p ^ ((|P| - |D|) m_3)` when `|Γ| = p ^ m_3`. -/
+theorem br_deeper_count {Γ : Type*} [Finite Γ] {ι : Type*} {p m3 : ℕ}
+    (hΓ : Nat.card Γ = p ^ m3) (P D : Finset (ι × ι)) (hDP : D ⊆ P) (c0 : ι × ι → Γ) :
+    {c : ι × ι → Γ | ∀ q, q ∉ P \ D → c q = c0 q}.ncard ≤ p ^ ((P.card - D.card) * m3) := by
+  classical
+  let F : (ι × ι → Γ) → (↥(P \ D) → Γ) := fun c q => c q.1
+  have hinj : Set.InjOn F {c : ι × ι → Γ | ∀ q, q ∉ P \ D → c q = c0 q} := by
+    intro c hc c' hc' he
+    funext q
+    by_cases hq : q ∈ P \ D
+    · exact congrFun he ⟨q, hq⟩
+    · rw [hc q hq, hc' q hq]
+  have hk : (P \ D).card = P.card - D.card := by
+    have := Finset.card_sdiff_add_card_eq_card hDP
+    omega
+  calc _ ≤ Nat.card (↥(P \ D) → Γ) := br_ncard_le_card_of_injOn _ F hinj
+    _ = p ^ ((P.card - D.card) * m3) := by
+      rw [Nat.card_fun, Nat.card_eq_fintype_card (α := ↥(P \ D)), Fintype.card_coe, hk, hΓ,
+        ← pow_mul]
+      ring
+
+/-- The deeper count in the paper's form: generators `Fin r_1`, the pairs `j < k`, and a set `D`
+of `r_2` defining pairs: at most `p ^ (((r_1 choose 2) - r_2) m_3)` arrays. -/
+theorem br_deeper_count_fin {Γ : Type*} [Finite Γ] {p r m3 : ℕ} (hΓ : Nat.card Γ = p ^ m3)
+    (D : Finset (Fin r × Fin r)) (hD : ∀ q ∈ D, q.1 < q.2) (c0 : Fin r × Fin r → Γ) :
+    {c : Fin r × Fin r → Γ | ∀ q, q ∉ (Finset.univ.filter (fun q : Fin r × Fin r => q.1 < q.2)) \ D →
+      c q = c0 q}.ncard ≤ p ^ ((r.choose 2 - D.card) * m3) := by
+  classical
+  have hTc : (Finset.univ.filter (fun q : Fin r × Fin r => q.1 < q.2)).card = r.choose 2 := by
+    have h0 := br_card_pairs_fin r 0
+    rw [Nat.sub_zero] at h0
+    rw [← h0]
+    congr 1
+    ext q
+    simp
+  have hDP : D ⊆ Finset.univ.filter (fun q : Fin r × Fin r => q.1 < q.2) := by
+    intro q hq
+    rw [Finset.mem_filter]
+    exact ⟨Finset.mem_univ _, hD q hq⟩
+  have h := br_deeper_count hΓ _ D hDP c0
+  rwa [hTc] at h
+
+/-- The bracket sets counted above are finite once `L_1` is finitely generated and `L_2` is
+finite. -/
+theorem br_finite_hom_of_gen {A B : Type*} [Group A] [Group B] [Finite B] {ι : Type*} [Finite ι]
+    (g : ι → A) (hg : Subgroup.closure (Set.range g) = ⊤) : Finite (A →* B) :=
+  Finite.of_injective (fun f : A →* B => fun i => f (g i)) (fun f f' h =>
+    MonoidHom.eq_of_eqOn_dense hg (by
+      rintro _ ⟨i, rfl⟩
+      exact congrFun h i))
+
+theorem br_bracket_set_finite [Finite L2] {ι : Type*} [Finite ι] (g : ι → L1)
+    (hg : Subgroup.closure (Set.range g) = ⊤) (S : Set (L1 →* L1 →* L2)) : S.Finite := by
+  haveI := br_finite_hom_of_gen (B := L2) g hg
+  haveI := br_finite_hom_of_gen (B := L1 →* L2) g hg
+  exact Set.toFinite S
+
+end BrBreadth
 
 section BrLemma61
 
@@ -1430,5 +2098,120 @@ theorem br_s2_le_group (hG : IsPGroup p G) :
 
 end BrGroup
 
+/-! ### Transport of the graded brackets to fixed layers
+
+For CNT3 the brackets of a group are compared on fixed layers `L_1, L_2, L_3` (the ones carried
+by the recorded Sims data): identifications `e_1 : G^ab ≃ L_1`, `e_2 : γ_2/γ_3 ≃ L_2`,
+`e_3 : γ_3/γ_4 ≃ L_3` transport `brB1 G`, `brB2 G` to brackets on `L_1, L_2, L_3`, which are
+alternating, satisfy the Jacobi identity, and generate `L_2`; their values on generators are the
+transported leading commutators `[g_j, g_k] γ_3` and `[[g_j, g_k], g_l] γ_4`. -/
+
+section BrTransport
+
+variable {G : Type u} [Group G] {L1 L2 L3 : Type*} [CommGroup L1] [CommGroup L2] [CommGroup L3]
+
+/-- The bracket `L_1 × L_1 → L_2` transported along `e_1`, `e_2`. -/
+noncomputable def brT1 (e1 : Abelianization G ≃* L1) (e2 : brL2 G ≃* L2) : L1 →* L1 →* L2 :=
+  MonoidHom.mk' (fun x => (e2.toMonoidHom.comp (brB1 G (e1.symm x))).comp e1.symm.toMonoidHom)
+    (fun x x' => by
+      ext z
+      simp [MonoidHom.comp_apply, MonoidHom.mul_apply, map_mul])
+
+/-- The bracket `L_2 × L_1 → L_3` transported along `e_1`, `e_2`, `e_3`. -/
+noncomputable def brT2 (e1 : Abelianization G ≃* L1) (e2 : brL2 G ≃* L2) (e3 : brL3 G ≃* L3) :
+    L2 →* L1 →* L3 :=
+  MonoidHom.mk' (fun x => (e3.toMonoidHom.comp (brB2 G (e2.symm x))).comp e1.symm.toMonoidHom)
+    (fun x x' => by
+      ext z
+      simp [MonoidHom.comp_apply, MonoidHom.mul_apply, map_mul])
+
+variable (e1 : Abelianization G ≃* L1) (e2 : brL2 G ≃* L2) (e3 : brL3 G ≃* L3)
+
+theorem brT1_apply (x y : L1) : brT1 e1 e2 x y = e2 (brB1 G (e1.symm x) (e1.symm y)) := rfl
+
+theorem brT2_apply (z : L2) (x : L1) : brT2 e1 e2 e3 z x = e3 (brB2 G (e2.symm z) (e1.symm x)) :=
+  rfl
+
+/-- The leading coefficient of `[g_j, g_k]`: the value of the transported bracket on the images
+of `a, b` is the transported class of `[a, b]` in `γ_2/γ_3`. -/
+theorem brT1_of (a b : G) :
+    brT1 e1 e2 (e1 (Abelianization.of a)) (e1 (Abelianization.of b)) = e2 (brq2 G (cw a b)) := by
+  rw [brT1_apply, MulEquiv.symm_apply_apply, MulEquiv.symm_apply_apply, brB1_of]
+
+/-- The leading coefficient of `[w, g_l]`, `w ∈ γ_2`: the transported class of `[w, c]` in
+`γ_3/γ_4`. -/
+theorem brT2_of (w : lcs G 1) (c : G) :
+    brT2 e1 e2 e3 (e2 (brq2 G w)) (e1 (Abelianization.of c)) = e3 (brq3 G (cw2 w c)) := by
+  rw [brT2_apply, MulEquiv.symm_apply_apply, MulEquiv.symm_apply_apply, brB2_mk_of]
+
+theorem brT1_alt : brAlt (brT1 e1 e2) := by
+  intro x
+  rw [brT1_apply, brB1_alt, map_one]
+
+theorem brT_jacobi : brJacobi (brT1 e1 e2) (brT2 e1 e2 e3) := by
+  intro x y z
+  rw [brT1_apply, brT1_apply, brT1_apply, brT2_apply, brT2_apply, brT2_apply,
+    MulEquiv.symm_apply_apply, MulEquiv.symm_apply_apply, MulEquiv.symm_apply_apply,
+    ← map_mul e3, ← map_mul e3, brB_jacobi (G := G) (e1.symm x) (e1.symm y) (e1.symm z), map_one]
+
+theorem brT1_closure :
+    Subgroup.closure (Set.range (fun q : L1 × L1 => brT1 e1 e2 q.1 q.2)) = ⊤ := by
+  have hle : Subgroup.closure
+      (Set.range (fun q : Abelianization G × Abelianization G => brB1 G q.1 q.2)) ≤
+      (Subgroup.closure (Set.range (fun q : L1 × L1 => brT1 e1 e2 q.1 q.2))).comap
+        e2.toMonoidHom := by
+    rw [Subgroup.closure_le]
+    rintro _ ⟨⟨a, b⟩, rfl⟩
+    rw [SetLike.mem_coe, Subgroup.mem_comap]
+    apply Subgroup.subset_closure
+    refine ⟨(e1 a, e1 b), ?_⟩
+    show brT1 e1 e2 (e1 a) (e1 b) = e2 (brB1 G a b)
+    rw [brT1_apply, MulEquiv.symm_apply_apply, MulEquiv.symm_apply_apply]
+  rw [brB1_closure] at hle
+  rw [eq_top_iff]
+  intro w _
+  have h := hle (Subgroup.mem_top (e2.symm w))
+  rw [Subgroup.mem_comap] at h
+  simpa using h
+
+/-- Equal transported brackets give equal leading coefficients: if two groups `G`, `G'` with
+identifications have the same transported first bracket, and generators `a`, `a'` with the same
+images in `L_1`, then the transported classes of `[a_j, a_k]` and `[a'_j, a'_k]` agree. -/
+theorem brT1_coeff_eq {G' : Type u} [Group G'] (e1' : Abelianization G' ≃* L1)
+    (e2' : brL2 G' ≃* L2) (hT : brT1 e1 e2 = brT1 e1' e2') {ι : Type*} (a : ι → G) (a' : ι → G')
+    (ha : ∀ i, e1 (Abelianization.of (a i)) = e1' (Abelianization.of (a' i))) (j k : ι) :
+    e2 (brq2 G (cw (a j) (a k))) = e2' (brq2 G' (cw (a' j) (a' k))) := by
+  rw [← brT1_of e1 e2, ← brT1_of e1' e2', hT, ha j, ha k]
+
+/-- The same for the second bracket. -/
+theorem brT2_coeff_eq {G' : Type u} [Group G'] (e1' : Abelianization G' ≃* L1)
+    (e2' : brL2 G' ≃* L2) (e3' : brL3 G' ≃* L3) (hT : brT2 e1 e2 e3 = brT2 e1' e2' e3')
+    (w : lcs G 1) (w' : lcs G' 1) (hw : e2 (brq2 G w) = e2' (brq2 G' w')) (c : G) (c' : G')
+    (hc : e1 (Abelianization.of c) = e1' (Abelianization.of c')) :
+    e3 (brq3 G (cw2 w c)) = e3' (brq3 G' (cw2 w' c')) := by
+  rw [← brT2_of e1 e2 e3, ← brT2_of e1' e2' e3', hT, hw, hc]
+
+end BrTransport
+
+
+#print axioms br_card_subgroups_le
+#print axioms br_card_homs_le_sharp
+#print axioms br_prop42
+#print axioms br_eq53
+#print axioms br_eq53_breadth
+#print axioms br_eq53_sum
+#print axioms br_s3_le_breadth
+#print axioms br_breadth_range
+#print axioms br_deeper_count_fin
+#print axioms br_bracket_set_finite
+#print axioms br_prop43_fin
+#print axioms br_rem44_lift
+#print axioms br_lemma61_group
+#print axioms br_s2_le_group
+#print axioms brB_jacobi
+#print axioms brT_jacobi
+#print axioms brT1_closure
+#print axioms brT1_coeff_eq
+#print axioms brT2_coeff_eq
 
 end OMA.SimsLite
