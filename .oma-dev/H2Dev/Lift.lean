@@ -382,13 +382,10 @@ theorem lf_reduce {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fi
   obtain ⟨w, hw, hx⟩ := key n
   exact ⟨w, fun j => hw j (by omega), hx⟩
 
-/-- The group presented by the relations (37) has order at most `p ^ Σ_j a(j)`. -/
-theorem lf_card_quot_le {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ) :
-    Finite ((Fin n → ℤ) ⧸ lfSpan p a b) ∧
-      Nat.card ((Fin n → ℤ) ⧸ lfSpan p a b) ≤ p ^ ∑ j, a j := by
-  let β : ((j : Fin n) → Fin (p ^ a j)) → (Fin n → ℤ) ⧸ lfSpan p a b :=
-    fun e => QuotientAddGroup.mk (fun j => ((e j : ℕ) : ℤ))
-  have hsurj : Function.Surjective β := by
+/-- Every class of the presented group has a representative with Sims coordinates. -/
+theorem lf_box_surj {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ) :
+    Function.Surjective (fun e : (j : Fin n) → Fin (p ^ a j) =>
+      (QuotientAddGroup.mk (fun j => ((e j : ℕ) : ℤ)) : (Fin n → ℤ) ⧸ lfSpan p a b)) := by
     intro q
     obtain ⟨x, rfl⟩ := QuotientAddGroup.mk_surjective q
     obtain ⟨w, hw, hxw⟩ := lf_reduce hp a b x
@@ -406,13 +403,21 @@ theorem lf_card_quot_le {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n 
     have e : -w + x = x - w := by abel
     rw [e]
     exact hxw
-  refine ⟨Finite.of_surjective β hsurj, ?_⟩
-  calc Nat.card ((Fin n → ℤ) ⧸ lfSpan p a b) ≤ Nat.card ((j : Fin n) → Fin (p ^ a j)) :=
-        Nat.card_le_card_of_surjective β hsurj
-    _ = p ^ ∑ j, a j := by
-        rw [Nat.card_eq_fintype_card, Fintype.card_pi]
-        simp only [Fintype.card_fin]
-        rw [Finset.prod_pow_eq_pow_sum]
+
+lemma lf_card_box {n p : ℕ} (a : Fin n → ℕ) :
+    Nat.card ((j : Fin n) → Fin (p ^ a j)) = p ^ ∑ j, a j := by
+  rw [Nat.card_eq_fintype_card, Fintype.card_pi]
+  simp only [Fintype.card_fin]
+  rw [Finset.prod_pow_eq_pow_sum]
+
+/-- The group presented by the relations (37) has order at most `p ^ Σ_j a(j)`. -/
+theorem lf_card_quot_le {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ) :
+    Finite ((Fin n → ℤ) ⧸ lfSpan p a b) ∧
+      Nat.card ((Fin n → ℤ) ⧸ lfSpan p a b) ≤ p ^ ∑ j, a j := by
+  have hsurj := lf_box_surj hp a b
+  refine ⟨Finite.of_surjective _ hsurj, ?_⟩
+  rw [← lf_card_box (p := p) a]
+  exact Nat.card_le_card_of_surjective _ hsurj
 
 variable {L : Type*} [CommGroup L]
 
@@ -468,7 +473,8 @@ theorem lf_quot_equiv [Finite L] {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ)
     (b : Fin n → Fin n → ℕ) (y : Fin n → L) (hy : Subgroup.closure (Set.range y) = ⊤)
     (hL : Nat.card L = p ^ ∑ j, a j) (hrel : ∀ j, lfPsi y (lfRel p a b j) = 0) :
     ∃ φ : ((Fin n → ℤ) ⧸ lfSpan p a b) ≃+ Additive L,
-      ∀ j, φ (QuotientAddGroup.mk (Pi.single j 1)) = Additive.ofMul (y j) := by
+      (∀ j, φ (QuotientAddGroup.mk (Pi.single j 1)) = Additive.ofMul (y j)) ∧
+        ∀ x, φ (QuotientAddGroup.mk x) = lfPsi y x := by
   have hle : lfSpan p a b ≤ (lfPsi y).ker := by
     rw [lfSpan, AddSubgroup.closure_le]
     rintro _ ⟨j, rfl⟩
@@ -503,7 +509,7 @@ theorem lf_quot_equiv [Finite L] {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ)
     · rw [← hLA, hL]
       exact hcard
     · exact Nat.card_le_card_of_surjective φ hsurj
-  refine ⟨AddEquiv.ofBijective φ hbij, fun j => ?_⟩
+  refine ⟨AddEquiv.ofBijective φ hbij, fun j => ?_, fun x => rfl⟩
   have h1 : φ (QuotientAddGroup.mk (Pi.single j 1)) = lfPsi y (Pi.single j 1) := rfl
   show φ (QuotientAddGroup.mk (Pi.single j 1)) = Additive.ofMul (y j)
   rw [h1, lfPsi_single]
@@ -517,12 +523,30 @@ theorem lf_layer_iso {L' : Type*} [CommGroup L'] [Finite L] [Finite L'] {n p : �
     (hL : Nat.card L = p ^ ∑ j, a j) (hL' : Nat.card L' = p ^ ∑ j, a j)
     (hrel : ∀ j, lfPsi y (lfRel p a b j) = 0) (hrel' : ∀ j, lfPsi y' (lfRel p a b j) = 0) :
     ∃ e : L ≃* L', ∀ j, e (y j) = y' j := by
-  obtain ⟨φ, hφ⟩ := lf_quot_equiv hp a b y hy hL hrel
-  obtain ⟨φ', hφ'⟩ := lf_quot_equiv hp a b y' hy' hL' hrel'
+  obtain ⟨φ, hφ, -⟩ := lf_quot_equiv hp a b y hy hL hrel
+  obtain ⟨φ', hφ', -⟩ := lf_quot_equiv hp a b y' hy' hL' hrel'
   let e : L ≃* L' := MulEquiv.toAdditive.symm (φ.symm.trans φ')
   have key : ∀ x, e x = Additive.toMul (φ' (φ.symm (Additive.ofMul x))) := fun x => rfl
   refine ⟨e, fun j => ?_⟩
   rw [key, ← hφ j, AddEquiv.symm_apply_apply, hφ' j, toMul_ofMul]
+
+/-- Uniqueness of Sims coordinates in the coordinate group: when the presented group is identified
+with a group of order `p ^ Σ a(j)`, two coordinate vectors in the box `0 ≤ e_j < p ^ a(j)` with the
+same class are equal. -/
+theorem lf_box_inj {n p : ℕ} (hp : 0 < p) (a : Fin n → ℕ) (b : Fin n → Fin n → ℕ)
+    (φ : ((Fin n → ℤ) ⧸ lfSpan p a b) ≃+ Additive L) (hL : Nat.card L = p ^ ∑ j, a j)
+    (e e' : Fin n → ℕ) (he : ∀ j, e j < p ^ a j) (he' : ∀ j, e' j < p ^ a j)
+    (h : (QuotientAddGroup.mk (fun j => (e j : ℤ)) : (Fin n → ℤ) ⧸ lfSpan p a b) =
+      QuotientAddGroup.mk (fun j => (e' j : ℤ))) : e = e' := by
+  have hcard : Nat.card ((j : Fin n) → Fin (p ^ a j)) =
+      Nat.card ((Fin n → ℤ) ⧸ lfSpan p a b) := by
+    rw [lf_card_box, ← hL]
+    exact (Nat.card_congr (Additive.ofMul : L ≃ Additive L)).trans
+      (Nat.card_congr φ.toEquiv).symm
+  have hbij := (Nat.bijective_iff_surjective_and_card _).2 ⟨lf_box_surj hp a b, hcard⟩
+  have key : (fun j => (⟨e j, he j⟩ : Fin (p ^ a j))) = fun j => ⟨e' j, he' j⟩ := hbij.1 h
+  funext j
+  exact congrArg Fin.val (congrFun key j)
 
 end LfPresent
 
@@ -743,6 +767,189 @@ theorem SimsGenSet.lf_card_layer (S : SimsGenSet p a g) (hp : 0 < p) (i : Fin c)
     Fintype.card_pi]
   simp only [Fintype.card_fin]
   rw [Finset.prod_pow_eq_pow_sum]
+
+lemma lf_map_ofFn_prod {K : Subgroup G} {M : Type*} [Monoid M] (π : K →* M) {n : ℕ}
+    (f : Fin n → G) (hf : ∀ v, f v ∈ K) (h : (List.ofFn f).prod ∈ K) :
+    π ⟨(List.ofFn f).prod, h⟩ = (List.ofFn fun v => π ⟨f v, hf v⟩).prod := by
+  have e : (⟨(List.ofFn f).prod, h⟩ : K) = (List.ofFn fun v => (⟨f v, hf v⟩ : K)).prod := by
+    apply Subtype.ext
+    rw [SubmonoidClass.coe_list_prod, List.map_ofFn]
+    try rfl
+  rw [e, map_list_prod, List.map_ofFn]
+  try rfl
+
+/-- (35)/(39) in a commutative quotient `π : γ_{i+1} → L` of the layer: the class of
+`(Π_v g_{i,v} ^ e(v)) d`, `d ∈ γ_{i+2}`, is `Π_v ḡ_{i,v} ^ e(v)`. -/
+theorem SimsGenSet.lf_pi_block (S : SimsGenSet p a g) (i : Fin c) {L : Type*} [CommGroup L]
+    (π : lcs G i →* L) (hker : ∀ x : lcs G i, (x : G) ∈ lcs G ((i : ℕ) + 1) → π x = 1)
+    (e : Fin (r i) → ℕ) {d : G} (hd : d ∈ lcs G ((i : ℕ) + 1)) {x : G} (hx : x ∈ lcs G i)
+    (hxe : x = (List.ofFn fun v => g ⟨i, v⟩ ^ e v).prod * d) :
+    π ⟨x, hx⟩ = ∏ v, π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩ ^ e v := by
+  have hf : ∀ v, g ⟨i, v⟩ ^ e v ∈ lcs G i := fun v => Subgroup.pow_mem _ (S.mem ⟨i, v⟩) _
+  have hB : (List.ofFn fun v => g ⟨i, v⟩ ^ e v).prod ∈ lcs G i :=
+    Subgroup.list_prod_mem _ fun z hz => by
+      rw [List.mem_ofFn'] at hz
+      obtain ⟨v, rfl⟩ := hz
+      exact hf v
+  have hdi : d ∈ lcs G i := lcs_antitone (Nat.le_succ _) hd
+  have e1 : (⟨x, hx⟩ : lcs G i) = ⟨_, hB⟩ * ⟨d, hdi⟩ := Subtype.ext hxe
+  rw [e1, map_mul, hker ⟨d, hdi⟩ hd, mul_one, lf_map_ofFn_prod π _ hf hB, List.prod_ofFn]
+  refine Finset.prod_congr rfl fun v _ => ?_
+  rw [← map_pow]
+  exact congrArg π (Subtype.ext (by simp))
+
+/-- (37) in a commutative quotient of the layer:
+`ḡ_{i,j} ^ (p ^ a(i,j)) = Π_{v < j} ḡ_{i,v} ^ b(i,j,i,v)`. -/
+theorem SimsGenSet.lf_pi_rel (S : SimsGenSet p a g) (i : Fin c) {L : Type*} [CommGroup L]
+    (π : lcs G i →* L) (hker : ∀ x : lcs G i, (x : G) ∈ lcs G ((i : ℕ) + 1) → π x = 1)
+    (j : Fin (r i)) :
+    π ⟨g ⟨i, j⟩, S.mem ⟨i, j⟩⟩ ^ (p ^ a ⟨i, j⟩) =
+      ∏ v ∈ Finset.univ.filter (fun v : Fin (r i) => v < j),
+        π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩ ^ (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val := by
+  have hpow := S.powerData.pow i j
+  have hdeep := deeper_mem g S.mem (fun h => (S.powerWords ⟨i, j⟩ h).val) i
+  have hmem : g ⟨i, j⟩ ^ p ^ a ⟨i, j⟩ ∈ lcs G i := Subgroup.pow_mem _ (S.mem ⟨i, j⟩) _
+  have hb := S.lf_pi_block i π hker (fun v => (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val) hdeep hmem hpow
+  rw [← map_pow]
+  have e1 : (⟨g ⟨i, j⟩, S.mem ⟨i, j⟩⟩ : lcs G i) ^ (p ^ a ⟨i, j⟩) = ⟨_, hmem⟩ :=
+    Subtype.ext (SubgroupClass.coe_pow _ _)
+  rw [e1, hb, Finset.prod_filter]
+  refine Finset.prod_congr rfl fun v _ => ?_
+  by_cases hv : v < j
+  · rw [if_pos hv]
+  · rw [if_neg hv, S.powerWords_same_layer_eq_zero i j v (not_lt.mp hv), pow_zero]
+
+/-- The order of a commutative layer quotient `π : γ_{i+1} → L` (kernel `γ_{i+2}`). -/
+theorem SimsGenSet.lf_card_quotL (S : SimsGenSet p a g) (hp : 0 < p) (i : Fin c)
+    (hlast : (i : ℕ) + 1 < c ∨ lcs G ((i : ℕ) + 1) = ⊥) {L : Type*} [CommGroup L]
+    (π : lcs G i →* L) (hπ : Function.Surjective π)
+    (hker : ∀ x : lcs G i, π x = 1 ↔ (x : G) ∈ lcs G ((i : ℕ) + 1)) :
+    Nat.card L = p ^ ∑ v : Fin (r i), a ⟨i, v⟩ := by
+  have hkereq : π.ker = (lcs G ((i : ℕ) + 1)).subgroupOf (lcs G i) := by
+    ext x
+    rw [MonoidHom.mem_ker, Subgroup.mem_subgroupOf, hker]
+  rw [← S.lf_card_layer hp i hlast]
+  exact (Nat.card_congr ((QuotientGroup.quotientMulEquivOfEq hkereq).symm.trans
+    (QuotientGroup.quotientKerEquivOfSurjective π hπ)).toEquiv).symm
+
+/-- The identification (57) of a layer with the coordinate group presented by the recorded data
+(37): for a commutative layer quotient `π : γ_{i+1} → L` with kernel `γ_{i+2}` and the same-layer
+power words `b`, the presented group `(ℤ^{r_i}) / ⟨p ^ a(i,j) δ_j - Σ_{v<j} b(j,v) δ_v⟩` is
+isomorphic to `L` by `e ↦ Π_v ḡ_{i,v} ^ e(v)`. -/
+theorem SimsGenSet.lf_layer_equiv (S : SimsGenSet p a g) (hp : 0 < p) (i : Fin c)
+    (hlast : (i : ℕ) + 1 < c ∨ lcs G ((i : ℕ) + 1) = ⊥) {L : Type*} [CommGroup L] [Finite L]
+    (π : lcs G i →* L) (hπ : Function.Surjective π)
+    (hker : ∀ x : lcs G i, π x = 1 ↔ (x : G) ∈ lcs G ((i : ℕ) + 1))
+    (b : Fin (r i) → Fin (r i) → ℕ) (hb : ∀ j v, (S.powerWords ⟨i, j⟩ ⟨i, v⟩).val = b j v) :
+    ∃ φ : ((Fin (r i) → ℤ) ⧸ lfSpan p (fun v => a ⟨i, v⟩) b) ≃+ Additive L,
+      ∀ x : Fin (r i) → ℤ, φ (QuotientAddGroup.mk x) =
+        lfPsi (fun v => π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩) x := by
+  have hker1 : ∀ x : lcs G i, (x : G) ∈ lcs G ((i : ℕ) + 1) → π x = 1 :=
+    fun x hx => (hker x).2 hx
+  have hgen : Subgroup.closure (Set.range fun v => π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩) = ⊤ := by
+    rw [eq_top_iff]
+    intro z _
+    obtain ⟨⟨x, hx⟩, rfl⟩ := hπ z
+    rw [S.lf_pi_block i π hker1 (fun v => (S.nf.coord x ⟨i, v⟩).val)
+      (deeper_mem g S.mem (fun h => (S.nf.coord x h).val) i) hx (S.lf_sims_lift i hx)]
+    exact Subgroup.prod_mem _ fun v _ =>
+      Subgroup.pow_mem _ (Subgroup.subset_closure ⟨v, rfl⟩) _
+  have hcard := S.lf_card_quotL hp i hlast π hπ hker
+  have hrel : ∀ j, lfPsi (fun v => π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩)
+      (lfRel p (fun v => a ⟨i, v⟩) b j) = 0 := by
+    intro j
+    apply lfPsi_rel_eq_zero
+    beta_reduce
+    rw [← ofMul_pow, S.lf_pi_rel i π hker1 j, ofMul_prod]
+    simp only [ofMul_pow, hb]
+  obtain ⟨φ, -, hφ⟩ := lf_quot_equiv hp _ b _ hgen hcard hrel
+  exact ⟨φ, hφ⟩
+
+/-- Under the identification (57), the class of `x ∈ γ_{i+1}` corresponds to its vector of Sims
+coordinates `(e(i,v))_v`. -/
+theorem SimsGenSet.lf_layer_equiv_coord (S : SimsGenSet p a g) (i : Fin c) {L : Type*}
+    [CommGroup L] (π : lcs G i →* L)
+    (hker : ∀ x : lcs G i, (x : G) ∈ lcs G ((i : ℕ) + 1) → π x = 1)
+    (b : Fin (r i) → Fin (r i) → ℕ)
+    (φ : ((Fin (r i) → ℤ) ⧸ lfSpan p (fun v => a ⟨i, v⟩) b) ≃+ Additive L)
+    (hφ : ∀ x : Fin (r i) → ℤ, φ (QuotientAddGroup.mk x) =
+      lfPsi (fun v => π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩) x) {x : G} (hx : x ∈ lcs G i) :
+    φ (QuotientAddGroup.mk (fun v => ((S.nf.coord x ⟨i, v⟩ : ℕ) : ℤ))) =
+      Additive.ofMul (π ⟨x, hx⟩) := by
+  rw [hφ, lfPsi_apply, S.lf_pi_block i π hker (fun v => (S.nf.coord x ⟨i, v⟩).val)
+    (deeper_mem g S.mem (fun h => (S.nf.coord x h).val) i) hx (S.lf_sims_lift i hx), ofMul_prod]
+  simp only [ofMul_pow, natCast_zsmul]
+
+/-- Comparison of two groups with Sims generating sets over the same relative orders and the
+same same-layer power words: elements of `γ_{i+1}` whose classes correspond under the
+identifications (57) have the same weight-`i` Sims coordinates. -/
+theorem SimsGenSet.lf_coord_eq {G' : Type*} [Group G'] {g' : SimsIdx c r → G'}
+    (S : SimsGenSet p a g) (S' : SimsGenSet p a g') (hp : 0 < p) (i : Fin c)
+    {L : Type*} [CommGroup L] {L' : Type*} [CommGroup L'] (π : lcs G i →* L)
+    (π' : lcs G' i →* L')
+    (hker : ∀ x : lcs G i, (x : G) ∈ lcs G ((i : ℕ) + 1) → π x = 1)
+    (hker' : ∀ x : lcs G' i, (x : G') ∈ lcs G' ((i : ℕ) + 1) → π' x = 1)
+    (hL : Nat.card L = p ^ ∑ v : Fin (r i), a ⟨i, v⟩)
+    (b : Fin (r i) → Fin (r i) → ℕ)
+    (φ : ((Fin (r i) → ℤ) ⧸ lfSpan p (fun v => a ⟨i, v⟩) b) ≃+ Additive L)
+    (φ' : ((Fin (r i) → ℤ) ⧸ lfSpan p (fun v => a ⟨i, v⟩) b) ≃+ Additive L')
+    (hφ : ∀ x : Fin (r i) → ℤ, φ (QuotientAddGroup.mk x) =
+      lfPsi (fun v => π ⟨g ⟨i, v⟩, S.mem ⟨i, v⟩⟩) x)
+    (hφ' : ∀ x : Fin (r i) → ℤ, φ' (QuotientAddGroup.mk x) =
+      lfPsi (fun v => π' ⟨g' ⟨i, v⟩, S'.mem ⟨i, v⟩⟩) x)
+    {x : G} (hx : x ∈ lcs G i) {x' : G'} (hx' : x' ∈ lcs G' i)
+    (h : φ.symm (Additive.ofMul (π ⟨x, hx⟩)) = φ'.symm (Additive.ofMul (π' ⟨x', hx'⟩)))
+    (v : Fin (r i)) : (S.nf.coord x ⟨i, v⟩ : ℕ) = (S'.nf.coord x' ⟨i, v⟩ : ℕ) := by
+  have h1 := S.lf_layer_equiv_coord i π hker b φ hφ hx
+  have h2 := S'.lf_layer_equiv_coord i π' hker' b φ' hφ' hx'
+  have h3 : (QuotientAddGroup.mk (fun v => ((S.nf.coord x ⟨i, v⟩ : ℕ) : ℤ)) :
+      (Fin (r i) → ℤ) ⧸ lfSpan p (fun v => a ⟨i, v⟩) b) =
+      QuotientAddGroup.mk (fun v => ((S'.nf.coord x' ⟨i, v⟩ : ℕ) : ℤ)) := by
+    rw [← φ.symm_apply_apply (QuotientAddGroup.mk _), h1, h,
+      ← φ'.symm_apply_apply (QuotientAddGroup.mk (fun v => ((S'.nf.coord x' ⟨i, v⟩ : ℕ) : ℤ))),
+      h2]
+  have key := lf_box_inj hp (fun v => a ⟨i, v⟩) b φ hL (fun v => (S.nf.coord x ⟨i, v⟩ : ℕ))
+    (fun v => (S'.nf.coord x' ⟨i, v⟩ : ℕ)) (fun v => (S.nf.coord x ⟨i, v⟩).isLt)
+    (fun v => (S'.nf.coord x' ⟨i, v⟩).isLt) h3
+  exact congrFun key v
+
+/-- `e_1` of (57): `L_1 = G / γ_2` is the coordinate group of the first layer. -/
+theorem SimsGenSet.lf_abel_equiv [Finite G] (S : SimsGenSet p a g) (hp : 0 < p) (h0 : 0 < c)
+    (hlast : 1 < c ∨ lcs G 1 = ⊥) (b : Fin (r ⟨0, h0⟩) → Fin (r ⟨0, h0⟩) → ℕ)
+    (hb : ∀ j v, (S.powerWords ⟨⟨0, h0⟩, j⟩ ⟨⟨0, h0⟩, v⟩).val = b j v) :
+    ∃ φ : ((Fin (r ⟨0, h0⟩) → ℤ) ⧸ lfSpan p (fun v => a ⟨⟨0, h0⟩, v⟩) b) ≃+
+        Additive (Abelianization G),
+      ∀ x, φ (QuotientAddGroup.mk x) = lfPsi (fun v =>
+        (Abelianization.of.comp (lcs G 0).subtype) ⟨g ⟨⟨0, h0⟩, v⟩, S.mem _⟩) x := by
+  refine S.lf_layer_equiv hp ⟨0, h0⟩ hlast (Abelianization.of.comp (lcs G 0).subtype)
+    ?_ ?_ b hb
+  · intro z
+    obtain ⟨x, rfl⟩ := br_of_surjective z
+    exact ⟨⟨x, mem_lcs_zero x⟩, rfl⟩
+  · intro x
+    rw [MonoidHom.comp_apply, Subgroup.coe_subtype, ← MonoidHom.mem_ker, Abelianization.ker_of,
+      commutator_eq_lcs_one]
+    try exact Iff.rfl
+
+/-- `e_2` of (57): `L_2 = γ_2 / γ_3` (`brL2`) is the coordinate group of the second layer. -/
+theorem SimsGenSet.lf_brL2_equiv [Finite G] (S : SimsGenSet p a g) (hp : 0 < p) (h1 : 1 < c)
+    (hlast : 2 < c ∨ lcs G 2 = ⊥) (b : Fin (r ⟨1, h1⟩) → Fin (r ⟨1, h1⟩) → ℕ)
+    (hb : ∀ j v, (S.powerWords ⟨⟨1, h1⟩, j⟩ ⟨⟨1, h1⟩, v⟩).val = b j v) :
+    ∃ φ : ((Fin (r ⟨1, h1⟩) → ℤ) ⧸ lfSpan p (fun v => a ⟨⟨1, h1⟩, v⟩) b) ≃+ Additive (brL2 G),
+      ∀ x, φ (QuotientAddGroup.mk x) =
+        lfPsi (fun v => brq2 G ⟨g ⟨⟨1, h1⟩, v⟩, S.mem _⟩) x :=
+  S.lf_layer_equiv hp ⟨1, h1⟩ hlast (brq2 G) brq2_surjective (fun x => brq2_eq_one_iff x) b hb
+
+/-- `e_3` of (57): `L_3 = γ_3 / γ_4` (`brL3`) is the coordinate group of the third layer (for
+class 3, `γ_4 = 1`). -/
+theorem SimsGenSet.lf_brL3_equiv [Finite G] (S : SimsGenSet p a g) (hp : 0 < p) (h2 : 2 < c)
+    (hlast : 3 < c ∨ lcs G 3 = ⊥) (b : Fin (r ⟨2, h2⟩) → Fin (r ⟨2, h2⟩) → ℕ)
+    (hb : ∀ j v, (S.powerWords ⟨⟨2, h2⟩, j⟩ ⟨⟨2, h2⟩, v⟩).val = b j v) :
+    ∃ φ : ((Fin (r ⟨2, h2⟩) → ℤ) ⧸ lfSpan p (fun v => a ⟨⟨2, h2⟩, v⟩) b) ≃+ Additive (brL3 G),
+      ∀ x, φ (QuotientAddGroup.mk x) =
+        lfPsi (fun v => brq3 G ⟨g ⟨⟨2, h2⟩, v⟩, S.mem _⟩) x :=
+  S.lf_layer_equiv hp ⟨2, h2⟩ hlast (brq3 G) (lf_brq3_surjective G) (fun x => brq3_eq_one_iff x)
+    b hb
 
 end LfSimsLift
 
