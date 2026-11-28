@@ -693,7 +693,5 @@ theorem thm71_i_exists : ∃ C : ℝ, ∀ r1 r2 s : ℕ, 2 ≤ s → s ≤ r1 �
 
 end Thm71
 
-#print axioms OMA.SimsLite.Alt2.thm71_i
-#print axioms OMA.SimsLite.Alt2.prop101
 
 end OMA.SimsLite.Alt2
