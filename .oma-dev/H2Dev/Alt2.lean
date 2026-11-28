@@ -19,7 +19,9 @@ the target is `F = ZMod 2`).  `X = Fin R → F`, alternating forms are `R × R` 
   `s ≤ r1`, `r2 ≤ C(r1,2)` and `2 ≤ s` when `r2 ≥ 1`) and `N2_le` (`N2 ≤ 2^(r2 C(r1,2))`).
 * Lemma 2.7 (crude forms) : `card_GL_le` (`|GL_d(q)| ≤ q^(d^2)`, part (iii)), `ncard_grass_le`
   (at most `q^(n k)` subspaces of dimension `k` in `F^n`), `exists_pivots` (pivot coordinates) and
-  `ncard_grass_le_pivot` (`[n, k]_q ≤ 2^n q^(k(n-k))`, part (i) up to the constant).
+  `ncard_grass_le_pivot` (`[n, k]_q ≤ 2^n q^(k(n-k))`, part (i) up to the constant), and
+  `ncard_alt_rank_le` (part (ii) with constant `2^R`: at most `2^R q^((R-ρ)ρ + C(ρ,2))` alternating
+  forms with `dim rad ≥ R - ρ`).
 * Lemma 8.1 (structural part) : `isotropic_of_le_rad`, `isoLocus_smul` (`Z_h(cA) = Z_h(A)`),
   `isoCount_le_grass`, and `two_mul_finrank_le_of_isotropic` (an isotropic `h`-space satisfies
   `2h ≤ R + dim rad A`, so `Z_h(A) = ∅` for `h > R - a` when `rank A = 2a`).
@@ -721,6 +723,172 @@ theorem ncard_grass_le_pivot [Finite F] (k : ℕ) :
 
 end Grass
 
+section Lemma27ii
+
+variable {F : Type*} [Field F] {R : ℕ}
+
+/-- Alternating forms are skew: `A(x, y) = - A(y, x)`. -/
+lemma bfL_swap {A : Matrix (Fin R) (Fin R) F} (hA : IsAltMat A) (x y : Fin R → F) :
+    bfL x y A = -bfL y x A := by
+  have h := bfL_self_eq_zero hA (x + y)
+  have hx := bfL_self_eq_zero hA x
+  have hy := bfL_self_eq_zero hA y
+  rw [bfL_apply, Matrix.mulVec_add, dotProduct_add, add_dotProduct, add_dotProduct] at h
+  rw [bfL_apply] at hx hy
+  rw [bfL_apply, bfL_apply]
+  linear_combination h - hx - hy
+
+lemma bfL_rad_left {A : Matrix (Fin R) (Fin R) F} {x : Fin R → F} (hx : x ∈ rad A)
+    (y : Fin R → F) : bfL x y A = 0 := by
+  have h := LinearMap.congr_fun (LinearMap.mem_ker.1 hx) y
+  rw [Matrix.toBilin'_apply', LinearMap.zero_apply] at h
+  exact h
+
+lemma bfL_rad_right {A : Matrix (Fin R) (Fin R) F} (hA : IsAltMat A) {x : Fin R → F}
+    (hx : x ∈ rad A) (y : Fin R → F) : bfL y x A = 0 := by
+  rw [bfL_swap hA, bfL_rad_left hx, neg_zero]
+
+/-- A subspace `U ≤ W` extends inside `W` to any dimension `≤ dim W`. -/
+lemma exists_le_le_finrank_eq (W : Submodule F (Fin R → F)) (k : ℕ) :
+    ∀ U : Submodule F (Fin R → F), U ≤ W → finrank F U + k ≤ finrank F W →
+      ∃ H : Submodule F (Fin R → F), U ≤ H ∧ H ≤ W ∧ finrank F H = finrank F U + k := by
+  induction k with
+  | zero => intro U hU _; exact ⟨U, le_rfl, hU, rfl⟩
+  | succ k ih =>
+    intro U hUW hk
+    have hlt : U < W := lt_of_le_of_ne hUW (fun h => by rw [h] at hk; omega)
+    obtain ⟨v, hvW, hv⟩ := SetLike.exists_of_lt hlt
+    have hv0 : v ≠ 0 := fun h => hv (by rw [h]; exact U.zero_mem)
+    obtain ⟨U', hUU', hU'W, hU'⟩ : ∃ U' : Submodule F (Fin R → F),
+        U < U' ∧ U' ≤ W ∧ finrank F U' ≤ finrank F U + 1 := by
+      refine ⟨U ⊔ Submodule.span F {v}, ?_,
+        sup_le hUW (Submodule.span_le.2 (Set.singleton_subset_iff.2 hvW)), ?_⟩
+      · refine lt_of_le_of_ne le_sup_left ?_
+        intro heq
+        apply hv
+        rw [heq]
+        exact Submodule.mem_sup_right (Submodule.mem_span_singleton_self v)
+      · have := Submodule.finrank_add_le_finrank_add_finrank U (Submodule.span F {v})
+        rwa [finrank_span_singleton hv0] at this
+    have h1 : finrank F U < finrank F U' := Submodule.finrank_lt_finrank_of_lt hUU'
+    obtain ⟨H, hH, hHW, hHf⟩ := ih U' hU'W (by omega)
+    exact ⟨H, hUU'.le.trans hH, hHW, by omega⟩
+
+/-- Two forms agreeing on the coordinates outside `P` agree on vectors vanishing on `P`. -/
+lemma bfL_eq_of_agree {A A' : Matrix (Fin R) (Fin R) F} (P : Finset (Fin R))
+    (hAA : ∀ p ∉ P, ∀ q ∉ P, A p q = A' p q) {c d : Fin R → F} (hc : ∀ i ∈ P, c i = 0)
+    (hd : ∀ i ∈ P, d i = 0) : bfL c d A = bfL c d A' := by
+  rw [bfL_apply, bfL_apply, Matrix.dot_mulVec_eq_sum_sum, Matrix.dot_mulVec_eq_sum_sum]
+  refine Finset.sum_congr rfl (fun j _ => Finset.sum_congr rfl (fun i _ => ?_))
+  by_cases hj : j ∈ P
+  · rw [hd j hj, mul_zero, mul_zero]
+  · by_cases hi : i ∈ P
+    · rw [hc i hi, zero_mul, zero_mul, zero_mul, zero_mul]
+    · rw [hAA i hi j hj]
+
+/-- Lemma 2.7 (ii), crude form: the alternating `R × R` forms of rank at most `ρ`
+(`dim rad A ≥ R - ρ`) number at most `2^R q^((R-ρ)ρ + C(ρ,2))`; for `ρ = 2a` the exponent is
+`a(2R - 2a - 1)`. -/
+theorem ncard_alt_rank_le [Finite F] (ρ : ℕ) (hρ : ρ ≤ R) :
+    {A : Matrix (Fin R) (Fin R) F | IsAltMat A ∧ R - ρ ≤ finrank F (rad A)}.ncard ≤
+      2 ^ R * Nat.card F ^ ((R - ρ) * ρ + ρ.choose 2) := by
+  classical
+  have hK : ∀ A : {A : Matrix (Fin R) (Fin R) F // IsAltMat A ∧ R - ρ ≤ finrank F (rad A)},
+      ∃ K : Submodule F (Fin R → F), K ≤ rad A.1 ∧ finrank F K = R - ρ := by
+    intro A
+    have h2 := A.2.2
+    obtain ⟨H, -, hH, hf⟩ := exists_le_le_finrank_eq (rad A.1) (R - ρ) ⊥ bot_le
+      (by rw [finrank_bot]; omega)
+    exact ⟨H, hH, by rw [hf, finrank_bot, zero_add]⟩
+  choose K hKrad hKdim using hK
+  have hP : ∀ K : Submodule F (Fin R → F), ∃ P : Finset (Fin R), P.card = finrank F K ∧
+      (∀ w : P → F, ∃ v ∈ K, ∀ i : P, v i = w i) := fun K => by
+    obtain ⟨P, h1, -, h3⟩ := exists_pivots K
+    exact ⟨P, h1, h3⟩
+  choose P hPcard hPsurj using hP
+  have hPc : ∀ A, ((P (K A))ᶜ).card = ρ := fun A => by
+    rw [Finset.card_compl, Fintype.card_fin, hPcard, hKdim]
+    omega
+  let code : {A : Matrix (Fin R) (Fin R) F // IsAltMat A ∧ R - ρ ≤ finrank F (rad A)} →
+      {U : Submodule F (Fin R → F) // finrank F U = R - ρ} × (TPairs ρ → F) := fun A =>
+    (⟨K A, hKdim A⟩, fun p => A.1 (((P (K A))ᶜ).orderEmbOfFin (hPc A) p.1.1)
+      (((P (K A))ᶜ).orderEmbOfFin (hPc A) p.1.2))
+  have hemb : ∀ (T T' : Finset (Fin R)) {m : ℕ} (h : T.card = m) (h' : T'.card = m), T = T' →
+      ∀ a, T.orderEmbOfFin h a = T'.orderEmbOfFin h' a := by
+    rintro T _ m h h' rfl a
+    rfl
+  have hinjc : Function.Injective code := by
+    intro A A' h
+    have hKK : K A = K A' := congrArg Subtype.val (congrArg Prod.fst h)
+    have h2 := congrArg Prod.snd h
+    have hPP : (P (K A))ᶜ = (P (K A'))ᶜ := by rw [hKK]
+    set τ := ((P (K A))ᶜ).orderEmbOfFin (hPc A) with hτ
+    have hτ' : ∀ a, ((P (K A'))ᶜ).orderEmbOfFin (hPc A') a = τ a := fun a =>
+      (hemb _ _ (hPc A) (hPc A') hPP a).symm
+    have hent : ∀ p : TPairs ρ, A.1 (τ p.1.1) (τ p.1.2) = A'.1 (τ p.1.1) (τ p.1.2) := by
+      intro p
+      have h3 := congrFun h2 p
+      simp only [code] at h3
+      rw [hτ', hτ'] at h3
+      exact h3
+    have hagree : ∀ p ∉ P (K A), ∀ q ∉ P (K A), A.1 p q = A'.1 p q := by
+      intro p hp q hq
+      obtain ⟨a, rfl⟩ : p ∈ Set.range τ := by
+        rw [hτ, Finset.range_orderEmbOfFin]
+        exact Finset.mem_compl.2 hp
+      obtain ⟨b, rfl⟩ : q ∈ Set.range τ := by
+        rw [hτ, Finset.range_orderEmbOfFin]
+        exact Finset.mem_compl.2 hq
+      rcases lt_trichotomy a b with hab | hab | hab
+      · exact hent ⟨(a, b), hab⟩
+      · rw [hab, A.2.1.1, A'.2.1.1]
+      · rw [A.2.1.2 (τ b) (τ a), A'.2.1.2 (τ b) (τ a)]
+        congr 1
+        exact hent ⟨(b, a), hab⟩
+    apply Subtype.ext
+    ext i j
+    have hdec : ∀ i : Fin R, ∃ k ∈ K A, ∀ l ∈ P (K A), (Pi.single i (1 : F) - k) l = 0 := by
+      intro i
+      obtain ⟨k, hk, hkP⟩ := hPsurj (K A) (fun l => (Pi.single i (1 : F) : Fin R → F) l)
+      refine ⟨k, hk, fun l hl => ?_⟩
+      show (Pi.single i (1 : F) : Fin R → F) l - k l = 0
+      rw [hkP ⟨l, hl⟩]
+      exact sub_self _
+    obtain ⟨ki, hki, hci⟩ := hdec i
+    obtain ⟨kj, hkj, hcj⟩ := hdec j
+    have hki' : ki ∈ K A' := hKK ▸ hki
+    have hkj' : kj ∈ K A' := hKK ▸ hkj
+    have expand : ∀ B : Matrix (Fin R) (Fin R) F, IsAltMat B → ki ∈ rad B → kj ∈ rad B →
+        B i j = bfL (Pi.single i 1 - ki) (Pi.single j 1 - kj) B := by
+      intro B hB hri hrj
+      have e1 : bfL (Pi.single i 1 - ki) (Pi.single j 1 - kj) B =
+          bfL (Pi.single i 1) (Pi.single j 1) B - bfL (Pi.single i 1) kj B -
+            (bfL ki (Pi.single j 1) B - bfL ki kj B) := by
+        simp only [bfL_apply, Matrix.mulVec_sub, dotProduct_sub, sub_dotProduct]
+        ring
+      rw [e1, bfL_single, bfL_rad_right hB hrj, bfL_rad_left hri, bfL_rad_left hri]
+      ring
+    rw [expand A.1 A.2.1 (hKrad A hki) (hKrad A hkj),
+      expand A'.1 A'.2.1 (hKrad A' hki') (hKrad A' hkj')]
+    exact bfL_eq_of_agree (P (K A)) hagree hci hcj
+  rw [← Nat.card_coe_set_eq]
+  have hG := ncard_grass_le_pivot (F := F) (n := R) (R - ρ)
+  have hRR : R - (R - ρ) = ρ := by omega
+  rw [hRR] at hG
+  calc Nat.card {A : Matrix (Fin R) (Fin R) F | IsAltMat A ∧ R - ρ ≤ finrank F (rad A)}
+      = Nat.card {A : Matrix (Fin R) (Fin R) F // IsAltMat A ∧ R - ρ ≤ finrank F (rad A)} := rfl
+    _ ≤ Nat.card ({U : Submodule F (Fin R → F) // finrank F U = R - ρ} × (TPairs ρ → F)) :=
+        Nat.card_le_card_of_injective code hinjc
+    _ = {U : Submodule F (Fin R → F) | finrank F U = R - ρ}.ncard * Nat.card F ^ ρ.choose 2 := by
+        rw [Nat.card_prod, Nat.card_fun, Nat.card_eq_fintype_card (α := TPairs ρ), card_TPairs]
+        try rfl
+    _ ≤ 2 ^ R * Nat.card F ^ ((R - ρ) * ρ) * Nat.card F ^ ρ.choose 2 :=
+        Nat.mul_le_mul_right _ hG
+    _ = 2 ^ R * Nat.card F ^ ((R - ρ) * ρ + ρ.choose 2) := by
+        rw [pow_add, mul_assoc]
+
+end Lemma27ii
+
 section Lemma81
 
 variable {F : Type*} [Field F] {R : ℕ}
@@ -786,5 +954,11 @@ theorem isoLocus_eq_empty {A : Matrix (Fin R) (Fin R) F} {h : ℕ}
   omega
 
 end Lemma81
+
+#print axioms prop72_iii
+#print axioms ncard_grass_le_pivot
+#print axioms ncard_alt_rank_le
+#print axioms N2_support
+#print axioms two_mul_finrank_le_of_isotropic
 
 end OMA.SimsLite.Alt2
