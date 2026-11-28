@@ -1,0 +1,900 @@
+# H2 blueprint (Sims-lite)
+
+## Route
+Sims-lite with explicit constants. The bound is log_p f(p^m) <= (2/25)m^3 + 7m^2 + 5m, so B = 84.
+
+Three ingredients:
+- Ingredient (a): a strict-chain Sims core.
+- Ingredient (b): the layer-2 Jacobi saving. A layer-2 generator created at step beta needs its commutator with core generator k recorded only for k <= beta.
+- Ingredient (c): a trivial count of the layer-1 commutators.
+
+The isomorphism class of G is determined by a code in which:
+- the commutators of pairs of weight-1 positions are recorded;
+- only commutators of deeper elements with the t core generators are recorded;
+- power relations are recorded for every position.
+
+Rigidity does not use a presented group. Take the diagonal subgroup D = <(x_i, x'_i)> <= G x G'. An abstract core/Lie lemma, proved at subgroup level with only the three-subgroup lemma mod N and [gamma_a, gamma_b] <= gamma_{a+b}, gives gamma_w(D) = <positions of weight >= w>. Then pc.lean's nf_surj gives |D| <= p^m, so D = G = G'.
+
+The route needs no Frattini or Burnside basis theorem, no Gaussian binomials, no alternating-form (Sims-rank) count, no relatively free groups and no PresentedGroup.
+
+The margin is 1/12 - 2/25 = 1/300. Both the strict chain and the step restriction are needed for that margin. The O(m^2) part of the bound is explicit and absorbed by B.
+
+## Math proof
+CONVENTIONS
+- [x,y] = x y x^-1 y^-1 (Mathlib). For subgroups, [A,B] = <[a,b] : a in A, b in B>, and AB means A ⊔ B.
+- gamma_1(D) = D and gamma_{w+1}(D) = [gamma_w(D), D]. In Lean, gamma_w(D) = (⊤ : Subgroup D).lowerCentralSeries (w-1).
+- For a list X, X_{>=n} := X.drop n. nf(l,e) = l[k-1]^{e(k-1)} ... l[0]^{e(0)}, exactly as in pc.lean.
+- p is prime, f(n) = g(n), and log means log_p.
+
+MAIN THEOREM A. For every prime p and every m >= 0: g(p^m) <= (m+2)^{5m} * p^{floor((2m^3 + 50m^2)/25)}.
+
+COROLLARY (the goal) with B = 84. Put p = 3.
+- (a+2)^{60a} <= 3^{60a(a+1)}, since a+2 <= 3^{a+1}.
+- 12*floor((2a^3 + 50a^2)/25) <= (24a^3 + 600a^2)/25 <= a^3 + 24a^2.
+- Hence g(3^a)^12 <= 3^{a^3 + 84a^2 + 60a} <= 3^{a^3 + 84(a+1)^2}.
+
+======================================================================
+§1 COMMUTATOR CALCULUS
+In this section D is any group.
+
+C1 (centraliser modulo N). Let N be normal in D and x in D. Then Z_N(x) := {g : [x,g] in N} is a subgroup, namely the preimage of the centraliser of xN in D/N. Also [x,g] in N iff [g,x] in N, because [g,x] = [x,g]^{-1}.
+
+C1' (generator reduction). Let N be normal and A, B subsets of D with [a,b] in N for all a in A, b in B. Then [<A>,<B>] <= N.
+- For each a in A, B ⊆ Z_N(a). So <B> ⊆ Z_N(a).
+- By symmetry, for each b' in <B>, A ⊆ Z_N(b'). So <A> ⊆ Z_N(b').
+- Finish with commutator_le.
+
+C2.
+- [gamma_w, D] = gamma_{w+1}, and [D, gamma_w] = gamma_{w+1}.
+- If gamma_{w+1} <= K <= gamma_w then K is normal: for k in K, g k g^-1 = [g,k] k.
+- If K contains gamma_2 then K is normal.
+
+C3 (three subgroups mod N). Let N be normal. If [[B,C],A] <= N and [[C,A],B] <= N, then [[A,B],C] <= N.
+Proof: map to D/N using Subgroup.map_commutator, then apply commutator_commutator_eq_bot_of_rotate.
+
+C4. [gamma_a, gamma_b] <= gamma_{a+b}. Induction on b, for all a simultaneously.
+- b = 1 is C2.
+- Step: [gamma_a, gamma_{b+1}] = [[gamma_b, D], gamma_a]. Apply C3 with N = gamma_{a+b+1}:
+  - [[D, gamma_a], gamma_b] = [gamma_{a+1}, gamma_b] <= N by the induction hypothesis at a+1;
+  - [[gamma_a, gamma_b], D] <= [gamma_{a+b}, D] = N.
+
+C5 (identities, provable by `group`).
+- (I1) [x, yz] = [x,y] * [y,[x,z]] * [x,z].
+- (I2) [yz, x] = [y,[z,x]] * [z,x] * [y,x].
+The factors [y,[x,z]] and [y,[z,x]] lie in gamma_3. Hence for any subgroup W containing gamma_3 (normality not needed):
+- if [x,y] in W, then [x,yz] in W iff [x,z] in W;
+- if [x,z] in W, then [x,yz] in W iff [x,y] in W;
+- if [y,x] in W, then [yz,x] in W iff [z,x] in W.
+
+======================================================================
+§2 THEOREM L (core lemma; "Lie lemma" in group form)
+
+Data.
+- A group D, a number t, and elements u_0, ..., u_{t-1} of D.
+- A set H_1 ⊆ D.
+- A set P ⊆ {(a,b) : a < b < t}, and E_2 := {[u_a,u_b] : (a,b) in P}.
+- Sets E_w ⊆ D for w >= 3.
+- S_w := <E_w> and M_w := S_w gamma_{w+1} for w >= 2, and M_1 := D.
+
+Hypotheses.
+- (L0) D = <H_1> gamma_2.
+- (L2) For w >= 2, every x in E_{w+1} equals [y, u_b] for some y in S_w and b < t.
+- (H1) [x,y] in M_2 for all x, y in H_1.
+- (H2) [[u_a,u_b], u_k] in M_3 for all (a,b) in P and all k <= b.
+- (H3) [x, u_k] in M_{w+1} for all w >= 3, x in E_w and k < t.
+
+Conclusion. gamma_w <= M_w for all w >= 1.
+
+Proof.
+(0) Preliminaries.
+- By induction, S_w <= gamma_w: E_2 ⊆ gamma_2 directly, and higher E_w by (L2). So each M_w is normal (C2).
+- Let A(w) be the statement "[x,g] in M_{w+1} for all x in M_w and g in D".
+- If A(w) holds and gamma_w <= M_w, then gamma_{w+1} = [gamma_w, D] <= M_{w+1}. So it suffices to prove A(w) for all w.
+- Reduce A(w) to generators with C1'. D is generated by H_1 ∪ gamma_2, and M_w by E_w ∪ gamma_{w+1} (by H_1 ∪ gamma_2 when w = 1). Most pairs are automatic:
+  - if x is in gamma_{w+1}, then [x,g] is in gamma_{w+2} <= M_{w+1};
+  - if g is in gamma_2, then [x,g] is in [gamma_w, gamma_2] <= gamma_{w+2} (C4).
+- So only x in E_w (with E_1 := H_1) and g = h in H_1 remain.
+
+(1) A(1) is (H1). Hence gamma_2 <= M_2.
+
+(2) B(2): for every k < t, [x, u_k] in M_3 for all x in M_2. Strong induction on k.
+- By C1 it suffices to take x in E_2 ∪ gamma_3. The case x in gamma_3 is trivial.
+- Let x = [u_a,u_b] with (a,b) in P. If k <= b, use (H2).
+- If b < k, put A = <u_a>, B = <u_b>, C = <u_k> and N = M_3:
+  - [B,C] <= gamma_2 <= M_2, and [M_2, A] <= N by the induction hypothesis at a < k;
+  - [[C,A],B] <= [M_2, B] <= N by the induction hypothesis at b < k.
+  - C3 gives [[A,B],C] <= N, and [x, u_k] lies in this subgroup.
+
+(3) B(w) for w >= 3: [x, u_k] in M_{w+1} for x in M_w. Use C1 on the generators: E_w (by H3) and gamma_{w+1} (trivial).
+
+(4) A(2). Take x = [u_a,u_b] and h in H_1. Put A = <u_a>, B = <u_b>, C = <h>, N = M_3:
+- [[B,C],A] <= [M_2, A] <= N by B(2);
+- [[C,A],B] <= [M_2, B] <= N by B(2);
+- C3 finishes.
+
+(5) A(w) for w >= 3, by induction on w. Take x = [y, u_b] in E_w with y in S_{w-1} <= M_{w-1} ∩ gamma_{w-1}, and h in H_1. Put A = <y>, B = <u_b>, C = <h>, N = M_{w+1}.
+- (5a) [C,A] <= M_w by A(w-1) together with C1 and C1'. Then [M_w, B] <= N by B(w).
+- (5b) [B,C] <= gamma_2. Claim: [z,y] in N for all z in gamma_2. Since gamma_2 <= M_2 = <E_2 ∪ gamma_3> and Z_N(y) is a subgroup, it suffices to check two kinds of z:
+  - z in gamma_3: then [z,y] is in [gamma_3, gamma_{w-1}] <= gamma_{w+2} <= N (C4).
+  - z = [u_c,u_d] in E_2: use C3 with A' = <u_c>, B' = <u_d>, C' = <y>.
+    - [B',C'] <= M_w by B(w-1) (this is (2) if w-1 = 2 and (3) if w-1 >= 3). Then [M_w, A'] <= N by B(w).
+    - The term [[C',A'],B'] is handled symmetrically.
+  - Extend from y to <y> by C1. Then C3 finishes (5).
+
+So A(w) holds for every w, and hence gamma_w <= M_w for every w. QED
+
+COROLLARY L'. Suppose also that gamma_{N+1}(D) = 1 for some N, and that E_w is empty for w > W. Then for every w >= 1, gamma_w <= <the union of E_v over v >= w>, with E_1 := H_1. Proof: downward induction from w = max(N, W) + 1.
+
+======================================================================
+§3 THEOREM S (strict chains)
+
+Setting. G is any finite group and Gamma_w := gamma_w(G). For u : N -> G put W_k(u) := <[u_a,u_b] : a < b < k> Gamma_3. Then:
+- Gamma_3 <= W_k(u) <= Gamma_2, so W_k(u) is normal;
+- W_0 = W_1 = Gamma_3, and W_k is monotone in k;
+- W_{k+1} = W_k <[u_a,u_k] : a < k>.
+
+Definition. u is strict of length t if W_{k-1} ≠ W_k for all 2 <= k <= t. A strict chain of length t has t <= |G|, because the orders |W_k| increase strictly.
+
+S1. There exist t ≠ 1 and u strict of length t with Gamma_2 <= W_t(u).
+
+Proof.
+- If Gamma_2 <= Gamma_3, take t = 0.
+- Otherwise some [x,y] is not in Gamma_3, so (x,y) is strict of length 2. Let t >= 2 be the maximal length of a strict chain and u such a chain.
+- Suppose [x,y] is not in W_t for some x, y.
+- Case 1: [u_a, v] is not in W_t for some a < t and some v. Appending v gives a strict chain of length t+1. Contradiction.
+- Case 2: [u_a, v] is in W_t for all a < t and all v. Put w := x if some a < t-1 has [u_a,x] not in W_{t-1}; otherwise put w := u_{t-1} x. Let u' be u with u'_{t-1} := w and u'_t := y.
+  - (i) W_k(u') = W_k(u) for k <= t-1.
+  - (ii) Strictness at k = t. If w = x, this holds by the choice of w. Otherwise every [u_a,x] is in W_{t-1}, so by C5 [u_a, u_{t-1}x] is in W_{t-1} iff [u_a, u_{t-1}] is. Strictness of u at t gives an a with [u_a, u_{t-1}] not in W_{t-1}.
+  - (iii) Strictness at k = t+1.
+    - First, W_t(u') <= W_t(u). The generators [u_a, w] lie in W_t by Case 2 and C5.
+    - Second, [w, y] is not in W_t(u). For w = u_{t-1}x, (I2) gives [w,y] = [u_{t-1},[x,y]] [x,y] [u_{t-1},y] with [u_{t-1},y] in W_t. So [w,y] in W_t would force [x,y] in W_t, which is false.
+  - So u' is strict of length t+1, contradicting maximality. QED
+
+S2 (independence). If u is strict of length t >= 2, then for every k < t, u_k is not in <u_0, ..., u_{k-1}> Gamma_2.
+
+Proof.
+- For k >= 1, take a < k. The subgroup Z_{W_k}(u_a) contains:
+  - every u_b with b < k (the commutator is a generator of W_k, its inverse, or 1);
+  - all of Gamma_2, because [u_a, Gamma_2] <= Gamma_3.
+- If u_k were in <u_0, ..., u_{k-1}> Gamma_2, then [u_a,u_k] would lie in W_k for every a < k. Then W_{k+1} = W_k, contradicting strictness at k+1.
+- For k = 0: if u_0 were in Gamma_2, then [u_0,u_1] would lie in Gamma_3, so W_2 = W_1. Contradiction. QED
+
+======================================================================
+§4 LEMMA G (chains and greedy fold)
+
+Setting. |G| = p^m. H <= G and N_0 is normal with N_0 <= H and [H,G] <= N_0. Every K with N_0 <= K <= H is then normal (C2-type argument, commutator_top_right_le_iff).
+
+G1. For such K and c in H, let K' := K <c>.
+- [K' : K] = p^a for some a <= m, by relIndex_dvd_card and Nat.dvd_prime_pow.
+- c^{p^a} lies in K, by pow_relIndex_mem.
+- Define Chain(c; K) := (c, c^p, ..., c^{p^{a-1}}). It is empty iff c is in K.
+
+G2 (fold). Let c = (c_0, ..., c_{n-1}) with entries in H. Put N_j := <c_0, ..., c_{j-1}> N_0. Define Y(c) by Y(c ++ [d]) := Chain(d; N_n) ++ Y(c). Then:
+- (Y1) Every entry is c_j^{p^e}. Each chain begins with c_j, and every non-initial entry is the p-th power of the entry before it.
+- (Y2) Y[i]^p lies in <Y_{>=i+1}> N_0.
+- (Y3) <Y> N_0 = N_n.
+- (Y4) p^{|Y|} = [N_n : N_0], by relIndex_mul_relIndex.
+- (Y5) The chain of c_j is nonempty iff N_{j+1} ≠ N_j.
+Proof by induction on n using G1.
+
+LEMMA K. If |G| = p^m then gamma_{m+1}(G) = 1.
+- G is nilpotent (IsPGroup.isNilpotent).
+- If gamma_{w+1} = gamma_w, then the series is constant from w on, so gamma_w = 1. Otherwise [gamma_w : gamma_{w+1}] >= p.
+- By induction, |gamma_{w+1}| <= max(1, p^{m-w}).
+
+======================================================================
+§5 CODES
+
+Shape m := (Fin m -> Fin (m+2)) x (Fin m -> Option(Option(Fin m x Fin m))) x (Fin m -> Option(Fin m)) x (Fin m -> Fin m). The four components are:
+- wt, the weight;
+- df, the definition: none = free; some none = pow (x_i = x_{i-1}^p); some(some(a,b)) = comm (x_i = [x_a, x_b]);
+- cidx, the core index;
+- st, the step.
+
+Let core := {i : cidx i ≠ none} and t := |core|.
+
+Valid(s) means:
+- (V1) 1 <= wt i, and wt is monotone (i <= j implies wt i <= wt j).
+- (V2) df i = free implies wt i = 1.
+- (V3) df i = pow implies i >= 1 and wt(i-1) = wt i; if moreover wt i = 2, then st i = st(i-1).
+- (V4) df i = comm(a,b) implies a < i, b < i, b in core, wt i = wt a + 1 >= 2; if moreover wt i = 2, then a is in core and cidx a < cidx b = st i.
+- (V5) i in core implies df i = free and cidx i < t; cidx is injective on core.
+- (V6) For each 1 <= beta < t there is some i with wt i = 2 and st i = beta. Every i with wt i = 2 has 1 <= st i < t.
+
+start(w) := #{i : wt i < w}. By (V1), {i : wt i >= w} is the suffix starting at start(w).
+
+Idx(s) is the disjoint union of four index sets:
+- I_pw = {(i,j) : i < j};
+- I_1 = {(a,b,j) : a < b, wt a = wt b = 1, wt j >= 2};
+- I_2 = {(i,k,j) : wt i = 2, k in core, cidx k <= st i, wt j >= 3};
+- I_3 = {(i,k,j) : wt i >= 3, k in core, wt j >= wt i + 1}.
+
+Code(p,m) := Σ_{s valid} (Idx(s) -> Fin p).
+
+(G, X) REALIZES (s, c) when all of the following hold:
+- (R0) |X| = m, |G| = p^m, and <X> = G.
+- (R1) df i = pow implies X_i = X_{i-1}^p; df i = comm(a,b) implies X_i = [X_a, X_b].
+- (R2) X_i^p = nf(X_{>=i+1}, c(pw,i,.)).
+- (R3) For a < b of weight 1: [X_a,X_b] = nf(X_{>=start 2}, c(1,a,b,.)).
+- (R4) For (i,k) as in I_2: [X_i,X_k] = nf(X_{>=start 3}, c(2,i,k,.)).
+- (R5) For (i,k) as in I_3: [X_i,X_k] = nf(X_{>=start(wt i+1)}, c(3,i,k,.)).
+Exponents are read with an offset, and are 0 outside the index set.
+
+======================================================================
+§6 THEOREM E (existence). Every G of order p^m realises some code.
+
+Write Gamma_w = gamma_w(G).
+
+Core. Take (t, u) from S1, with t ≠ 1 and Gamma_2 <= W_t(u).
+
+Candidate lists. Define the following, and set Y_w := Y(cand_w) relative to N_0 = Gamma_{w+1} (§4):
+- cand_1 := (u_0, ..., u_{t-1}) ++ (an enumeration of G), relative to Gamma_2.
+- cand_2 := blocks beta = 1, ..., t-1, where block beta = ([u_0,u_beta], ..., [u_{beta-1},u_beta]), relative to Gamma_3.
+- For w >= 2: cand_{w+1} := ([y, u_b] : y in Y_w, b < t), relative to Gamma_{w+2}.
+§4 applies with H = Gamma_w and N_0 = Gamma_{w+1}: every candidate lies in Gamma_w, and [Gamma_w, G] = Gamma_{w+1}.
+
+Apply Theorem L to D = G with:
+- H_1 = G and P = {(a,b) : a < b < t};
+- E_2 = set(cand_2) and E_w = set(cand_w).
+Checking the hypotheses:
+- (L0) is trivial.
+- (L2) holds by (Y1): the entries of Y_w lie in <cand_w>.
+- (H1): [x,y] lies in Gamma_2 <= W_t(u) = <cand_2> Gamma_3 = M_2.
+- (H2) and (H3): take x in E_w, which lies in <Y_w> Gamma_{w+1} by (Y3). The set {x' : [x', u_k] in M_{w+1}} is a subgroup (C1). It contains the entries of Y_w, because [y, u_k] is in cand_{w+1}, and it contains Gamma_{w+1}. So it contains x.
+Theorem L gives Gamma_w <= <cand_w> Gamma_{w+1}, so Gamma_w = <cand_w> Gamma_{w+1} = <Y_w> Gamma_{w+1}. With Lemma K, downward induction gives Gamma_w = <Y_w ++ ... ++ Y_m> for 1 <= w <= m+1.
+
+The list. X := Y_1 ++ ... ++ Y_m, where entries of Y_w get weight w.
+- Length: |X| = m. By (Y4), p^{|Y_w|} = [Gamma_w : Gamma_{w+1}], and the product of these indices is |G| = p^m.
+- Normal forms. The pc.lean hypotheses hold:
+  - X_i^p lies in <X_{>=i+1}>, by (Y2) and Gamma_{w+1} = <later layers>;
+  - [g, X_j] lies in Gamma_{wt j + 1} <= <X_{>=j+1}>.
+  So suffix_hyps and nf_surj give a normal form with exponents < p for every element of every suffix closure. This yields (R2)-(R5): [X_a,X_b] lies in Gamma_2 = <X_{>=start 2}>, and similarly for the rest.
+
+The shape.
+- A chain start in layer 1 is free; a non-start is pow.
+- A layer-2 start with candidate [u_a, u_beta] is comm(pos u_a, pos u_beta) with st = beta. Non-starts are pow and inherit st.
+- A layer-w start (w >= 3) with candidate [y, u_b] is comm(pos y, pos u_b), where pos y is the position of y inside the Y_{w-1} block.
+- pos u_kappa is the start of the chain of the candidate u_kappa in Y_1. This chain is nonempty by S2 and (Y5). Set cidx(pos u_kappa) := kappa.
+Checking validity:
+- (V1)-(V5) are immediate from the construction.
+- (V6): the closure before block beta is W_beta(u), and after it is W_{beta+1}(u), which is strictly larger. By (Y5) some chain in block beta is nonempty.
+- (R0) and (R1) hold by construction.
+
+======================================================================
+§7 THEOREM R (rigidity). If (G,X) and (G',X') realise the same (s,c), then G ≅ G'.
+
+Construction. Let D := <(X_i, X'_i) : i < m> <= G x G', and let Z_i := (X_i, X'_i), viewed in D.
+- Z satisfies the definitions (R1): commutators and powers are taken componentwise.
+- Z satisfies every recorded relation with the same exponents. Apply nf_map with fst and snd; an element of D is determined by its two projections.
+
+Weights. By induction on i, Z_i lies in gamma_{wt i}(D):
+- free: gamma_1 = D;
+- pow: same weight as i-1;
+- comm(a,b): Z_i is in [gamma_{wt a}, D] = gamma_{wt a + 1}.
+
+Apply Theorem L to D with:
+- t = |core| and u_kappa := Z_{cidx^{-1} kappa};
+- H_1 := {Z_i : df i = free};
+- P := {(cidx a, cidx b) : df i = comm(a,b), wt i = 2};
+- E_w := {Z_i : wt i = w, df i = comm}.
+Checking the hypotheses:
+- (L0): every Z_i lies in <H_1> gamma_2(D), by induction on i, and D = <Z> (closure_closure_coe_preimage).
+- (L2): weight-w positions lie in <E_w>. Heads are generators, and pow positions are powers of the previous same-weight position.
+- (H1) comes from (R3), using inverses for b < a. The suffix <Z_{>=start 2}> lies in <E_2> gamma_3(D), since weight-2 positions are in <E_2> and weight >= 3 positions are in gamma_3(D).
+- (H2) comes from (R4): it is recorded exactly for k <= st i = cidx b, by (V4).
+- (H3) comes from (R5).
+Conclusion. D is nilpotent, being a subgroup of the nilpotent group G x G' (Group.isNilpotent_prod and Subgroup.isNilpotent). Corollary L' then gives gamma_w(D) <= <Z_i : wt i >= w>.
+
+The pc.lean hypotheses hold for Z:
+- powers, by (R2);
+- for i < j, Z_i Z_j Z_i^{-1} = [Z_i, Z_j] Z_j, with [Z_i, Z_j] in gamma_{wt j + 1}(D), which lies in <Z_{>=j+1}> by (V1).
+So nf_surj gives |D| <= p^m = |G|.
+
+Finish. fst : D -> G is onto, since its image is <X> = G. So it is bijective, by bijective_of_nat_card_le. Likewise snd : D -> G' is bijective. Hence G ≅ D ≅ G'.
+
+======================================================================
+§8 THEOREM C (count). |Code(p,m)| <= (m+2)^{5m} p^{floor((2m^3+50m^2)/25)}.
+
+Shape count. |Shape m| = (m+2)^m (m^2+2)^m (m+1)^m m^m <= (m+2)^{5m}.
+
+For a valid shape s, put l1 = #{wt = 1}, l2 = #{wt = 2}, tau = #{wt >= 3}. Then:
+- l1 + l2 + tau = m;
+- t <= l1, because core positions are free, hence of weight 1;
+- l2 >= t-1, by the distinct witnesses in (V6).
+
+Sizes of the index sets.
+- |I_pw| = C(m,2).
+- |I_1| = C(l1,2)(l2 + tau).
+- |I_2| = tau * rho, where rho = Σ_{wt i = 2} (st i + 1). Here cidx is a bijection from core onto [0,t).
+- |I_3| <= t C(tau,2), because wt i < wt j implies i < j.
+
+rho bound. Choose witnesses i_beta for beta = 1, ..., t-1; every other weight-2 position has st <= t-1. So rho <= Σ_{beta=1}^{t-1} (beta+1) + (l2-t+1) t = t l2 - (t-1)(t-2)/2 for t >= 1, and rho = 0 when t = 0.
+
+With u := t-1 (so u <= l1 and u <= l2) and n := l2 + tau:
+E := |I_1| + |I_2| + |I_3| <= F + tau l2 + tau^2/2, where 2F := l1^2 n + tau u (2 l2 - u + tau).
+
+CUBIC INEQUALITY. If u <= l1 and u <= l2, then 25(l1^2 n + tau u (2l2 - u + tau)) <= 4(l1 + n)^3.
+
+Proof. Let v = min(l1, l2). The middle term increases in u on [0, l2], since its difference equals tau (v-u)(2l2 + tau - u - v) >= 0. So replace u by v and split into cases.
+- Case l2 <= l1, so 2F <= n(l1^2 + tau l2).
+  - If 4 l1 >= n: use 4 tau l2 <= n^2 and the identity 16(l1+n)^3 - 25n(4l1^2 + n^2) = (2l1 - 3n)^2 (4l1 - n) >= 0.
+  - If 4 l1 < n: then tau l2 <= n l1, so 2F <= n l1 (l1+n). Use 4(l1+n)^3 - 25 n l1 (l1+n) = (l1+n)(4l1 - n)(l1 - 4n) >= 0.
+- Case l1 < l2: 2F <= l1^2 n + tau l1 (2l2 - l1 + tau) = l1 n^2 - l1 l2 (l2 - l1) <= l1 n^2. Then 4(l1+n)^3 - 25 l1 n^2 = 4 l1^3 + n(12 l1^2 - 13 l1 n + 4n^2) >= 0, because 48(12a^2 - 13ab + 4b^2) = (24a - 13b)^2 + 23b^2.
+Equality holds at l1 = 3m/5 and l2 = tau = u = m/5.
+
+Conclusion. E <= (2/25)m^3 + m^2, so |Idx s| <= C(m,2) + E <= (2m^3 + 50m^2)/25. Then |Code| = Σ_s p^{|Idx s|} <= |Shape m| p^{floor(...)}.
+
+======================================================================
+§9 ASSEMBLY
+- Map each isomorphism class of order p^m to a code realised by a representative (Theorem E). The map is injective by Theorem R, by the same Set.ncard_le_ncard_of_injOn pattern as gg_pow_le.
+- Theorem C then gives Theorem A, and the Corollary gives B = 84.
+
+======================================================================
+VERIFICATION AND SOURCES
+- Checked numerically with Python scripts in C:\Users\monir\AppData\Local\Temp\claude\b596c85084d8d676\f9cebc68-e947-4ea6-b1ff-fe6711c31c1b\scratchpad\blueprint\:
+  - the cubic inequality on a grid (chk.py);
+  - the exact discrete maximum of E <= (2/25)m^3 for m <= 60 and m = 90, 120, 180, 240, with E/m^3 = 0.0797 at m = 240 (chk.py);
+  - the final arithmetic and B = 84 for a < 200 (arith.py);
+  - the G-side construction on random subgroups of UT_5(F_2) and UT_6(F_2), with t up to 4 and non-core generators present: core-only candidates generate every layer, the exchange algorithm terminates with independent cores, and |X| = m (lie_test2.py).
+- Sources: the overall strategy (Sims core, strict flag, restricted relations) is Sims' framework as summarised from Li-Qiao arXiv:2610.14509v3 Sec. 2 in the supplied research reports. I did not re-read those sources here. The proof above is self-contained and uses no cited lemma.
+
+## Reuse
+From C:\Users\monir\open-math-agents\.oma\scratch\pc.lean:
+
+Reused verbatim:
+- The normal-form layer: cl, cl_def, mem_cl_of_mem, nf, nf_cons, nf_map, nf_mem, nf_congr, cl_drop_mono, getElem_mem_drop.
+- nf_surj, the main reusable theorem. It is applied twice: to the LCS-adapted list in G on every suffix (existence), and to the diagonal list in the subgroup D of G x G' (rigidity).
+- suffix_hyps. Its hypotheses h2 (powers) and h3 (⁅g, X[j]⁆ ∈ cl(drop(j+1)) for all g) are exactly what the LCS-adapted list satisfies.
+
+Reused by copy-and-adapt:
+- card_Gam's counting argument (surjection from Fin m → Fin p onto the group) gives |D| ≤ p^m.
+- iso_Gam's final step (bijective_of_nat_card_le) gives the bijectivity of the projections D → G.
+- exists_code's packing of exponent functions into a finite code (enc/dec) carries over to Idx s → Fin p.
+- gg_pow_le's injection of iso classes into codes is reused almost verbatim, with exists_code replaced by Existence + Rigidity.
+- The tri/six arithmetic style carries over.
+
+Not reused:
+- Gam, rels and PresentedGroup: the diagonal-subgroup trick replaces the presented group.
+- exists_pcgs: the central-element induction is replaced by the LCS greedy construction.
+
+Mathlib (local copy) provides:
+- The lowerCentralSeries API. Note the new form: Subgroup.lowerCentralSeries (S : Subgroup G), used with S = ⊤, and lowerCentralSeries_succ = ⁅LCS n, S⁆.
+- lowerCentralSeries_normal, top_lowerCentralSeries_prod, nilpotent_iff_lowerCentralSeries, IsPGroup.isNilpotent, Subgroup.isNilpotent, Group.isNilpotent_prod.
+- The three-subgroup lemma in ⊥ form (Subgroup.commutator_commutator_eq_bot_of_rotate), map_commutator, commutator_le, commutator_comm, commutator_top_right_le_iff, Subgroup.Normal.of_commutator_le.
+- The index API: relIndex_mul_relIndex, relIndex_dvd_card, pow_relIndex_mem (the key lemma for chains), relIndex_bot_left.
+- Subgroup.centralizer / comap, closure_closure_coe_preimage, Nat.dvd_prime_pow.
+
+Not in Mathlib, and to be proved:
+- [γ_i, γ_j] ≤ γ_{i+j};
+- the three-subgroup lemma mod N;
+- the core/Lie lemma, strict chains, and greedy pcgs.
+
+Not needed at all: the Frattini subgroup, the Burnside basis theorem, Gaussian binomials, relatively free groups, and FreeGroup quotients.
+
+The research reports supplied:
+- the 2/25 observation, which I re-derived here with a full case-split certificate;
+- the strict-chain exchange argument, which I re-proved and tested;
+- the diagonal-subgroup rigidity idea from the 'elementary' report, which I made precise.
+
+## Reduction proposal
+Proposed 4-hypothesis reduction file. It assumes `open Subgroup` and the local abbreviation L D n := (⊤ : Subgroup D).lowerCentralSeries n. It contains only definitions plus a short main proof of about 120 lines.
+
+SHARED DEFINITIONS (about 160 lines; nf copied from pc.lean):
+- abbrev Shape (m) := (Fin m → Fin (m+2)) × (Fin m → Option (Option (Fin m × Fin m))) × (Fin m → Option (Fin m)) × (Fin m → Fin m). The components are wt; df (none = free, some none = pow, some(some(a,b)) = comm); cidx; st.
+- Shape.Valid, the conjunction of V1-V6 from §5 of the proof.
+- Shape.start w := #{i | wt i < w}.
+- inductive Kind | pw | r1 | r2 | r3.
+- Shape.IdxP : Kind × Fin m × Fin m × Fin m → Prop (the four index predicates).
+- Idx s := {q // s.IdxP q}.
+- Code p m := Σ s : {s : Shape m // s.Valid}, (Idx s.1 → Fin p).
+- expo x k i a n₀ : ℕ → ℕ (reads exponents at offset n₀, and is 0 outside the index set).
+- Realizes p m G X x : Prop, the conjunction of:
+  - X.length = m, Nat.card G = p^m and cl X = ⊤;
+  - the pow/comm definitions;
+  - X[i]^p = nf (X.drop (i+1)) (expo .pw i i (i+1));
+  - the r1 relation for weight-1 pairs a < b, with suffix start 2;
+  - the r2 relation for wt i = 2, cidx k = some κ with κ ≤ st i, with suffix start 3;
+  - the r3 relation for 3 ≤ wt i and k core, with suffix start (wt i + 1).
+
+H1 (LieLemma, about 500 lines; pure group theory):
+∀ (D : Type) [Group D] (t : ℕ) (u : ℕ → D) (H₁ : Set D) (P : Set (ℕ × ℕ)) (E : ℕ → Set D),
+  (∀ ab ∈ P, ab.1 < ab.2 ∧ ab.2 < t) →
+  E 2 = (fun ab => ⁅u ab.1, u ab.2⁆) '' P →
+  (∀ w, 2 ≤ w → ∀ x ∈ E (w+1), ∃ y ∈ closure (E w), ∃ b < t, x = ⁅y, u b⁆) →
+  closure H₁ ⊔ L D 1 = ⊤ →
+  (∀ x ∈ H₁, ∀ y ∈ H₁, ⁅x, y⁆ ∈ closure (E 2) ⊔ L D 2) →
+  (∀ ab ∈ P, ∀ k ≤ ab.2, ⁅⁅u ab.1, u ab.2⁆, u k⁆ ∈ closure (E 3) ⊔ L D 3) →
+  (∀ w, 3 ≤ w → ∀ x ∈ E w, ∀ k < t, ⁅x, u k⁆ ∈ closure (E (w+1)) ⊔ L D (w+1)) →
+  ∀ w, 2 ≤ w → L D (w-1) ≤ closure (E w) ⊔ L D w.
+It is independent of every code definition and depends only on C1-C4.
+
+H2 (Existence, about 1500 lines):
+LieLemma → ∀ p, p.Prime → ∀ m (G : Type) [Group G] [Finite G], Nat.card G = p^m → ∃ (X : List G) (x : Code p m), Realizes p m G X x.
+It contains the strict-chain lemma, the greedy fold, the class ≤ m lemma, the layer construction and the shape extraction.
+
+H3 (Rigidity, about 550 lines):
+LieLemma → ∀ p, p.Prime → ∀ m (G G' : Type) [Group G] [Group G'] [Finite G] [Finite G'] (X : List G) (X' : List G') (x : Code p m), Realizes p m G X x → Realizes p m G' X' x → Nonempty (G ≃* G').
+It is the diagonal-subgroup argument and needs no presented group.
+
+H4 (CountBound, about 500 lines; finite combinatorics plus the cubic inequality):
+∀ p m : ℕ, 0 < p → Nat.card (Code p m) ≤ (m+2)^(5*m) * p^((2*m^3 + 50*m^2)/25).
+
+main : LieLemma → Existence → Rigidity → CountBound → ∃ B : ℕ, ∀ a : ℕ, Erdos1160.g (3^a)^12 ≤ 3^(a^3 + B*(a+1)^2).
+Proof: take B := 84. Show g(3^a) ≤ Nat.card (Code 3 a) by the gg_pow_le-style injection, using H2 for a code and H3 for injectivity. Then use H4 and the arithmetic (a+2)^(60a) ≤ 3^(60a(a+1)) and 12·⌊(2a^3+50a^2)/25⌋ ≤ a^3 + 24a^2.
+
+The hypotheses H2 and H3 take H1 as a premise, so the core lemma is proved once and the two sides can be developed in parallel. H4 does not touch group theory at all.
+
+Fallback 3-way split, if fixing the code definitions up front is undesirable:
+- H1 = LieLemma.
+- H2' = the strict-chain lemma (S1 + S2) as a standalone Prop.
+- H3' := LieLemma → StrictChain → ∀ p prime ∀ m, g(p^m) ≤ (m+2)^(5m) · p^((2m^3+50m^2)/25).
+main is then pure arithmetic. This split is less balanced, because H3' carries about 2700 lines.
+
+## Lemmas
+
+### zn_subgroup (C1) (35 lines, risk low)
+def zn (N : Subgroup G) [N.Normal] (x : G) : Subgroup G := (Subgroup.centralizer {(x : G ⧸ N)}).comap (QuotientGroup.mk' N);  lemma mem_zn : g ∈ zn N x ↔ ⁅x, g⁆ ∈ N;  lemma comm_mem_symm [N.Normal] : ⁅x, g⁆ ∈ N ↔ ⁅g, x⁆ ∈ N
+- depends on: 
+- mathlib: Subgroup.centralizer, Subgroup.comap, commutatorElement_eq_one_iff_mul_comm, map_commutatorElement, QuotientGroup.eq_one_iff, commutatorElement_inv
+
+### commutator_closure_le_of (C1') (25 lines, risk low)
+[N.Normal] (h : ∀ a ∈ A, ∀ b ∈ B, ⁅a, b⁆ ∈ N) : ⁅closure A, closure B⁆ ≤ N
+- depends on: zn_subgroup (C1)
+- mathlib: Subgroup.commutator_le, Subgroup.closure_le
+
+### three_subgroup_mod (C3) (30 lines, risk low)
+[N.Normal] (h1 : ⁅⁅B, C⁆, A⁆ ≤ N) (h2 : ⁅⁅C, A⁆, B⁆ ≤ N) : ⁅⁅A, B⁆, C⁆ ≤ N
+- depends on: 
+- mathlib: Subgroup.commutator_commutator_eq_bot_of_rotate (three-subgroup lemma, ⊥ form), Subgroup.map_commutator, QuotientGroup.ker_mk', Subgroup.map_eq_bot_iff
+
+### normal_of_lcs_sandwich (C2) (25 lines, risk low)
+L G (w+1) ≤ K → K ≤ L G w → K.Normal, where L G n := (⊤ : Subgroup G).lowerCentralSeries n. Also ⁅⊤, L G w⁆ = L G (w+1).
+- depends on: 
+- mathlib: Subgroup.lowerCentralSeries_succ, commutator_comm, commutator_top_right_le_iff, Subgroup.Normal.of_commutator_le, lowerCentralSeries_normal
+
+### lcs_comm_le (C4) (50 lines, risk low)
+⁅L G i, L G j⁆ ≤ L G (i + j + 1)   (i.e. [gamma_a, gamma_b] <= gamma_{a+b})
+- depends on: three_subgroup_mod (C3), normal_of_lcs_sandwich (C2)
+- mathlib: Not in Mathlib (grep found no group version). Proof by induction on j for all i, using C3.
+
+### comm_mul_mem_iff (C5) (45 lines, risk low)
+(I1) ⁅x, y*z⁆ = ⁅x,y⁆ * ⁅y,⁅x,z⁆⁆ * ⁅x,z⁆;  (I2) ⁅y*z, x⁆ = ⁅y,⁅z,x⁆⁆ * ⁅z,x⁆ * ⁅y,x⁆;  for W ≥ L G 2: (⁅x,y⁆ ∈ W → (⁅x,y*z⁆ ∈ W ↔ ⁅x,z⁆ ∈ W)), (⁅x,z⁆ ∈ W → (⁅x,y*z⁆ ∈ W ↔ ⁅x,y⁆ ∈ W)), (⁅y,x⁆ ∈ W → (⁅y*z,x⁆ ∈ W ↔ ⁅z,x⁆ ∈ W))
+- depends on: normal_of_lcs_sandwich (C2)
+- mathlib: `group` tactic, Subgroup.mul_mem_cancel_left/right, commutator_mem_commutator
+
+### lie_lemma (Theorem L) (450 lines, risk medium)
+∀ (D : Type) [Group D] (t : ℕ) (u : ℕ → D) (H₁ : Set D) (P : Set (ℕ×ℕ)) (E : ℕ → Set D), (∀ ab ∈ P, ab.1 < ab.2 ∧ ab.2 < t) → E 2 = (fun ab => ⁅u ab.1, u ab.2⁆) '' P → (∀ w ≥ 2, ∀ x ∈ E (w+1), ∃ y ∈ closure (E w), ∃ b < t, x = ⁅y, u b⁆) → closure H₁ ⊔ L D 1 = ⊤ → (∀ x ∈ H₁, ∀ y ∈ H₁, ⁅x,y⁆ ∈ closure (E 2) ⊔ L D 2) → (∀ ab ∈ P, ∀ k ≤ ab.2, ⁅⁅u ab.1, u ab.2⁆, u k⁆ ∈ closure (E 3) ⊔ L D 3) → (∀ w ≥ 3, ∀ x ∈ E w, ∀ k < t, ⁅x, u k⁆ ∈ closure (E (w+1)) ⊔ L D (w+1)) → ∀ w ≥ 2, L D (w-1) ≤ closure (E w) ⊔ L D w
+- depends on: zn_subgroup (C1), commutator_closure_le_of (C1'), three_subgroup_mod (C3), normal_of_lcs_sandwich (C2), lcs_comm_le (C4)
+- mathlib: Only the generic commutator API. The lemma itself is new. Proof structure: A(1); B(2) by strong induction on the core index; B(w); A(2); A(w) by induction on w.
+
+### lcs_le_closure_tail (Cor L') (70 lines, risk low)
+Under lie_lemma's hypotheses, together with (∃ N, L D N = ⊥) and (∀ w > W, E w = ∅): ∀ w ≥ 1, L D (w-1) ≤ closure (⋃ v ≥ w, E' v), where E' 1 = H₁ and E' v = E v for v ≥ 2
+- depends on: lie_lemma (Theorem L)
+- mathlib: nilpotent_iff_lowerCentralSeries, lowerCentralSeries_antitone; downward induction
+
+### strictW_basics (70 lines, risk low)
+def W (u : ℕ → G) (k : ℕ) := closure {x | ∃ a b, a < b ∧ b < k ∧ x = ⁅u a, u b⁆} ⊔ L G 2;  W_normal;  W_mono;  W_succ : W u (k+1) = W u k ⊔ closure {⁅u a, u k⁆ | a < k};  Strict u t := ∀ k, 2 ≤ k → k ≤ t → W u (k-1) ≠ W u k;  Strict u t → t ≤ Nat.card G
+- depends on: normal_of_lcs_sandwich (C2)
+- mathlib: Subgroup.closure_mono, Subgroup.card_lt_of_lt (strictly increasing cards), Function.update for later edits
+
+### strict_chain_exists (S1) (220 lines, risk medium)
+[Finite G] : ∃ t u, t ≠ 1 ∧ Strict u t ∧ L G 1 ≤ W u t
+- depends on: strictW_basics, comm_mul_mem_iff (C5)
+- mathlib: Nat.findGreatest (maximal length, bounded by Nat.card G), Function.update, Subgroup.commutator_le (to find x, y with ⁅x,y⁆ ∉ W)
+
+### strict_chain_indep (S2) (70 lines, risk low)
+Strict u t → 2 ≤ t → ∀ k < t, u k ∉ closure (u '' Set.Iio k) ⊔ L G 1
+- depends on: strictW_basics, zn_subgroup (C1)
+- mathlib: Subgroup.closure_le into zn
+
+### chain_pow_mem (G1) (40 lines, risk low)
+Nat.card G = p^m → K.Normal → ∃ a, K.relIndex (K ⊔ zpowers c) = p^a ∧ c ^ (p^a) ∈ K
+- depends on: 
+- mathlib: Subgroup.relIndex_dvd_card, Nat.dvd_prime_pow, Subgroup.pow_relIndex_mem
+
+### greedy_fold (G2) (220 lines, risk medium)
+For N₀ ≤ H, ⁅H, ⊤⁆ ≤ N₀ and a list c with entries in H: Y := fold of chainOf, satisfying (Y1) chain structure (entry = c_j^(p^e), head = c_j, non-head = previous^p), (Y2) Y[i]^p ∈ cl (Y.drop (i+1)) ⊔ N₀, (Y3) cl Y ⊔ N₀ = cl c ⊔ N₀, (Y4) p^|Y| = N₀.relIndex (cl c ⊔ N₀), (Y5) the chain of c_j is nonempty ↔ N_j ≠ N_{j+1}
+- depends on: chain_pow_mem (G1), normal_of_lcs_sandwich (C2)
+- mathlib: Subgroup.relIndex_mul_relIndex, Nat.log / Nat.pow_log_le, List induction (snoc)
+
+### lcs_eq_bot_of_card (Lemma K) (60 lines, risk low)
+p.Prime → Nat.card G = p^m → L G m = ⊥
+- depends on: 
+- mathlib: IsPGroup.of_card, IsPGroup.isNilpotent, nilpotent_iff_lowerCentralSeries, Subgroup.relIndex_dvd_card, Nat.dvd_prime_pow
+
+### code_defs (reduction-file definitions) (160 lines, risk medium)
+abbrev Shape m := (Fin m → Fin (m+2)) × (Fin m → Option (Option (Fin m × Fin m))) × (Fin m → Option (Fin m)) × (Fin m → Fin m); Shape.Valid (V1–V6); start; inductive Kind | pw | r1 | r2 | r3; IdxP; Idx s := {q : Kind × Fin m × Fin m × Fin m // s.IdxP q}; Code p m := Σ s : {s // s.Valid}, (Idx s.1 → Fin p); expo; Realizes p m G X x (R0–R5) using pc.lean nf
+- depends on: 
+- mathlib: Fintype instances for products, functions, Option and Fin; classical decidability for subtypes
+
+### exists_layers (350 lines, risk medium)
+For G of order p^m with core (t, u) from S1: define cand_w and Y_w; Lie-lemma hypotheses hold in G with H₁ = univ and E w = set (cand w); hence ∀ w ∈ [1, m+1], L G (w-1) = cl (Y_w ++ … ++ Y_m)
+- depends on: lie_lemma (Theorem L), lcs_le_closure_tail (Cor L'), greedy_fold (G2), strict_chain_exists (S1), lcs_eq_bot_of_card (Lemma K), zn_subgroup (C1)
+- mathlib: List.flatMap / List.flatten lemmas, Subgroup.closure_union
+
+### layers_length (100 lines, risk medium)
+(Y_1 ++ … ++ Y_m).length = m
+- depends on: exists_layers, greedy_fold (G2)
+- mathlib: Subgroup.relIndex_mul_relIndex (telescoping), relIndex_bot_left, Nat.pow_right_injective
+
+### exists_exponents (120 lines, risk low)
+X := Y_1 ++ … ++ Y_m satisfies pc.lean's h2 and h3, so every element of cl (X.drop n) equals nf (X.drop n) e with e < p; hence (R2)–(R5) exponents exist
+- depends on: exists_layers, layers_length
+- mathlib: Reuse pc.lean suffix_hyps and nf_surj verbatim
+
+### exists_shape_valid (550 lines, risk high)
+Define wt, df, cidx and st on positions of X (offsets of layers, pos u_κ = start of the chain of candidate κ, block index for st) and prove V1–V6 and R0–R1
+- depends on: exists_layers, strict_chain_indep (S2), greedy_fold (G2), code_defs (reduction-file definitions)
+- mathlib: List.getElem_append, List.getElem_flatten, List.mem_iff_getElem; heavy index bookkeeping
+
+### existence (Theorem E) (100 lines, risk medium)
+LieLemma → ∀ p, p.Prime → ∀ m (G : Type) [Group G] [Finite G], Nat.card G = p^m → ∃ X x, Realizes p m G X x
+- depends on: exists_shape_valid, exists_exponents
+- mathlib: choice to package exponents into Idx s → Fin p (as enc/dec in pc.lean)
+
+### diag_setup (200 lines, risk medium)
+D := closure (range fun i => (X[i], X'[i])) ≤ G × G'; Z : List ↥D; Z satisfies R1–R5 with the same code (nf_map with fst/snd plus Prod.ext/Subtype.ext); Z[i] ∈ L ↥D (wt i - 1)
+- depends on: code_defs (reduction-file definitions)
+- mathlib: Subgroup.closure_closure_coe_preimage, MonoidHom.fst/snd, Subgroup.subtype, pc.lean nf_map
+
+### diag_lie (200 lines, risk medium)
+Apply lie_lemma to ↥D (u κ := Z[cidx⁻¹ κ], H₁ := free positions, E w := comm heads of weight w); with ↥D nilpotent, L ↥D (w-1) ≤ cl (Z positions of weight ≥ w)
+- depends on: diag_setup, lie_lemma (Theorem L), lcs_le_closure_tail (Cor L')
+- mathlib: IsPGroup.isNilpotent, Group.isNilpotent_prod, Subgroup.isNilpotent (instance), nilpotent_iff_lowerCentralSeries
+
+### card_diag_le (60 lines, risk low)
+Nat.card ↥D ≤ p^m
+- depends on: diag_lie
+- mathlib: pc.lean nf_surj, card_Gam pattern (surjection from Fin m → Fin p), Nat.card_le_card_of_surjective
+
+### rigidity (Theorem R) (80 lines, risk low)
+LieLemma → Realizes p m G X x → Realizes p m G' X' x → Nonempty (G ≃* G')
+- depends on: card_diag_le
+- mathlib: MonoidHom.map_closure (fst is onto), Function.Surjective.bijective_of_nat_card_le, MulEquiv.ofBijective
+
+### idx_card_parts (220 lines, risk medium)
+For valid s: |I_pw| = C(m,2), |I_1| = C(l1,2)(l2+τ), |I_2| = τ·Σ_{wt i = 2}(st i + 1), |I_3| ≤ t·C(τ,2), t ≤ l1, l1 + l2 + τ = m
+- depends on: code_defs (reduction-file definitions)
+- mathlib: Finset.card_filter, Finset.card_sigma/product, Finset.sum_comm, monotone weights ⇒ suffix
+
+### rho_bound (90 lines, risk medium)
+Valid s → 1 ≤ t → 2·Σ_{wt i = 2}(st i + 1) + (t-1)(t-2) ≤ 2·t·l2 (also giving t ≤ l2 + 1)
+- depends on: idx_card_parts
+- mathlib: choice of witnesses (V6), Finset.card_le_card_of_injOn, Finset.sum_le_sum, Gauss sum
+
+### cubic_ineq / final_arith (80 lines, risk low)
+u ≤ l1 → u ≤ l2 → 25·(l1^2·n + τ·u·(2·l2 - u + τ)) ≤ 4·(l1+n)^3 with n = l2 + τ (over ℤ); hence 25·|Idx s| ≤ 2m^3 + 50m^2
+- depends on: idx_card_parts, rho_bound
+- mathlib: nlinarith with explicit hints: sq_nonneg (2l1-3n), sq_nonneg (24 l1 - 13 n), sq_nonneg (τ - l2), case splits l2 ≤ l1 and 4 l1 ≥ n
+
+### card_code_le (Theorem C) (80 lines, risk low)
+0 < p → Nat.card (Code p m) ≤ (m+2)^(5m) · p^((2m^3+50m^2)/25)
+- depends on: cubic_ineq / final_arith
+- mathlib: Fintype.card_sigma, Fintype.card_fun, Fintype.card_prod, Fintype.card_option, Finset.sum_le_card_nsmul, Nat.le_div_iff_mul_le
+
+### g_le_card_code (70 lines, risk low)
+Existence → Rigidity → LieLemma → p.Prime → g (p^m) ≤ Nat.card (Code p m)
+- depends on: existence (Theorem E), rigidity (Theorem R)
+- mathlib: Copy of pc.lean gg_pow_le: Set.ncard_le_ncard_of_injOn, CategoryTheory.InducedCategory.isoMk, MulEquiv.toGrpIso
+
+### target_R3H1R1H2R1H2 (50 lines, risk low)
+∃ B : ℕ, ∀ a : ℕ, Erdos1160.g (3^a)^12 ≤ 3^(a^3 + B*(a+1)^2), with B = 84
+- depends on: g_le_card_code, card_code_le (Theorem C)
+- mathlib: pow_le_pow_left, pow_le_pow_right, Nat.div_mul_le_self, a+2 ≤ 3^(a+1), nlinarith
+
+## Skeptic checks
+
+### sound=True
+- Minor gap in Section 8 (count), the t = 0 case. The proof sets u := t-1 and uses E <= F + tau*l2 + tau^2/2, then the cubic inequality, whose monotonicity step assumes u is in [0, l2]. For t = 0, u = -1. The first inequality becomes C(l1,2)*n <= l1^2*n/2 - tau/2, which holds only when tau <= l1*n. That is true for valid shapes, but the proof never says why. When the core is empty, (V4) rules out every comm position. Pow keeps the weight and free has weight 1, so all weights are 1 and l2 = tau = 0. One-line fix: handle t = 0 separately. There E = |I_1| = C(l1,2)*n <= (2/27)m^3 < (2/25)m^3. This does not affect the theorem.
+- Not an error, but it should be stated explicitly. For t = 1, (V6) admits no weight-2 position (1 <= st i < 1 is impossible), so l2 = 0. The rho formula then gives 0, which is consistent. The count lemma should take l2 >= t-1 and st i < t from (V6) for t >= 1 only.
+- Effort estimate is optimistic. exists_shape_valid (positions in the flattened Y_1 ++ ... ++ Y_m, chain starts of core candidates, block indices) and idx_card_parts (cards of filtered subtypes of Kind x Fin m^3, with sums over st) are each likely 1.5-2x the estimate. Theorem L at 450 lines is plausible but tight, given the nested strong induction and the 0-based lowerCentralSeries shift.
+
+I checked the mathematics line by line and found no fatal flaw. The bound g(3^a)^12 <= 3^(a^3 + 84(a+1)^2) follows for every a.
+
+**Section 1, commutator calculus (C1-C5).**
+- C1, C1', C2, C3 and C4 are correct. C3 maps to D/N and uses the bottom-form three-subgroup lemma. C4 inducts on b with C3 applied to N = gamma_{a+b+1}.
+- I expanded identities (I1) and (I2) by hand for [x,y] = x y x^-1 y^-1, and both are exact.
+- The three membership-congruence consequences need only W >= gamma_3, because [y, gamma_2] <= gamma_3.
+
+**Section 2, Theorem L.**
+- (0): S_w <= gamma_w follows from (L2), so each M_w lies between gamma_{w+1} and gamma_w and is normal. Reducing A(w) to pairs in E_w x H_1 is valid by C1' and C4.
+- A(1) follows from (H1).
+- B(2), strong induction on the core index k. The case k <= b is (H2). For b < k, C3 with N = M_3 uses only B(2) at a and at b, both less than k, together with [u_b,u_k], [u_k,u_a] in gamma_2 <= M_2. This is the Jacobi saving, and it is valid.
+- B(w) for w >= 3 is (H3). A(2) and A(w) follow by C3. In (5b) the inner C3 uses B(w-1) and B(w), and the gamma_3 part uses [gamma_3, gamma_{w-1}] <= gamma_{w+2}.
+- The induction order (A(1), all of B(2), B(w), A(2), then A(w-1) to A(w)) has no circularity.
+- Corollary L' follows by downward induction, with the w = 1 case from (L0).
+- Mathematically this is the standard fact that if a set U in L_1 generates L_2 by brackets, it generates every L_w, written at subgroup level.
+
+**Section 3, strict chains.**
+- S1: Case 1 appends v. In Case 2, the exchange w = x or w = u_{t-1}x gives:
+  - (i) W_k(u') = W_k(u) for k <= t-1;
+  - (ii) strictness at k = t, from (I1) and the strictness of u at t;
+  - (iii) W_t(u') <= W_t(u), and [w,y] is not in W_t(u), from (I2) with [u_{t-1},y] in W_t.
+  Each step is correct, and maximality is bounded by t <= |G|.
+- S2 is correct, including k = 0, which uses t >= 2.
+
+**Section 4, Lemma G and Lemma K.**
+- Every K between N_0 and H is normal, because [H,G] <= N_0.
+- The chain for c has length log_p [K<c> : K], and c^{p^a} is in K. In the fold, later candidates come first in the list, so the last chain entry's p-th power lies in N_j = <later chains> N_0. This gives (Y2). (Y3)-(Y5) and Lemma K are correct.
+
+**Section 6, existence.**
+- In G, (H2) and (H3) hold for all k < t, because cand_{w+1} contains [y,u_k] for every entry y of Y_w.
+- Theorem L then gives Gamma_w = <Y_w> Gamma_{w+1}, so |X| = m by (Y4).
+- The pc hypotheses match pc.lean exactly. I read nf_surj (lines 74-77) and suffix_hyps (lines 283-289): the power condition, and the conjugation condition in its h3 form [g, X_j] in cl(drop(j+1)).
+- The shape conditions hold:
+  - core positions are chain starts, so X_pos(u_k) = u_k;
+  - (V4) holds with st = beta;
+  - (V6) holds by the strictness of W_beta < W_{beta+1} and (Y5);
+  - S2 makes the core chains nonempty.
+
+**Section 7, rigidity.** The diagonal argument is valid and uses no presented group.
+- Z_i = (X_i, X'_i) satisfies (R1)-(R5) with the same exponents, by nf_map on both projections.
+- Z_i lies in gamma_{wt i}(D).
+- (L0) and (L2) follow by induction on positions (pow positions are powers of a same-weight position).
+- (H1), (H2) and (H3) follow from (R3), (R4) and (R5). (H2) is needed only for cidx k <= st i = cidx b, which is exactly what (V4) and I_2 provide.
+- D is a nilpotent subgroup of the p-group G x G', so Corollary L' gives gamma_w(D) <= <Z_i : wt i >= w>. This yields the nf_surj conjugation hypothesis Z_i Z_j Z_i^-1 = [Z_i,Z_j] Z_j in cl(drop(i+1)).
+- Hence |D| <= p^m = |G|. Both projections are onto, so both are bijective, and G is isomorphic to G'.
+- The injection of isomorphism classes then follows the gg_pow_le pattern (pc.lean lines 519-546), and g in 1160.lean is the same definition.
+
+**Section 8, count.**
+- |I_pw|, |I_1|, |I_2| = tau*rho and |I_3| <= t*C(tau,2) are correct.
+- rho <= t*l2 - (t-1)(t-2)/2: my algebra matches.
+- For t >= 1, E = F + tau*l2 + tau^2/2 - (l1*n + tau)/2.
+- I re-derived all three identities in the cubic case split: (2l1-3n)^2(4l1-n), (l1+n)(4l1-n)(l1-4n), and 48(12a^2-13ab+4b^2) = (24a-13b)^2 + 23b^2. Equality holds at (3/5, 1/5, 1/5, 1/5)m.
+- The shape count (m+2)^m (m^2+2)^m (m+1)^m m^m <= (m+2)^{5m} is correct.
+
+**Numerical checks.** Script: C:\Users\monir\AppData\Local\Temp\claude\b596c85084d8d676\f9cebc68-e947-4ea6-b1ff-fe6711c31c1b\scratchpad\referee\cnt.py.
+- I brute-forced the exact index-set bound over all (l1, l2, tau, t) allowed by the constraints, for m <= 120 and m = 150, 200, 250, 300. There were 0 violations of 25|Idx| <= 2m^3 + 50m^2.
+- E <= F + tau*l2 + tau^2/2 and the cubic inequality hold on every t >= 1 configuration for m < 40.
+- The Corollary arithmetic holds for a < 400: 60a(a+1) + 12*floor((2a^3+50a^2)/25) <= a^3 + 84(a+1)^2, and a+2 <= 3^(a+1).
+- The margin is 1/12 - 2/25 = 1/300 > 0, and B = 84 is explicit.
+
+**Sources.** The proof cites no lemma from Sims, Li-Qiao or BNV. The blueprint itself says it did not re-read those sources, so there are no source claims to verify. The only gap is the t = 0 case in Section 8, and it has a one-line fix.
+
+### sound=True
+- Line estimates are optimistic by about 30-60%. The overrun is concentrated in exists_shape_valid (550 claimed, 800-1100 realistic), lie_lemma (450 claimed, 550-700), diag_lie (200 claimed, 300), greedy_fold (220 claimed, 300 once the provenance API needed downstream is included), idx_card_parts plus rho_bound (310 claimed, 400) and S1 (220 claimed, 300). For calibration, pc.lean's whole existence side is about 125 lines, and this route replaces it with about 2000.
+- exists_shape_valid is underspecified as an engineering task. As written, greedy_fold (Y1-Y5) gives no way to recover, for a global position of X = Y_1 ++ ... ++ Y_m, which candidate and exponent it came from, where the chain of candidate j starts, what the triangular block index of a cand_2 entry is, or the (j / t, j % t) decomposition of a cand_{w+1} = flatMap entry. Mathlib has none of this. Only Batteries' List.getElem_flatten (Batteries/Data/List/Scan.lean:184) helps. The fold needs to carry symbolic source tags, for example (tag, exponent) pairs together with an evaluation map, and expose an explicit chainStart function. Otherwise df, cidx and st cannot be defined cleanly. This is the single biggest schedule risk.
+- Mathlib has no lemma Subgroup.card_lt_of_lt; grep finds nothing. The bound Strict u t -> t <= Nat.card G has to be built from Subgroup.card_le_of_le and Subgroup.eq_of_le_of_card_ge (Mathlib/Algebra/Group/Subgroup/Finite.lean:159 and :115).
+- Mathlib has no lemma for C1' (a commutator of closures lies in N when the generators' commutators do). grep of GroupTheory/Commutator/Basic.lean finds none, so the blueprint is right to prove it, and the same goes for C4 ([gamma_i, gamma_j] <= gamma_{i+j}) and the three-subgroup lemma modulo N. Mathlib only has the bottom form, commutator_commutator_eq_bot_of_rotate (Commutator/Basic.lean:163). All three are easy (about 30-50 lines each).
+- chain_pow_mem (G1) as stated is missing the hypothesis p.Prime, which Nat.dvd_prime_pow (Data/Nat/Prime/Basic.lean:219) needs. Applying Subgroup.pow_relIndex_mem (GroupTheory/OrderOfElement.lean:1199) needs a [K.Normal] instance, so normality from the sandwich lemma has to be installed with haveI at each use. Lemma K likewise needs Finite G, derived from Nat.card G = p^m > 0, and a Fact p.Prime instance for IsPGroup.isNilpotent (GroupTheory/Nilpotent.lean:1208).
+- Some statement syntax is not Lean as written. In W_succ, closure {⁅u a, u k⁆ | a < k} must be written {x | ∃ a < k, x = ⁅u a, u k⁆}. In Realizes, indexing X[i] for i : Fin m inside a Prop needs a length proof in scope. Representing X as Fin m -> G and using nf (List.ofFn X) avoids dependent getElem proofs throughout existence, rigidity and diag_setup.
+- lcs_le_closure_tail carries a hypothesis (∀ w > W, E w = ∅) that its proof never uses; nilpotency, (∃ N, L D N = ⊥), is enough. Harmless, but drop it to simplify the D-side instantiation.
+- Lower-central-series names: in this Mathlib the API lives in namespace Subgroup with S.lowerCentralSeries (GroupTheory/Nilpotent.lean:395, where step 0 is S and step n+1 is ⁅·, S⁆). The root-level names (lowerCentralSeries_succ, nilpotent_iff_lowerCentralSeries and others) are deprecated aliases (Nilpotent.lean:1286ff). The blueprint's L D n := (⊤ : Subgroup D).lowerCentralSeries n is correct, but code copied from older examples will raise deprecation warnings or break.
+- Fintype/Nat.card on Code p m, a Σ over the subtype {s // Valid} of (Idx s -> Fin p) with Prop-valued predicates, invites instance diamonds between classical and derived Fintype instances when using Fintype.card_sigma. Prefer Nat.card with Finite instances and Nat.card_sigma or Finset sums over Finset.univ.filter. Code must have a Finite instance, otherwise Set.finite_univ fails in g_le_card_code (and Nat.card would silently be 0).
+- Module system: 1160.lean uses `module`, `public import FormalConjecturesUtil` and `@[expose] public section`, while pc.lean is a plain file. The final file must either import 1160's module from a non-module file, or reuse pc.lean's local copy gg and close the gap with gg = Erdos1160.g by rfl (g is exposed). Low risk, but it needs checking at build time, which this review did not do (no lean or lake was run).
+
+Verdict: the plan is sound, but the schedule is optimistic. Mathlib has the core infrastructure the blueprint names. I read this local Mathlib directly rather than relying on the blueprint's list:
+- Commutator lemmas (GroupTheory/Commutator/Basic.lean): commutator_commutator_eq_bot_of_rotate :163, map_commutator :296, commutator_le :146, commutator_comm :183, commutator_top_right_le_iff :241 (⁅H,⊤⁆ ≤ H ↔ H.Normal), Subgroup.Normal.of_commutator_le :415, commutatorElement_inv :66.
+- Lower central series and nilpotency (GroupTheory/Nilpotent.lean): Subgroup.lowerCentralSeries :395, lowerCentralSeries_normal :675, Subgroup.isNilpotent instance :683, nilpotent_iff_lowerCentralSeries :508, top_lowerCentralSeries_prod :1056, Group.isNilpotent_prod :1063, IsPGroup.isNilpotent :1208.
+- Index lemmas (GroupTheory/Index.lean): relIndex_mul_relIndex :127, relIndex_bot_left :272, relIndex_dvd_card :360. Also Subgroup.pow_relIndex_mem (OrderOfElement.lean:1199).
+- Others: closure_closure_coe_preimage (Algebra/Group/Subgroup/Lattice.lean:409), Function.Surjective.bijective_of_nat_card_le (SetTheory/Cardinal/Finite.lean:132), Set.ncard_le_ncard_of_injOn (Data/Set/Card.lean:924).
+- Not in Mathlib, all easy: C1', C4 and the three-subgroup lemma modulo N.
+
+Mathematics, checked by hand:
+- Theorem L, steps A(1), B(2) (strong induction on k), B(w), A(2) and A(w). Each three-subgroup application has the right two rotated terms. Normality of M_w follows from S_w <= gamma_w via L2.
+- S1 exchange cases (i)-(iii), including both C5 identities, which I expanded by hand.
+- S2.
+- The G-side verification of H1-H3 by the Z_N(u_k) subgroup argument.
+- The D-side derivation of H1-H3 from R3-R5, of L0 and L2 from R1 and V2-V4, and of the nf_surj hypotheses. Only the trivial [gamma_a, gamma_b] <= gamma_{b+1} is needed there.
+- Rigidity via |D| <= p^m and surjective projections.
+- All three cubic-inequality certificates, by polynomial identity and random tests.
+
+Arithmetic, checked with a small Python script (C:\Users\monir\AppData\Local\Temp\claude\b596c85084d8d676\f9cebc68-e947-4ea6-b1ff-fe6711c31c1b\scratchpad\rev_chk.py was a draft; the checks themselves ran inline):
+- 25|Idx| <= 2m^3 + 50m^2 holds for all m <= 70 under the relaxed constraints t <= l1, t <= l2 + 1 and the rho bound, with max E/m^3 = 0.0791 < 2/25.
+- The final inequality with B = 84 holds for a < 150.
+- I did not consult Li-Qiao, Su-Xia or Sims. The proof is self-contained and the review needed none of them.
+
+Corrected per-lemma estimates (blueprint figure, then mine):
+
+| Lemma | Blueprint | Corrected |
+|---|---|---|
+| C1 | 35 | 40 |
+| C1' | 25 | 30 |
+| C2 | 25 | 30 |
+| C3 | 30 | 30 |
+| C4 | 50 | 50 |
+| C5 | 45 | 50 |
+| Theorem L | 450 | 600 |
+| Cor L' | 70 | 80 |
+| strictW_basics | 70 | 90 |
+| S1 | 220 | 300 |
+| S2 | 70 | 70 |
+| G1 | 40 | 50 |
+| G2 with provenance API | 220 | 300 |
+| Lemma K | 60 | 70 |
+| code_defs | 160 | 200 |
+| exists_layers | 350 | 400 |
+| layers_length | 100 | 120 |
+| exists_exponents | 120 | 150 |
+| exists_shape_valid | 550 | 900 (high variance) |
+| existence | 100 | 150 |
+| diag_setup | 200 | 250 |
+| diag_lie | 200 | 300 |
+| card_diag_le | 60 | 60 |
+| rigidity | 80 | 80 |
+| idx_card_parts | 220 | 300 |
+| rho_bound | 90 | 120 |
+| cubic/final arith | 80 | 120 |
+| card_code_le | 80 | 120 |
+| g_le_card_code | 70 | 70 |
+| target | 50 | 60 |
+
+The total comes to about 5200 lines, with a plausible range of 4500-6500. That is about 9x pc.lean (561 lines). I agree that it is not feasible in one session.
+
+Recommendations:
+1. Fix the reduction file (Code, Realizes, LieLemma) first, using Fin m -> G rather than List.
+2. Prove LieLemma first. It is independent and its risk is moderate.
+3. Build the greedy fold so it returns tagged (source, exponent) entries with an explicit chain-start function, so the shape data can be read off from tags. Without this, exists_shape_valid will balloon.
+4. In idx_card_parts, prove only upper bounds by injection into simpler finsets, not the exact cardinalities.
+5. The H1-H4 split in possible_reduction is well-balanced and lets the G-side, D-side and count be developed in parallel.
+
+## Research reports
+
+### li-qiao
+{
+ "key": "li-qiao",
+ "found": true,
+ "coefficient": "2/25 (the simplest route with c < 1/12: Sims' framework as recalled by Li-Qiao, using the trivial count N_p <= C(r1,2)*r2 and no Grassmannian estimate). The 2/25 optimisation is my own computation; the paper does not state it. The paper's own theorems give 2/27 (Theorem 1.1).",
+ "statement": "SOURCE CONTENT (Li-Qiao, arXiv:2610.14509v3, 100 pp. Page numbers are PDF pages.)\n(1) Thm 1.1 (p.5): f(p^m) <= p^{(2/27)m^3-(4/9)m^2+O(m)}, with an absolute constant. The proof uses all of Parts I-III plus [BLQR25] for Frattini class 2. Its constants are not explicit.\n(2) Sims' bound itself is only recalled, not re-proved (p.5: \"proof was presented in [BNV07, Chapter 5]\"). The recalled framework:\n- Prop 2.4 = BNV Thm 5.6 (rigidity).\n- Prop 2.5 = BNV Sec 5.5 (data count).\n- eq (22) = BNV Prop 5.5: N_p <= (1/2)r1^2(r2-(s-1)) + O((r1+r2)^{8/3}).\n- eq (42), p.19, \"see the derivation for Eq. (5.14) in [BNV07]\": log_p #(commutator arrays | data, power words) <= N_p(r1,r2,s) + (C(r1,2)+(s-1)r2-(s-1)^2/2)(m-r1-r2) + ((s-1)/2)(m-r1-r2)^2 + O(m^2).\n- p.43 (after Remark 6.4): the trivial bound N_p <= C(r1,2)*r2.\n(3) Lemma 11.2 (p.68), fully explicit: for every p, K>=1 and m>=3, #{nonabelian G of order p^m with r2<=K} <= p^{(2/27)(K/(K+1))m^3+(5K+11)m^2}.\n(4) Sec 12 (p.73), \"rough estimate\", saturated range r2 > C(s-1,2): s <= C*sqrt(m2) (eq 135), so Thm 6.3 gives E <= (2/27)(m-delta)^3 + O(m^{5/2}).\n\nDERIVED STATEMENT (my computation from the stated framework; please check it): for every prime p and m>=1,\n  log_p f(p^m) <= (2/25)m^3 + (15/2)m^2 + 1.\n2/25 = 0.08 < 1/12. Hence g(3^a)^12 <= 3^{a^3+102(a+1)^2}, so B = 102.\nThe only inputs are:\n- Prop 2.4 (BNV Thm 5.6);\n- the strictly increasing core flag 0=d_1<...<d_s=r2 (BNV Prop 5.2), which gives d_k >= k-1 and s-1 <= r2 (Lemma 2.3);\n- naive counting of the arrays over their restricted index ranges.",
+ "proof_outline": [
+  "Series (LQ Sec 2, eqs 15-16, p.11): lower central series G_{i+1}=[G_i,G]. Layers L_i=G_i/G_{i+1}, with r_i=d(L_i) <= s_i=log_p|L_i| and m_i=sum_{j>=i} s_j. Hence r1+m2 <= m and r2+m3 <= m2. Abelian groups number at most p^m (Lemma 2.7(iv)).",
+  "Sims rank and core (Def 2.1, eqs 17-20, p.11): s=min{d(H): G_2=[H,H]G_3}, equivalently the least dim U <= V=G/Phi(G) with beta(U,U)=W=G_2/G_3Phi(G_2). Lemma 2.2 (BNV Prop 3.8): G_i=H_i for i>=2, so G_{i+1}=[G_i,H].",
+  "Sims generating set (Sec 2.1, pp.12-13). Core basis g_{1,1..s} with W_k=span{[g_{1,a},g_{1,b}]: a<b<=k} strictly increasing, 0=d_1<d_2<...<d_s=r2 (BNV Prop 5.2). Hence d_k >= k-1 and s-1 <= r2 (Lemma 2.3 = BNV Cor 5.3). Extend to g_{1,1..r1} (Burnside basis theorem). g_{2,j}=[g_{1,f(j)},g_{1,k}] for d_{k-1}<j<=d_k (eqs 23-24). For i>=3, g_{i,j} is chosen among [g_{i-1,a},g_{1,b}] with b<=s, using G_{i+1}=[G_i,H] (BNV Prop 3.7).",
+  "Relation arrays: relative orders a(i,j) (eq 25), Sims normal form prod g_{i,j}^{e(i,j)} with 0<=e<p^{a(i,j)} (eq 26), power words b(i,j,u,v) (eq 27), commutator coefficients c(i,j,k,u,v) of [g_{i,j},g_{1,k}] (eq 28). Every coefficient lies in [0,p^{a(u,v)}).",
+  "Rigidity, Prop 2.4 (= BNV Thm 5.6, p.14, cited, not proved). The isomorphism class is determined by p, c, s, (r_i), (d_k) and the arrays over RESTRICTED index ranges: c(1,j,k,.) for all j<k<=r1; c(2,j,k,.) only for k<=s and j>d_{k-1}; c(i,j,k,.) for i>=3 only for core k<=s. This is where consequences of relations are used: the commutators left out are forced by Hall-Witt/Jacobi. LQ Sec 2.3 (p.18) carries out the Lie-level Jacobi recovery of [g2_j,g1_k] for j<=d_{k-1}. Lemma 4.1(iii) shows the bracket is determined by L1xL1 and L_i x C_core. LQ Thm 5.2 (p.28) gives a coordinate-preserving isomorphism G^(0)_k/G^(0)_{u+1} -> G^(1)_k/G^(1)_{u+1} when all generator commutators agree through weight u; this is the analogue of pc.lean's iso_Gam, with relative orders p^a.",
+  "Data count (Prop 2.5, p.15, proof as in Lemma 11.2): (c,s,(r_i),(d_k)) <= m^2 2^{2m}; f and the index pairs <= m^{2m}; relative-order arrays <= C(m-1, sum r_i - 1) <= 2^{m-1}. Total <= m^{2m+2}2^{3m-1} <= p^{5m^2}.",
+  "Power words (Sec 3, p.22): naive bound p^{m*sum r_i} <= p^{m^2}. Thm 3.1 eq (47) refines this but is not needed.",
+  "Commutator arrays, naive count over the Prop 2.4 ranges: exponent <= C(r1,2)m2 + [sum_{k=1}^s (r2-d_{k-1})]m3 + s*sum_{i>=3} r_i m_{i+1}. Using d_k >= k-1 and sum_{3<=i<j} s_i s_j <= m3^2/2, this is <= C(r1,2)m2 + (s r2-(s-1)(s-2)/2)m3 + s m3^2/2. This is LQ (42) with the trivial N_p <= C(r1,2)r2 (p.43), up to O(m^2).",
+  "Optimisation (mine). Put s'=s-1, with 0<=s'<=min(r1,r2). The exponent is <= Phi + (3/2)m^2, where Phi = r1^2 m2/2 + (s' r2 - s'^2/2)m3 + s' m3^2/2. Phi increases in r2, so set r2=m2-m3. It then increases in m3 on [0,m2-s'], so set m3=m2-s'. This gives Phi <= (m2/2)(r1^2 + s'(m2-s')).",
+  "Finish the optimisation by two cases. If r1 >= m2/2: Phi <= r1^2 m2/2 + m2^3/8 <= (2/25)(r1+m2)^3, because 16(r1+m2)^3 - 100r1^2 m2 - 25m2^3 = (2r1-3m2)^2(4r1-m2) >= 0. If r1 < m2/2: s' <= r1 gives Phi <= r1 m2^2/2, and 4(1+t)^3 > 25t for all t >= 0. Equality holds at r1=3m/5, m2=2m/5, r2=m3=s'=m/5, which a brute-force integer search also found (max E/m^3 = 0.0798 at m=240).",
+  "Sum the counts: f(p^m) <= p^m + p^{5m^2} * p^{m^2} * p^{(2/25)m^3+(3/2)m^2}. Hence log_p f(p^m) <= (2/25)m^3 + 7.5m^2 + 1. For p=3: 12 log_3 g(3^a) <= (24/25)a^3 + 90a^2 + 12 <= a^3 + 102(a+1)^2.",
+  "Sanity checks (mine): (a) If only sum_k(r2-d_{k-1}) <= s r2 is used, i.e. without the strict flag, the same optimisation gives 5/54 = 0.0926 > 1/12, so BNV Prop 5.2 is essential. A flag with d_k >= (k-1)/2 gives 0.096. (b) Adding Sims' N_p saving (22) gives LQ's B(x,y,z,u) (Sec 11, p.70) and the bound 2/27 ([BNV07, Lemma A.2]).",
+  "LQ's own sharper route, for reference only:\n- Theorem 5.1 (p.26): commutator count via Lie brackets with breadths, Props 4.2-4.3 and Section 5.\n- Theorem 6.3 (p.42): joint bound E <= r1^2 m2/2 + X + m2 z_bal/2 + 3m2m3 + 2m2e + r1 delta + Delta_p.\n- Saturated range: Delta_p = 0 (Prop 6.5).\n- Nonsaturated range: Theorem 7.1, proved via Lemma 8.1, Lemma 8.2 and Prop 9.2; for p >= 3, N_p <= (r2-s+1)C(r1,2) + O(m^2), with no binary endpoint.\n- Theorem 11.3 then shows f_ns <= p^{2m^3/27 - A m^2}, and Sections 12-14 plus BLQR25 finish Theorem 1.1."
+ ],
+ "prerequisites": [
+  "Lower central series, with [G_i,G_j] <= G_{i+j} and finite abelian layers L_i; Burnside basis theorem (Frattini quotient).",
+  "Sims core: Lemma 2.2 = BNV Prop 3.8 (G_2=[H,H]G_3 implies G_{i+1}=[G_i,H] for i>=2).",
+  "BNV Prop 5.2: a core basis with strictly increasing flag d_1=0<d_2<...<d_s=r2, giving s-1<=r2 (BNV Cor 5.3 = LQ Lemma 2.3). Cited only in LQ; essential for 2/25.",
+  "BNV Prop 3.7: higher-weight generators can be chosen among [g_{i-1,a}, g_{1,b}] with b<=s.",
+  "Sims normal form with relative orders p^{a(i,j)} (LQ eq 26), a generalisation of pc.lean's nf/nf_surj (relative order p^a instead of p).",
+  "Rigidity BNV Thm 5.6 = LQ Prop 2.4 (restricted commutator ranges determine the group). The coordinate-preserving iso extension LQ Thm 5.2 is the analogue of iso_Gam. LQ Secs 5.1-5.3 (Thm 5.6, Lemma 5.7, Cor 5.8, Prop 5.9) give an induction-on-excess comparison argument that could serve as a template for proving the needed rigidity without BNV.",
+  "Counting: LQ Prop 2.5 (data <= m^{2m+2}2^{3m-1}), naive power-word count p^{m^2}, naive commutator count, and the abelian count <= p^m.",
+  "Elementary polynomial inequalities: (2r1-3m2)^2(4r1-m2) >= 0, and 4(1+t)^3 > 25t (from 12t^2-13t+4 > 0)."
+ ],
+ "sources": [
+  "Li-Qiao, From almost tight p-group enumeration to 2-group domination among finite groups, arXiv:2610.14509v3 (12 Nov 2026): https://arxiv.org/abs/2610.14509v3",
+  "HTML v3: https://arxiv.org/html/2610.14509v3. The WebFetch conversion truncates at Sec 5.2, so Secs 6-15 were read from the PDF.",
+  "PDF v3: https://arxiv.org/pdf/2610.14509v3. Text extracted locally to C:\\Users\\monir\\AppData\\Local\\Temp\\claude\\b596c85084d8d676\\f9cebc68-e947-4ea6-b1ff-fe6711c31c1b\\scratchpad\\lq\\lq.txt",
+  "Sec 1.1, eqs (3) and (7), Thm 1.1 (p.5): Sims and Newman-Seeley bounds recalled; main theorem.",
+  "Sec 2 (pp.11-15): Def 2.1, Lemma 2.2 [BNV Prop 3.8], Lemma 2.3 [BNV Cor 5.3], eq (21) N_p, eq (22) [BNV Prop 5.5], Sec 2.1 generator construction [BNV Prop 5.2, Prop 3.7], Prop 2.4 [BNV Thm 5.6], Prop 2.5 [BNV Sec 5.5].",
+  "Sec 2.3 (pp.17-19): Jacobi recovery of omitted values. Sec 2.4 (p.19): eq (42) [BNV eq (5.14)]. Sec 2.5 (pp.19-21): Lemma 2.7, finite-field estimates (Gaussian binomials, rank <= 2a forms, |GL_d(q)| <= q^{d^2}, subgroups of order p^b <= p^{b(e-b+1)} [BNV Lemma 20.15]).",
+  "Sec 3, Thm 3.1, eq (47) (p.22); Sec 4, Lemma 4.1, Props 4.2-4.3, eqs (52)-(54) (pp.23-26); Sec 5, Thm 5.1 eq (55), Thm 5.2, Prop 5.5, Thm 5.6 (adjoint cocycles), Lemma 5.7, Cor 5.8, Props 5.9-5.10, Cor 5.11 (pp.26-40).",
+  "Sec 6: Lemma 6.1, Lemma 6.2, Thm 6.3 eq (85), Prop 6.5, and the trivial bound N_p <= C(r1,2)r2 (pp.40-43). Part II: Thm 7.1, Prop 7.2, Lemmas 8.1-8.2, Prop 9.2 (pp.44-53).",
+  "Sec 11: eq (123), Lemma 11.1, Lemma 11.2 (explicit), Thm 11.3, B(x,y,z,u) eqs (129)-(130) [BNV Lemma A.2] (pp.66-71). Sec 12: eq (135) and the rough O(m^{5/2}) estimate (pp.72-73).",
+  "Blackburn-Neumann-Venkataraman, Enumeration of Finite Groups (CUP 2007), Ch. 5: Prop 3.7, Prop 3.8, Prop 5.2, Cor 5.3, Prop 5.5, Thm 5.6, eq (5.14), Lemma A.2. These are cited by LQ and were not read by me."
+ ],
+ "difficulty_notes": "1. What the paper proves itself. Li-Qiao do not re-prove Sims' 2/27 + O(m^{8/3}) bound. They recall it from BNV Ch. 5 (eqs 22 and 42 are cited to BNV Prop 5.5 and eq 5.14). Their own complete theorem (Thm 1.1) is about 100 pages and depends on BLQR25. Its implied constants are absolute but never computed: the \"sufficiently large absolute constant\" C in Prop 9.2, h0 in Prop 10.4, C in Thm 11.3, epsilon in Prop 12.1. Lemma 11.2 and Lemma 2.7 are the only fully explicit cubic bounds, and Lemma 11.2 only covers bounded r2.\n\n2. The 2/25 shortcut. Plugging the trivial N_p <= C(r1,2)r2 (stated by LQ, p.43) into the naive Sims count (42) already gives 2/25 < 1/12. This is my own optimisation, which I checked by hand and by brute force over integer parameters; LQ do not state it anywhere. It needs no Grassmannian or totally-isotropic counting at all, and every constant is explicit: log_p f(p^m) <= (2/25)m^3 + 7.5m^2 + 1, so B = 102.\n\n3. What is not in the paper. The two group-theoretic inputs this shortcut relies on are only cited by LQ, not proved:\n- BNV Prop 5.2, the strict flag d_k >= k-1. It is essential: without it the bound degrades to 5/54 > 1/12.\n- BNV Thm 5.6, rigidity with the restricted commutator set.\n\n4. Lean burden.\n(a) Generalise pc.lean's nf and iso_Gam from relative order p to relative orders p^{a(i,j)} along the lower central series. LQ Thm 5.2 is essentially this statement for quotients G_k/G_{u+1}.\n(b) Prove the restricted-relation rigidity, i.e. that the omitted commutators are determined. They are:\n- [g_{2,j},g_{1,k}] for j <= d_{k-1};\n- [g_{i,j},g_{1,k}] for k > s;\n- [g_{i,j},g_{u,v}] for u >= 2.\nThe determination uses Hall-Witt identities, by induction on weight or excess. LQ Sec 2.3, Lemma 4.1 and Secs 5.1-5.3 (Prop 5.9 with all differences zero) give a written Lie-ring and comparison version of this argument.\n(c) Formalise the Sims core: Lemma 2.2 (BNV Prop 3.8) and BNV Prop 5.2. I did not find a proof of Prop 5.2 in LQ, and a naive greedy argument did not obviously work.\n(d) The counting and the cubic inequality are routine.",
+ "effective": true,
+ "error_term": "Derived route, explicit: E(m) = (15/2)m^2 + 1. This is 5m^2 for the data count (m^{2m+2}2^{3m-1}), m^2 for power words, (3/2)m^2 for lower-order commutator terms, and +1 for the abelian groups. For the Lean target this gives B = 102. In LQ: Thm 1.1 error -(4/9)m^2 + O(m) with an absolute but unspecified constant; Lemma 11.2 error (5K+11)m^2 (explicit, r2<=K only); Sec 12 rough estimate O(m^{5/2}) (saturated range); recalled Sims O(m^{8/3}) and Newman-Seeley O(m^{5/2})."
+}
+
+### sims-expositions
+{
+ "key": "sims-expositions",
+ "found": true,
+ "coefficient": "2/27 (Sims 1965, as presented in BNV07 Ch. 5). Own computation, not taken from a source: if you drop Sims' hardest step (the count N_p of alternating maps with given Sims rank, BNV Prop 5.5) and use the trivial count instead, the rest of the same framework gives 2/25 = 0.08. That is below 1/12 (24/25 < 1, slack 1/300), with an O(m^2) error.",
+ "statement": "Sims (Proc. LMS (3) 15 (1965) 151-166): log_p f(p^m) <= (2/27) m^3 + O(m^{8/3}). Newman-Seeley (unpublished; proof in BNV07 Ch. 5) improve the error to O(m^{5/2}).\n\nThe framework, as recalled in Li-Qiao arXiv:2610.14509v3 Section 2 (citing BNV): every p-group has a restricted presentation (a \"Sims generating set\" plus arrays). The isomorphism class is determined by a reduced set of commutator relations, and log_p of the number of such arrays is at most (Li-Qiao Eq. (42), citing BNV Eq. (5.14)):\nN_p(r1,r2,s) + (C(r1,2) + (s-1) r2 - (s-1)^2/2)(m-r1-r2) + ((s-1)/2)(m-r1-r2)^2 + O(m^2).\nOn top of that come p^{O(m^2)} power words and p^{O(m log m)} discrete data.\n\nHere N_p(r1,r2,s) is log_p of the number of surjective alternating maps Lambda^2 F_p^{r1} -> F_p^{r2} with Sims rank s. BNV Prop 5.5 (= Li-Qiao Eq. (22)) gives N_p <= (1/2) r1^2 (r2-(s-1)) + O((r1+r2)^{8/3}). The second, Newman-Seeley, bound adds (1/2) r1 r2 (s-1) with error O(m^{5/2}).\n\nOptimizing over x=r1/m, y=r2/m, z=m_3/m, sigma=s/m gives x^2(1-x-sigma)/2 + (sigma y - sigma^2/2) z + sigma z^2/2 <= 2/27, attained at sigma=0, x=2/3. This is Sims' expression M on p.165, per Poonen, arXiv:math/0608491 Section 10. I checked the maximum numerically.",
+ "proof_outline": [
+  "SETUP (Li-Qiao Sec. 2): G_i is the lower central series, L_i = G_i/G_{i+1}, r_i = d(L_i), s_i = log_p|L_i|, m_i = sum_{j>=i} s_j. V = L1/pL1 (dim r1) and W = L2/pL2 (dim r2). The commutator induces an alternating map beta: V x V -> W.",
+  "SIMS RANK / CORE (Li-Qiao Def. 2.1 and Eq. (20)): s = min{d(H) : G_2 = [H,H]G_3}, equivalently the least dim U <= V with beta(U,U) = W. A minimizing H is a Sims core. Lemma 2.2 (= BNV Prop 3.8): if G is nilpotent and G_2 = [H,H]G_3, then H_i = G_i for 2 <= i <= c. Hence G_{i+1} = [G_i, H] for i >= 2, so the deeper layers are generated by commutators with core generators only.",
+  "STRICT FLAG (Poonen Prop. 10.1, which credits Sims Prop. 2.1; Li-Qiao Sec. 2.1): a minimal U has a basis x_1..x_s with beta(x_i, x_{i+1}) not in beta(V_i,V_i). So W_k = beta(V_k,V_k) is strictly increasing: 0 = d_1 < d_2 < ... < d_s = r2. Consequence: s-1 <= r2 <= C(s,2) (Li-Qiao Lemma 2.3 = BNV Cor. 5.3).",
+  "SIMS GENERATING SET (Li-Qiao Sec. 2.1, Eqs. (23)-(28)): g_{1,1..s} is the core, extended to g_{1,1..r1}. g_{2,j} = [g_{1,f(j)}, g_{1,k}] for d_{k-1} < j <= d_k, adapted to the flag. g_{3,j} is chosen among [g_{2,a}, g_{1,b}] with b <= s and a > d_{b-1}; for i >= 4, g_{i,j} is chosen among [g_{i-1,a}, g_{1,b}] with b <= s. The data are relative orders a(i,j) with sum = m, a unique normal form prod g_{i,j}^{e(i,j)} with 0 <= e < p^{a(i,j)}, power words b(i,j,u,v), and commutator coefficients c(i,j,k,u,v) of [g_{i,j}, g_{1,k}].",
+  "RIGIDITY (Li-Qiao Prop. 2.4 = BNV Thm. 5.6): the isomorphism class is determined by p, c, s, (r_i), (d_k), a, b and c restricted to three ranges. (i) c(1,j,k,u,v) for all 1 <= j < k <= r1 and u >= 2. (ii) c(2,j,k,u,v) only for k <= s, d_{k-1} < j <= r2 and u >= 3. (iii) c(i,j,k,u,v) for i >= 3 only for k <= s and u >= i+1. Proof idea, from the analogous algebra result Poonen Prop. 10.5: a non-core generator acts on G_2 = H_2 through its action on the core generators. For i = 2 and j <= d_{k-1}, use strong induction on k. For i >= 3, use induction on i via g_{i,j} = [g_{i-1,a}, g_{1,b}] with b <= s.",
+  "COUNT: discrete data <= p^{O(m log m)} (Li-Qiao Prop. 2.5: 2^{O(m)} m^{2m}). Power words <= p^{O(m^2)} (Li-Qiao Sec. 3, 'naive bound'). Commutator arrays: Li-Qiao Eq. (42). Poonen's algebra version, which he says equals Sims' M on p.165 up to O(n^2): (m1^2/2)(n-1-m1-s) + (m2 s - s^2/2)(n-1-m1-m2) + sum_{i>=3} m_i s (n-1-m1-...-m_i) + O(n^{8/3}). The term -s^2/2 uses d_{l-1} >= l-2.",
+  "WHERE O(m^{8/3}) ARISES: only in the bound on N_p(r1,r2,s), the alternating maps with Sims rank s. Sources: Sims Sec. 2.4-2.6 (cited by Poonen Prop. 10.4), BNV Prop. 5.5, and the ring analog Kruse-Price Thm. 5.4 (cited in Blackburn-McLean Lemma 2.2(1)). All other terms are O(m^2) or O(m log m).",
+  "MECHANISM, verified for the 5/2 version only (Blackburn-McLean arXiv:2107.13215 Lemma 2.2(2)). A Sims lemma (their Lemma 2.1 = Kruse-Price Lemma 5.5) says dim(image of a subspace X) - dim X <= t - s + 1. Split the r generators into g ~ r/f blocks of size f. For each block pair, the image of (V_i+V_j)^2 lies in some W_ij of dimension d = 2f + t - s + 1. Choose W_ij (Gaussian binomial <= p^{d(t-d+1)}), then the products inside W_ij (p^d each). With f = floor(sqrt r) this gives r^2(t-s) + (1/2) r s t + O(m^{5/2}).",
+  "MECHANISM FOR 8/3 (my inference, consistent with the above but NOT read in Sims or BNV): use the same block scheme with a crude subspace count (<= p^{t^2} per pair) and blocks of size f ~ m^{2/3}. The error is r^2 f + (r/f)^2 t^2, which is minimized at f^3 ~ t^2 and gives O(m^{8/3}).",
+  "OPTIMIZATION: for Sims' M, max x^2(1-x-sigma)/2 + (sigma y - sigma^2/2) z + sigma z^2/2 = 2/27 at sigma=0, x=2/3 (numerical check). Newman-Seeley / Blackburn-McLean handle the 5/2 version with a case split: use the 8/3 bound where there is constant slack (for rings x <= 3/5) and the second bound elsewhere.",
+  "OWN OBSERVATION (proved here, not in any source): replace N_p by the trivial C(r1,2) r2. The exponent becomes T = x^2(1-x)/2 + (sigma y - sigma^2/2) z + sigma z^2/2 with 0 <= sigma <= min(x,y) and x+y+z <= 1. T is increasing in z and in sigma, so z = 1-x-y and sigma = min(x,y). If y <= x: T <= x^2(1-x)/2 + (1-x)^3/8, whose critical points satisfy 15x^2 - 14x + 3 = 0, i.e. x = 3/5 (value 2/25) or x = 1/3. If y >= x: T <= x(1-x)^2/2 <= 2/27. So sup T = 2/25, attained at r1 = 3m/5 and r2 = m_3 = s = m/5. Integer maxima of Eq. (42) with this substitution: 0.078, 0.079, 0.0795 times m^3 at m = 60, 120, 240. So log_p f(p^m) <= (2/25)m^3 + O(m^2), effective, and 12*(2/25) = 24/25 < 1 is enough for the Erdos-1160 step."
+ ],
+ "prerequisites": [
+  "Lower central series facts: [G_i, G_j] <= G_{i+j}, and each L_i is abelian, generated by images of commutators [x, g_{1,b}] with x in G_{i-1}.",
+  "Burnside basis theorem / Frattini non-generator property, used to get G_2 = [H,H]G_3 from beta(U,U) = W = G_2/G_3 G_2^p.",
+  "BNV Prop. 3.8 (Li-Qiao Lemma 2.2): if G is nilpotent and G_2 = [H,H]G_3, then H_i = G_i for i >= 2.",
+  "Sims Prop. 2.1 / Poonen Prop. 10.1: strict-flag basis for a minimal core. This gives d_{k-1} >= k-2 and s-1 <= r2 (BNV Cor. 5.3). It is essential: without the saving from d_{k-1} the trivial-count variant reaches about 0.0926 > 1/12.",
+  "Normal form with relative orders p^{a(i,j)} (Li-Qiao Eq. (26)). pc.lean uses order-p steps, so it needs refining or adapting.",
+  "Reduced rigidity theorem BNV Thm. 5.6 (Li-Qiao Prop. 2.4): the omitted commutator relations are consequences of the retained ones. This replaces pc.lean's iso_Gam, which needs all pc relations.",
+  "Counting lemmas: number of arrays = p^{sum of slot sizes}. Each coefficient vector over u >= t contributes m_t. Use sum_{i>=3} s_i m_{i+1} <= m_3(m_3-1)/2.",
+  "Discrete-data bound p^{O(m log m)} (Li-Qiao Prop. 2.5) and power words <= p^{m^2}.",
+  "Only for the full 2/27: a Sims-type lemma dim beta(X,X) - dim X <= r2 - s + 1 (ring version Kruse-Price Lemma 5.5) and the block-decomposition count (BNV Prop. 5.5)."
+ ],
+ "sources": [
+  "Li-Qiao, arXiv:2610.14509v3, https://arxiv.org/html/2610.14509v3 : Sec. 1.1 (history; 8/3 due to Sims, 5/2 Newman-Seeley with proof in BNV Ch. 5); Sec. 2 Def. 2.1 (Sims rank), Lemma 2.2 (= BNV Prop. 3.8), Lemma 2.3 (= BNV Cor. 5.3), Eq. (20); Sec. 2.1 Eqs. (23)-(28) (Sims generating set and arrays); Prop. 2.4 (= BNV Thm. 5.6, with index ranges); Prop. 2.5 (p^{O(m log m)}); Eq. (22) (= BNV Prop. 5.5, both N_p bounds); Sec. 2.4 Eq. (42) (commutator-array exponent, citing BNV Eq. (5.14)); Remark 4.4; Sec. 3 (power words, naive p^{O(m^2)}).",
+  "B. Poonen, The moduli space of commutative algebras of finite rank, arXiv:math/0608491, https://ar5iv.labs.arxiv.org/html/math/0608491 : Sec. 10 'Dimension: upper bound', an explicit adaptation of Sims. Prop. 10.1 (strict-flag basis, proof 'as in' Sims Prop. 2.1); Cors. 10.2-10.3; Prop. 10.4 (count q^{(m^2/2)(n-s)+O((m+n)^{8/3})}, proof 'see Sims Sec. 2.4-2.6'); Prop. 10.5 (data ranges and inductive proof); Prop. 10.6 proof (term-by-term count, equal to Sims' M on p.165 up to O(n^2)).",
+  "S. R. Blackburn and K. R. McLean, The enumeration of finite rings, arXiv:2107.13215 (JLMS 106 (2022) 3240-3262), https://ar5iv.labs.arxiv.org/html/2107.13215 : Sec. 2 Sims dimension; Lemma 2.1 (= Kruse-Price Lemma 5.5); Lemma 2.2(1) (8/3 bound = Kruse-Price Thm. 5.4, cited only) and 2.2(2) with full sqrt(r)-block proof (5/2); Thm. 2.3 proof (which products are determined, exponent (9), split at x = 3/5). The appendix shows the Kruse-Price ring-to-algebra reduction is flawed and that Poonen's Lemma 11.1 relies on the same step. This affects rings only, not groups or Poonen's Sec. 10 algebra count.",
+  "BNV07, Enumeration of Finite Groups, Ch. 5 'Enumerating p-groups: upper bounds', pp. 28-44, DOI 10.1017/CBO9780511542756.006, https://cambridge.org/core/books/enumeration-of-finite-groups/enumerating-pgroups-upper-bounds/C6FBD5B700B8DCF5AC2BF02816BE0416 : no text accessible. Section titles (5.1 An elementary upper bound; 5.2 An overview of the Sims approach; 5.3 'Linearising' the problem; 5.4 A small set of relations; 5.5 Proof of the upper bound) come only from a search-result snippet of a table of contents and are unverified.",
+  "C. C. Sims, Enumerating p-groups, Proc. LMS (3) 15 (1965) 151-166, DOI 10.1112/plms/s3-15.1.151 : paywalled (HTTP 403). zbMATH 0133.28401 has no review. Not read.",
+  "S. R. Blackburn, Group Enumeration, DPhil thesis, Oxford 1992, https://ora.ox.ac.uk/objects/uuid:caac5ed0-44e3-4bec-a97e-59e11ea268af : open access but scanned images. It could not be rendered here (no pdftoppm), so it was not read.",
+  "G. Venkataraman, survey arXiv:1911.01924 Sec. 2 (https://ar5iv.labs.arxiv.org/html/1911.01924): states Sims' 8/3 and Newman-Seeley's 5/2 without proof."
+ ],
+ "difficulty_notes": "VERIFIED vs INFERRED\n- Read in sources: the framework objects, index ranges, Eq. (42) and Eq. (22) (from Li-Qiao, which cites BNV), and Poonen's term-by-term count.\n- The 8/3 mechanism (crude subspace count with blocks of size ~m^{2/3}) is my inference. Only the 5/2 block proof (Blackburn-McLean Lemma 2.2(2), rings) was actually read.\n- Not read: Sims' original Sec. 2.4-2.6, BNV Prop. 5.5 proof, BNV Thm. 5.6 proof. Pirate copies of BNV (nzdr.ru) were deliberately not opened.\n- Sims' original uses 'presentations of a restricted type' (Li-Qiao Sec. 2). I found no evidence of subgroup counts in F/P_k(F) for this bound; Eick-O'Brien's 'lower exponent-p series + cohomology orbits' is Sims' 1967 algorithmic method, not this bound.\n\nKEY ACTIONABLE FINDING (own computation, checked analytically and numerically)\n- Use only the Sims-core reduced data with the trivial count for the layer-1 commutators: C(r1,2)*m_2 slots, i.e. no Prop. 5.5. The exponent is then at most (2/25)m^3 + O(m^2) + O(m log m).\n- 2/25 < 1/12, so this suffices for g(3^a)^12 <= 3^{a^3 + B(a+1)^2}: 12*(2/25) = 24/25, leaving a^3/25 to absorb the O(a^2 log a) terms, with B covering small a.\n- This avoids the hardest analytic step (the N_p count, the source of 8/3) entirely.\n- It still needs:\n  (a) the strict-flag lemma (Sims Prop. 2.1). Without the d_{k-1} >= k-2 saving the bound rises to about 0.0926 > 1/12. Triangularity for i >= 3 (coefficients only in u >= i+1) is also essential: dropping it gives about 0.10.\n  (b) H_i = G_i (BNV Prop. 3.8).\n  (c) MAIN FORMALIZATION OBSTACLE: the reduced rigidity theorem (BNV Thm. 5.6). pc.lean's iso_Gam requires all pc relations, so one must show the omitted relations are determined by the kept ones. Options: show the full code is a function of the reduced code (induction on weight i, and on core index k for i = 2, using [x,y]^z = [x^z, y^z] and x^z = x[x,z]); or build a presented group from the reduced relations and prove card <= p^m by collection. Either needs a careful well-founded induction.\n  (d) Moving from pc.lean's order-p central-series pcgs to a lower-central-series pcgs with relative orders p^{a(i,j)} (or refining it).\n- The margin 1/12 - 2/25 = 1/300 is small but positive. All constants are explicit.",
+ "effective": true,
+ "error_term": "Sims: O(m^{8/3}). It comes only from N_p(r1,r2,s) <= (1/2) r1^2 (r2-s+1) + O((r1+r2)^{8/3}) (Sims Sec. 2.4-2.6; BNV Prop. 5.5; Kruse-Price Thm. 5.4 for rings). The other terms are O(m^2) (power words, lower-order corrections in Eq. (42)) and O(m log m) (discrete data). Newman-Seeley: O(m^{5/2}) via sqrt(m)-blocks and a Gaussian-binomial count. The 2/25 route needs no N_p bound: its error is O(m^2) + O(m log m), effective."
+}
+
+### su-xia
+{
+ "key": "su-xia",
+ "found": false,
+ "coefficient": "Su-Xia give no self-contained bound for ALL groups of order p^m with leading coefficient below 1/12. The bounds that do appear: (i) 2/27 for all p-groups, implicit in the proof of Prop 3.5 (Sec 3.2) and in Theorems 1.2/1.3, but this rests on Sims' method as presented in BNV Ch. 5; (ii) 2/27 for \"roots\" only (groups whose Frattini subgroup is central elementary abelian), which is self-contained and elementary (Lemma 2.8). (iii) My own arithmetic, not a claim of the paper: if their displayed presentation-count inequality is used with the trivial count of alternating maps instead of the Sims / Newman-Seeley stratum count, the leading coefficient comes out at exactly 2/25 = 0.08 < 1/12.",
+ "statement": "Source: Ning Su, Binzhou Xia, \"Almost all finite groups are 2-groups of class two\", arXiv:2610.11092v1 (8 Oct 2026). Notation: P_p(m) = f(p^m); a \"root\" is a group with gamma_3^(p)(G)=1, i.e. Phi(G) central elementary abelian; R_p(m) counts roots; D_d = d(d+1)/2; lambda(m) = 2m^3/27 - 4m^2/9.\n\n(1) Eq. (1), Sec 1, cited and not proved: log_p f(p^m) = 2m^3/27 + O(m^{5/2}), attributed to Higman [4], Sims [11] and Newman-Seeley via BNV Theorem 5.8.\n\n(2) Lemma 2.8 (Sec 2.2), self-contained, roots only: B_p(d,s) <= p^{s D_d}, where B_p(d,s) counts roots with d(G)=d and dim Phi(G)=s. Summing over d gives R_p(m) <= (m+1) p^{2m^3/27 + m^2/8}. More precisely, for rho>0 the sum over d with |d/m - 2/3| >= rho is at most (m+1) p^{(2/27 - rho^2/6)m^3 + m^2/8}.\n\n(3) Proposition 3.5 (Sec 3.2), all finite p-groups, p fixed: for each eps>0, the number of isomorphism classes of order p^m with |d(G)/m - 2/3| >= eps is at most p^{(2/27 - c_eps)m^3 + O(m^{8/3})}, where c_eps = min{7/3375, 7 eps^2/15} and the O-constant does not depend on eps.\n\n(4) Proposition 5.7 (Sec 5.6): groups with dim Phi(G/gamma_3^(p)(G)) <= S number at most p^{2m^3/27 - c_S m^2 log_2 m}, with c_S = 1/(100 log_2(2S+1)), for m large.\n\n(5) Proposition 6.2 (Sec 6.1): N_p(m) = #{non-roots} <= p^{lambda(m) - m^2/300} for m >= m_0(p).\n\n(6) Theorem 1.3: R_p(m) <= Q_p(m) <= P_p(m) <= (1 + p^{-m^2/300}) R_p(m) for m large.\n\n(7) Theorem 1.2: P_p(m) = M_p(m)(1 + O(p^{-m/3})), where M_p(m) = p^{(2/27)m^3 - (4/9)m^2 + O(m)} / g_p^2. Corollary 7.1: log_p P_p(m) = lambda(m) + O(m).\n\nFor p=3, (7) is far stronger than the goal g(3^a)^12 <= 3^{a^3 + B(a+1)^2}. But the upper half of (5)-(7) depends on (3), and (3) depends on BNV Chapter 5.",
+ "proof_outline": [
+  "Read in full from the arXiv HTML (I downloaded it and extracted the text locally). Proof of Prop 3.5, Sec 3.2: take a nonabelian G of order p^m. Set d = d(G), b = d(gamma_2/gamma_3), V = G/Phi(G), W = G'/((G')^p gamma_3(G)). The commutator gives a surjection beta: Lambda^2 V -> W. Let sigma be the least dimension of a subspace U <= V with beta(Lambda^2 U) = W. BNV Cor 5.3 gives 2 <= sigma <= min(d, b+1). Put q = sigma - 1 and u = m - d - b.",
+  "Let N_p(d,b,sigma) be log_p of the number of labeled alternating maps F_p^d x F_p^d -> F_p^b with this sigma. BNV Prop 5.5, eqs (5.5) and (5.6), as quoted by Su-Xia: N_p <= d^2(b-q)/2 + O((d+b)^{8/3}) (Sims), and N_p <= d^2(b-q)/2 + dbq/2 + O((d+b)^{5/2}) (Newman-Seeley).",
+  "Restricted presentation theorem, BNV Thm 5.6 (p. 38; construction pp. 35-40): the structural indices, power data and a specified subset of the commutator data determine the isomorphism class. The proof of BNV Thm 5.7 bounds the structural and power choices by 2^{3m-2} p^{m^2} (BNV p. 41). The commutator count comes from BNV (5.12)-(5.14) (pp. 42-43). Together these give: log_p T_p(m;d,b,sigma) <= N_p(d,b,sigma) + d^2 u/2 + (qb - q^2/2)u + q u^2/2 + O(m^2), where T_p counts nonabelian classes with parameters (d,b,sigma).",
+  "Normalize x=d/m, y=b/m, z=u/m, w=q/m, so x+y+z=1 and 0<=w<=min(x,y). Using (5.6) the leading term is A = x^2(y+z-w)/2 + xyw/2 + (wy - w^2/2)z + wz^2/2. Using (5.5) it is B = the same expression without xyw/2. For x >= 3/5, dA/dw < 0, so A <= f(x) = x^2(1-x)/2. For x <= 3/5, B <= 9/125. The identity 2/27 - f(x) = (x-2/3)^2(x+1/3)/2 then gives the gap c_eps. Finally sum over polynomially many parameter values and add the abelian groups (at most 2^m).",
+  "My own check (Python grid search plus closed form): max A = 2/27, attained at x=y=z=w=1/3, and max B = 2/27, attained at x=2/3, w=0. So either alternating-map estimate alone already gives Sims' 2/27 for all groups; Su-Xia's localization only needs both to get a gap away from d = 2m/3.",
+  "My own derived observation, NOT stated by Su-Xia: replace N_p by the trivial bound b*d(d-1)/2 <= d^2 b/2, i.e. count every alternating map. The leading term becomes C = x^2(1-x)/2 + w z (y - w/2 + z/2). C is increasing in w for w <= y, so take w = y (this requires y <= x). Then C <= (1-x)(5x^2 - 2x + 1)/8, whose maximum is exactly 2/25, at x=3/5, y=z=w=1/5. Grid search over the whole region confirms max C = 2/25. Since 1/12 - 2/25 = 1/300, a bound log_p f(p^m) <= (2/25)m^3 + O(m^2) would be enough for the goal. It needs only BNV Cor 5.3, Thm 5.6 and the commutator count (5.12)-(5.14), not the alternating-map stratum lemma Prop 5.5. Caveat: this depends on Su-Xia's paraphrase of BNV (5.14) being exact. I have not read BNV.",
+  "Self-contained roots bound (Lemma 2.2, Prop 2.4, Lemma 2.8): every root with parameters (d,s) is U_d/N, where U_d = F_d/(F_d^{p^2} gamma_2(F_d)^p gamma_3(F_d)) has order p^{d + D_d} with normal forms x_1^{a_1}...x_d^{a_d} prod [x_j,x_i]^{b_ij}, and N is a codimension-s subspace of W_d = Phi(U_d), which has dimension D_d. Such groups correspond to surjections theta: F_p^{D_d} -> F_p^s, so there are at most p^{s D_d} classes. Since (m-d)D_d = m^3 x^2(1-x)/2 + m^2 x(1-x)/2 <= 2m^3/27 + m^2/8, summing over d gives R_p(m) <= (m+1)p^{2m^3/27 + m^2/8}.",
+  "Full upper bound for all groups (Prop 6.2, Sec 6.1): split the non-roots into three families. (a) s <= 2: Prop 5.7, using descendant trees, capacity bounds and Lemma 5.5. (b) |d/m - 2/3| >= 1/10000: Prop 3.5, which is Sims-dependent. (c) The central strip: Props 4.4 and 5.6 with Lemma 6.1, using covers, nucleus bounds, cohomology of central extensions and cup-rank estimates. Prop 6.2 then follows, and combined with the roots count it gives Theorems 1.3 and 1.2."
+ ],
+ "prerequisites": [
+  "BNV = Blackburn, Neumann, Venkataraman, Enumeration of Finite Groups (CUP 2007), Chapter 5, as cited by Su-Xia (I have not read BNV): Cor 5.3, p. 33 (2 <= sigma <= min(d, b+1)); Prop 5.5, eqs (5.5) and (5.6), pp. 33-34 (counts of alternating maps with given sigma); Thm 5.6, p. 38, the restricted presentation theorem, with construction and proof on pp. 35-40; proof of Thm 5.7, p. 41 (2^{3m-2} p^{m^2} structural and power choices); eqs (5.12)-(5.14), pp. 42-43 (commutator count); Thm 5.8 (Newman-Seeley refinement).",
+  "For the roots-only bound: free class-2, exponent-p^2 quotient U_d with an explicit normal form and |U_d| = p^{d + D_d} (Lemma 2.2, which uses UT_3(F_p) and C_{p^2} to show independence); Burnside basis theorem; roots correspond to codimension-s subspaces of W_d (Prop 2.4).",
+  "For Theorem 1.3 / Prop 6.2, needed only if the full Su-Xia route is followed: Prop 3.1 / Lemma 3.2 / Lemma 3.3 on tensor stabilizers; Sec 4 on covers, central extensions and nucleus bounds (Prop 4.3) and weighted root counts (Prop 4.4); Sec 5 on H^2/H^3 of central extensions, inflation, annihilators and cup-rank; Leary's LHS-spectral-sequence differential [5]. This is heavy machinery and not needed for the 1/12 goal.",
+  "For the derived 2/25 route: only BNV Cor 5.3, Thm 5.6, the bound from the proof of Thm 5.7, and (5.12)-(5.14). The alternating-map stratum counts (5.5) and (5.6) are not needed."
+ ],
+ "sources": [
+  "https://arxiv.org/abs/2610.11092 (abstract page; v1, 8 Oct 2026; Su, Xia)",
+  "https://arxiv.org/html/2610.11092v1 Sec 1: eq (1) citing Higman/Sims/Newman-Seeley via BNV Thm 5.8; Theorems 1.1-1.4; the AI Declaration (GPT-6 wrote most technical details of the initial draft)",
+  "https://arxiv.org/html/2610.11092v1 Sec 2.1 Lemma 2.2 and Sec 2.2 Prop 2.4, Lemmas 2.5-2.8 (self-contained roots count B_p(d,s) <= p^{sD_d})",
+  "https://arxiv.org/html/2610.11092v1 Sec 3.2 Proposition 3.5 and its proof (Sims-based localization; cites BNV Cor 5.3, Prop 5.5 (5.5)/(5.6), Thm 5.6, Thm 5.7 p. 41, (5.12)-(5.14) pp. 42-43)",
+  "https://arxiv.org/html/2610.11092v1 Sec 5.5 Prop 5.6, Sec 5.6 Prop 5.7, Sec 6 Lemma 6.1, Sec 6.1 Prop 6.2, Sec 6.2 proof of Thm 1.3, Sec 7.1 Corollary 7.1",
+  "Reference [1] in Su-Xia: S. R. Blackburn, P. M. Neumann, G. Venkataraman, Enumeration of Finite Groups, Cambridge Tracts in Math. 173, CUP 2007, Ch. 5 (cited; not read by me)",
+  "Reference [11] in Su-Xia: C. C. Sims, Enumerating p-groups, Proc. LMS (3) 15 (1965) 151-166 (cited; not read by me)"
+ ],
+ "difficulty_notes": "Verdict: Su-Xia do not reprove Sims' bound. Their only bound covering all p-groups (Prop 3.5, and through Prop 6.2 also Theorems 1.2 and 1.3) is built on BNV Chapter 5: the restricted presentation theorem 5.6, the alternating-map counts (5.5) and (5.6), and the commutator count (5.12)-(5.14). They give this as a compressed paraphrase (\"Substituting ... into (5.14) and absorbing ... gives\"), not a derivation. So for Lean it adds nothing beyond what BNV Ch. 5 already offers, apart from two useful points.\n\n(a) The roots-only bound, Lemma 2.8: R_p(m) <= (m+1)p^{2m^3/27 + m^2/8}. It is elementary, explicit and fits the existing pc.lean framework of normal forms plus injection into codes. But it covers only groups with Phi(G) central elementary abelian, so on its own it does not bound g(3^a).\n\n(b) Their displayed leading polynomials make the cost structure of Sims' count explicit. My arithmetic, not stated in the paper: dropping the hard alternating-map stratum lemma (BNV Prop 5.5) and counting alternating maps trivially still gives leading coefficient exactly 2/25 < 1/12. The slack is 1/300, which beats an O(m^2) error. Each of the Sims (5.5) and Newman-Seeley (5.6) estimates alone gives 2/27. If BNV (5.14) is as Su-Xia paraphrase it, the cheapest formalization target is: BNV Thm 5.6 (Sims' restricted presentation, where commutators [g,u] with u in a lift of a minimal sigma-subspace U, together with power data, determine the group) plus the elementary count giving (2/25)m^3 + O(m^2). This must be checked against BNV pp. 35-43 before relying on it.\n\nThe rest of Su-Xia (Secs 4-5: covers, nucleus, cohomology, Leary's differential, tensor-stabilizer moments) is heavy and only needed for the sharp 2/27 - 4/9 constant. The paper is an unrefereed v1. It declares that GPT-6 wrote most technical details of the initial draft, and several steps are asserted by citation.\n\nEffectiveness: I saw no ineffective step (no compactness, no ineffective constants). However, the thresholds (d >= 10000, 'sufficiently large m', m_0(p), the constants K and n_0 in Lemma 3.2) are not made explicit, and the O(m^{8/3}) constant in Prop 3.5 comes from BNV. For the Lean goal (exists B), an asymptotic bound with an existentially quantified threshold m_0 is enough: for a < m_0, the existing bound g(3^a) <= 3^{(a^3-a)/6} gives g^12 <= 3^{2a^3} <= 3^{a^3 + B(a+1)^2} once B >= m_0.",
+ "effective": true,
+ "error_term": "Prop 3.5: O(m^{8/3}), inherited from BNV eq (5.5); the paper gives no explicit constant, but it is uniform in eps. Presentation-count inequality: + O(m^2), which includes log_p(2^{3m-2} p^{m^2}). Roots-only bound (Lemma 2.8): explicit, m^2/8 + log_p(m+1). Thm 1.2 / Cor 7.1: log_p f(p^m) = 2m^3/27 - 4m^2/9 + O(m), but only for m >= m_0(p) with m_0 not explicit. Derived 2/25 route: O(m^2) error, assuming BNV (5.14) is as paraphrased."
+}
+
+### elementary
+{
+ "key": "elementary",
+ "found": true,
+ "coefficient": "2/25 (= 0.08 < 1/12 = 0.08333; Sims' 2/27 = 0.0741). The slack is 1/12 - 2/25 = 1/300, which is small. It holds only if both refinements below (the strict-chain core and the Jacobi saving at layer 2) are kept.",
+ "effective": true,
+ "error_term": "O(m^2), effective. log_p f(p^m) <= max over shapes of E_main + m(m-1)/2 (power relations) + m*log_p(4(m^2+m+2)) (shape and definition pointers), where E_main = C(l1,2)(l2+tau) + (t*l2 - (t-1)(t-2)/2)*tau + t*tau(tau-1)/2, with t <= min(l1, l2+1). An exact discrete maximization gives 12*E_main <= m^3 for every m in 1..130 and for m = 150, 200, 300 (E_main/m^3 is 0.0798 at m=300). Asymptotically 12*E_main <= (24/25)m^3 + O(m^2). For p=3 a constant B around 15-30 should suffice in g(3^a)^12 <= 3^(a^3+B(a+1)^2); the exact B gets fixed when the polynomial inequality and the shape count are formalized.",
+ "statement": "Sims-lite bound. For every prime p and every m: log_p f(p^m) <= (2/25) m^3 + C m^2, with an absolute effective C. Consequently there is a B with g(3^a)^12 <= 3^(a^3 + B(a+1)^2) for all a.\n\nMechanism. Let G have order p^m, lower central series gamma_i, l_i = log_p|gamma_i/gamma_{i+1}| and T_i = log_p|gamma_i|. The isomorphism class of G is determined by a code recording only:\n(R1) [h_a,h_b] for all pairs of layer-1 generators. There are r1 <= l1 of them, and each relation has T_2 exponents.\n(R2) [x_{2,j}, h_k] only for core k <= t and only for layer-2 elements x_{2,j} created at step >= k of the core chain. Each has T_3 exponents.\n(R3) [x_{i,j}, h_k] for i >= 3 and core k <= t only. Each has T_{i+1} exponents.\n(R4) The p-th power relations of an m-element pcgs refining gamma.\n(R5) O(m log m) digits of shape and definition data.\n\nHere every pcgs element of weight >= 2 is defined as an iterated commutator with core generators. The core h_1..h_t is a 'strict chain': d_k := log_p|<[h_a,h_b]: a<b<=k> gamma_3 / gamma_3| is strictly increasing in k, so d_{k-1} >= k-2, t <= l2+1 and t <= r1. The recorded count is C(r1,2)T_2 + sum_{k<=t}(l2 - d_{k-1})T_3 + t*sum_{i>=3} r_i T_{i+1}. Its supremum over all shapes is (2/25)m^3 + O(m^2). Equality is approached at (l1, l2, T_3) = (3/5, 1/5, 1/5)m with t = l2 and T_3 spread over many 1-dimensional layers.\n\nThe argument avoids Sims' alternating-form / Sims-rank count (BNV Prop 5.5, quoted as Eq. (22) in Li-Qiao). It does NOT avoid Sims' consequence-of-relations machinery (core plus Jacobi). That machinery is needed on both the existence side and the rigidity side.",
+ "proof_outline": [
+  "0. HONEST VERDICT. I found no route below 1/12 without Sims' 'consequence of relations' idea. Every route I tested needs the core trick (only commutators with about l2+1 core generators are recorded at depth >= 2) plus a Jacobi/Hall-Witt rigidity lemma. The cheapest route found keeps those two ingredients and replaces the hardest counting part of Sims (counting alternating maps of given Sims rank, BNV Prop 5.5) by an elementary strict-chain lemma plus the layer-2 Jacobi saving. Result: c = 2/25.",
+  "1. DEAD-END CHECK (numerics, own scripts). Free-relation N-series count S0 = sum_{i<=j} (1 - delta_ij/2) y_i y_j T_{i+j}. For 3 layers the max is exactly 1/(6 sqrt 3) = 0.096225 at x = 1/sqrt3, y = z = (1 - 1/sqrt3)/2, confirmed (x(1-x)(1+x)/4 after optimizing y,z). With more layers: c=4 gives 0.10730, c=5 0.11411, c=6 0.11882, c=10 0.12899, c=16 0.13567, c=24 0.14008. The SUPREMUM IS 1/6, i.e. no gain over the plain pc count. Put the mass on layer indices 1, 2, 4, ..., 2^(K-1), padded with negligible 1-dimensional layers; then T_{i+j} = T_{j+1} for i <= j, and equal masses give (K-1)(K-2)/(6K^2) + (K-1)/(4K^2), which tends to 1/6. Other schemes (sup in the many-layer limit): definitions with ALL generators 1/8; core without the layer-2 Jacobi saving 5/54 = 0.0926; Jacobi saving but a pair-greedy core (t <= 2 l2) 0.0962; strict core plus Jacobi saving 2/25; full Sims 2/27. Central-extension / H^2 layer-by-layer counting gives sum r_i * h(G/P_i). With the classical relation bound h <= d*log|Q| this is about x(1-x)(1+x)/2, max about 0.19. A Jacobi-aware bound on h is the same Lie lemma as in step 4. The same holds for counting normal subgroups of a relatively free group: the size of the next covering layer is bounded by sum_k (r2 - d_{k-1}) only through the core Lie lemma. So these routes are not cheaper.",
+  "2. STRICT-CHAIN LEMMA (elementary, own proof, checked by brute force over F_2 and F_3). Let beta: V x V -> W be alternating bilinear whose values span W. (Group form, no vector spaces: beta(x,y) = [x,y] mod gamma_3, valued in gamma_2/gamma_3; x -> [x,v] gamma_3 is a homomorphism.) Claim: there are u_1..u_t with W_k = span{beta(u_a,u_b): a<b<=k} strictly increasing for 2 <= k <= t and W_t = W. Proof: a strict chain has dim W_t >= t-1, so length <= dim W + 1. Take a strict chain of maximal length and suppose W_t != W. If some v has beta(U_t, v) not contained in W_t, append v. Otherwise beta(U_t, V) <= W_t; pick v, v' with beta(v,v') not in W_t. Put w = v if beta(U_{t-1}, v) is not in W_{t-1}, else w = u_t + v. In both cases (u_1..u_{t-1}, w) is strict and W'_t <= W_t. Since beta(w,v') is in beta(v,v') + W_t, appending v' gives a longer strict chain, a contradiction. Strict chains are linearly independent mod gamma_2 G^p (equivalently, the core elements are independent mod Phi(G)). The constructive version was verified on 307 random alternating maps (chain_alg.py).",
+  "3. EXISTENCE OF GENERATORS (G side). Core h_1..h_t is a strict chain in G. Complete it greedily mod gamma_2 by non-core h_{t+1}..h_{r1} (r1 <= l1). Layer 2: at step k, add commutators [h_a,h_k] (a<k) greedily until W_{k-1} becomes W_k; they are defined as x_{2,j} = [h_{f(j)}, h_{step(j)}] with f(j) < step(j) <= t, the number created at steps >= k is <= l2 - d_{k-1}, and their span is gamma_2 mod gamma_3. Layer i+1 (i >= 2): choose greedily from {[x_{i,j}, h_b] : b <= t} a generating set of their span mod gamma_{i+2} (r_{i+1} <= l_{i+1}); each is defined as x_{i+1,j} = [x_{i-1... i,a}, h_b] with b core. The Lie lemma (step 4) applied to G then gives gamma_i = S_i gamma_{i+1} for all i, where S_i = <x_{i,*}>.",
+  "4. LIE LEMMA (group form, the core of Sims' consequence machinery; cf. Li-Qiao Lemma 4.1 and their Section 2.3 Jacobi recovery of the omitted j <= d_{k-1}). Let D be any group generated by h_1..h_r, with core indices <= t and elements x_{i,j} defined as above. Hypotheses: (H1) [h_a,h_b] in S_2 gamma_3(D) for all a<b; (H2) [x_{2,j}, h_k] in S_3 gamma_4 for core k and step(j) >= k; (H3) [x_{i,j}, h_k] in S_{i+1} gamma_{i+2} for i >= 3 and core k. Conclusion: gamma_i(D) = S_i gamma_{i+1}(D) for all i. Proof, in the graded Lie ring L = (+) gamma_i/gamma_{i+1}, which needs [gamma_a,gamma_b] <= gamma_{a+b}, bilinearity, and Hall-Witt mod gamma_{a+b+c+1}. (A) For core k, strong induction on k: if step(j) = k' < k then x_{2,j} = [h_a, h_k'] with a < k' < k, and [[h_a,h_k'],h_k] = -[[h_k',h_k],h_a] - [[h_k,h_a],h_k']; both terms lie in [S_2, h_a] or [S_2, h_k'] with smaller index. (B) L_2 = S_2 by (H1). (C) [S_i, core] <= S_{i+1} by (A) and (H3). (D) For non-core w, induction on i: when i = 2, [[h_a,h_b],w] = -[[h_b,w],h_a] - [[w,h_a],h_b], which lies in [L_2, core] = [S_2, core]. When i >= 3, write x = [y, h_b] with y in S_{i-1}. Then [[y,h_b],w] = -[[h_b,w],y] - [[w,y],h_b]. Here [w,y] is in S_i by the induction hypothesis. Also [h_b,w] is in L_2 = span [h_c,h_d] (core pairs), and [[h_c,h_d],y] = -[[h_d,y],h_c] - [[y,h_c],h_d] lies in [[S_{i-1},core],core] <= S_{i+1}. Since L_{i+1} = [L_i, L_1], we get L_{i+1} = S_{i+1}.",
+  "5. NORMAL FORMS. Flatten into a list X of length L: non-core layer-1 generators, then core, then layer 2, 3, ..., each generator followed by its p-power chain, with minimal relative orders (each element not in the closure of the later ones). Step 4 gives gamma_w = cl(elements of weight >= w), so the hypotheses of pc.lean's nf_surj hold (X[i]^p and X[i]X[j]X[i]^{-1} lie in cl(drop(i+1))). Irredundancy plus normality give index >= p at every step, so L <= m; nf_surj gives p^L >= m-order, so L = m. The exponent vector of each recorded relation is supported on the correct suffix (apply nf_surj to the suffix list).",
+  "6. CODE AND COUNT. A code is the shape (weights, kinds, definition pointers, t) plus R1, R2 (only step(j) >= k), R3 and power exponent vectors restricted to their allowed suffix positions. log_p #codes <= max_shape [C(r1,2)T_2 + sum_{k=1}^t (l2 - d_{k-1})T_3 + t*sum_{i>=3} r_i T_{i+1}] + m(m-1)/2 + m log_p(4(m^2+m+2)). Use r_i <= l_i, d_{k-1} >= k-2, and sum_{i>=3} r_i T_{i+1} <= C(tau,2) where tau = T_3.",
+  "7. RIGIDITY (cleaner than Li-Qiao Thm 5.2's inductive extension, and reuses pc.lean). Suppose G and G' have the same code. Let D <= G x G' be generated by the pairs (h_a, h'_a). The defined elements of D are (x_u, x'_u). By nf_map through both projections, every recorded relation holds in D with the same exponent vector, so (H1)-(H3) hold in D. Step 4 gives gamma_w(D) = cl(weight >= w), so nf_surj applies to D's flattened list and |D| <= p^m. Both projections are onto (G = cl(X_G)), so they are bijective and G is isomorphic to G'. Iso classes therefore inject into codes, as in gg_pow_le.",
+  "8. OPTIMIZATION. With x = l1/m, y = l2/m, tau = T_3/m and sigma = t/m <= min(x, y): f = x^2(1-x)/2 + (sigma*y - sigma^2/2)tau + sigma*tau^2/2. The f-expression is increasing in sigma. If sigma = y <= x, then f = x^2(1-x)/2 + y*tau(1-x)/2 <= (1-x)(x^2/2 + (1-x)^2/8), which is maximized at x = 3/5 (roots of -15x^2+14x-3) with value 2/25. If x < y, the interior optimum is infeasible and the case reduces to the boundary y = x, or to f <= x(1-x)^2/2 <= 2/27. Grid search confirms sup = 0.080000 at (0.6, 0.2, 0.2), and the exact discrete maximization gives 12*E_main <= m^3 for all m <= 130. For Lean: case split t <= l1 and t <= l2+1, then nlinarith on 12*E_main <= m^3 + B'(m+1)^2; there is slack, since the 1/12 target exceeds the true constant 0.96/12.",
+  "9. ASSEMBLY for p = 3. 12 log_3 g(3^a) <= 12*E_main + 12[a(a-1)/2 + a log_3(4(a^2+a+2))] <= a^3 + B(a+1)^2."
+ ],
+ "prerequisites": [
+  "Reusable from C:\\Users\\monir\\open-math-agents\\.oma\\scratch\\pc.lean: nf, nf_map, nf_mem, nf_surj, and the injection-into-codes pattern of gg_pow_le / gg_bound. iso_Gam and Gam are NOT needed: rigidity goes through the diagonal subgroup D <= G x G' and nf_surj.",
+  "Mathlib (local copy under formal-conjectures/.lake/packages/mathlib): lowerCentralSeries API in Mathlib/GroupTheory/Nilpotent.lean (lowerCentralSeries_succ, mem_lowerCentralSeries_succ_iff, map_lowerCentralSeries, lowerCentralSeries_eq_bot_iff_nilpotencyClass_le); the three-subgroup lemma in ⊥ form, Subgroup.commutator_commutator_eq_bot_of_rotate (Mathlib/GroupTheory/Commutator/Basic.lean:163); Subgroup.map_commutator for passing to quotients. Mathlib's convention is ⁅g1,g2⁆ = g1*g2*g1⁻¹*g2⁻¹.",
+  "NOT in Mathlib (grep found neither): [gamma_i, gamma_j] <= gamma_{i+j}, proved by induction with the three-subgroup lemma applied in D/gamma_{i+j+1}; and the Hall-Witt identity, provable with the `group` tactic.",
+  "New lemmas: bilinearity of (x,y) -> [x,y] mod gamma_{a+b+1} on gamma_a x gamma_b; Hall-Witt mod gamma_{a+b+c+1}; gamma_{i+1} generated mod gamma_{i+2} by [s,h] for s generating gamma_i mod gamma_{i+1} and h generating D.",
+  "The Lie lemma in group form (step 4), stated for an arbitrary group so it can be used for both G (existence) and D (rigidity).",
+  "Strict-chain lemma in abelian-group form inside gamma_2/gamma_3: strict subgroup inclusions in a p-group have index >= p.",
+  "Greedy selection of generators: adding an element outside a subgroup of an abelian p-group multiplies its order by >= p, which gives the counts r_i <= l_i and #(layer-2 elements created at steps >= k) <= l2 - d_{k-1}.",
+  "Finite code type with shape-dependent support, plus the cardinality bound #shapes * p^(max slots).",
+  "Polynomial inequality 12*E_main <= m^3 + B'(m+1)^2 for naturals with t <= min(l1, l2+1) and l1+l2+tau = m (nlinarith with a case split)."
+ ],
+ "sources": [
+  "Y. Li, Y. Qiao, arXiv:2610.14509v3 (HTML https://arxiv.org/html/2610.14509v3), read: Section 2. Def. 2.1 (Sims rank s(G) = min{d(H): G_2 = [H,H]G_3}). Eqs. (19)-(20). Lemma 2.3 (s-1 <= r_2 <= C(s,2)): it cites BNV Cor. 5.3 and the text has no proof; the strict-chain proof in step 2 is mine. Sims generating set Eqs. (23)-(28), where commutators are recorded only with core generators, and c(2,j,k,.) only for d_{k-1} < j. Prop. 2.4 (the data determine the group, cited as BNV Thm 5.6). Prop. 2.5 (p^{O(m log m)} combinatorial data). Eq. (22): bound on alternating maps of Sims rank s, cited as BNV Prop. 5.5, N_p <= r1^2(r2-(s-1))/2 + O((r1+r2)^{8/3}).",
+  "Same paper: Section 2.3, where the Jacobi identity recovers the omitted values j <= d_{k-1}; Lemma 4.1(i)-(iii), where agreement on L_i x C_core for all i plus agreement on L_1 x L_1 forces agreement on L x L (the Lie-ring analogue of step 4); Theorem 5.1 / Eq. (55), the fixed-breadth count; Theorem 5.2, their inductive extension of isomorphisms G_k/G_{u+1}. A WebFetch usage limit stopped a final re-read of Section 2.3, so I am not quoting its exact formula.",
+  "N. Su, B. Xia, arXiv:2610.11092 (https://arxiv.org/abs/2610.11092): abstract only (almost all groups are 2-groups of class two; an asymptotic formula for f(p^m) with relative error O(p^{-m/3})). I read no method details and use nothing from it.",
+  "BNV07 (Blackburn-Neumann-Venkataraman, Enumeration of Finite Groups, Ch. 5): not read directly. Cor. 5.3, Prop. 5.2, Prop. 5.5 and Thm. 5.6 are known to me only through Li-Qiao's citations. I did not use the unofficial PDF mirror that came up in search.",
+  "Own numerics (all in C:\\Users\\monir\\AppData\\Local\\Temp\\claude\\b596c85084d8d676\\f9cebc68-e947-4ea6-b1ff-fe6711c31c1b\\scratchpad\\): opt.py and opt2.py (layer-scheme maximization); dbl.py (S0 tends to 1/6 with doubling layers); lim.py (many-layer limits: 1/8, 5/54, 0.0962, 2/25); disc.py (exact discrete max of E_main, 12*E_main <= m^3 for m <= 130 and at m = 150, 200, 300); core.py and chain_alg.py (strict-chain lemma checked over F_2/F_3)."
+ ],
+ "difficulty_notes": "COST. This is the cheapest rigorous route I found, but it is a sizeable formalization, roughly 2500-4500 Lean lines. Sources of difficulty:\n(a) The commutator calculus Mathlib lacks: [gamma_i,gamma_j] <= gamma_{i+j}, bilinearity mod gamma, Hall-Witt mod gamma. Medium, about 400-800 lines.\n(b) The Lie lemma in group form. Medium, about 400-700 lines.\n(c) The existence-side bookkeeping. Hardest part, about 800-1500 lines: strict core, greedy layer generators with definitions, the flattened LCS-adapted pcgs of exact length m with minimal relative orders, and suffix-supported exponent vectors.\n(d) The code type with shape-dependent supports and its cardinality bound, about 300-600 lines.\n(e) The polynomial inequality. The nlinarith case split should be routine because 1/12 has slack over the true 0.96/12.\nRigidity is comparatively cheap because of the diagonal-subgroup trick: D <= G x G', nf_map, the Lie lemma in D, nf_surj, then |D| <= p^m and both projections are bijective.\n\nFRAGILITY. The margin 1/12 - 2/25 = 1/300 is thin. Dropping the layer-2 Jacobi saving gives 5/54. Using a weaker core (two vectors per step, t <= 2 l2) gives 0.0962. Recording non-core actions on deep layers gives 1/8. Any of these exceeds 1/12. The strict chain (d_k >= k-1, t <= l2+1) and the restriction 'R2 only for step(j) >= k' are therefore both essential. Optional further savings, not needed: a Jacobi saving at layers >= 3, or the alternating-form count (BNV Prop 5.5), which is what gets Sims to 2/27.\n\nUNAVOIDABLE. The existence side already needs 'gamma_2(G) <= <core>' and 'gamma_{i+1} = [gamma_i, core] gamma_{i+2}'. These are Jacobi consequences, so even the generator choice for G needs the Lie lemma. A 'normal subgroup of the core, non-core acts by R1' shortcut handles non-core actions in D for free, but it still needs the layer-2 Jacobi recovery and the G-side Lie lemma. So it does not remove the machinery.\n\nDEAD END CONFIRMED. The free N-series count is 1/(6 sqrt 3) for 3 layers, grows with the number of layers, and has supremum 1/6.\n\nUNVERIFIED. Nothing here is kernel-checked. The constants B and C are heuristic until the polynomial inequality and the shape count are formalized. The strict-chain proof is my own (Li-Qiao state the lemma only by citation), backed by randomized checks rather than a proof assistant."
+}
