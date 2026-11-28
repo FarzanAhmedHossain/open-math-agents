@@ -85,7 +85,8 @@ lemma elemQ_nsmul (K : Subgroup H) (x : Additive (ElemQ p H K)) : p • x = 0 :=
 
 /-- `ElemQ p H K` is an `F_p`-vector space. -/
 instance elemQ_module (K : Subgroup H) : Module (ZMod p) (Additive (ElemQ p H K)) :=
-  @AddCommGroup.zmodModule p ⟨hp.out.ne_zero⟩ _ _ (elemQ_nsmul K)
+  letI : NeZero p := ⟨hp.out.ne_zero⟩
+  AddCommGroup.zmodModule (elemQ_nsmul K)
 
 lemma elemQ_smul_eq_nsmul (K : Subgroup H) (c : ZMod p) (x : Additive (ElemQ p H K)) :
     c • x = c.val • x := by
@@ -143,7 +144,7 @@ lemma commutator_lcs_one_le :
 
 lemma pow_mem_pN_subgroupOf (g : lcs G 1) : g ^ p ∈ (pN p G).subgroupOf (lcs G 1) := by
   rw [Subgroup.mem_subgroupOf]
-  have e : ((g ^ p : lcs G 1) : G) = (g : G) ^ p := by simp
+  have e : ((g ^ p : lcs G 1) : G) = (g : G) ^ p := map_pow (lcs G 1).subtype g p
   rw [e]
   exact Subgroup.mem_sup_right (Subgroup.subset_closure ⟨g, rfl⟩)
 
@@ -181,7 +182,7 @@ theorem W_mul_comm (w w' : WQ p G) : w * w' = w' * w := mul_comm w w'
 theorem card_V_eq_index : Nat.card (VQ p G) = (pPhi p G).index :=
   card_elemQ commutator_le_pPhi (pow_mem_pPhi p)
 
-theorem card_W_eq_relindex : Nat.card (WQ p G) = (pN p G).relindex (lcs G 1) :=
+theorem card_W_eq_relindex : Nat.card (WQ p G) = ((pN p G).subgroupOf (lcs G 1)).index :=
   card_elemQ commutator_lcs_one_le pow_mem_pN_subgroupOf
 
 /-! The commutator form `β_G : V × V → W`. -/
@@ -325,18 +326,21 @@ theorem lamLin_swap (v w : Additive (VQ p G)) : lamLin v w = - lamLin w v := by
 theorem lamLin_span :
     Submodule.span (ZMod p)
       (Set.range (fun vw : Additive (VQ p G) × Additive (VQ p G) => lamLin vw.1 vw.2)) = ⊤ := by
+  let T : Submodule (ZMod p) (Additive (WQ p G)) := Submodule.span (ZMod p)
+    (Set.range (fun vw : Additive (VQ p G) × Additive (VQ p G) => lamLin vw.1 vw.2))
   let K : Subgroup (WQ p G) :=
-    { carrier := {w | Additive.ofMul w ∈ Submodule.span (ZMod p)
-        (Set.range (fun vw : Additive (VQ p G) × Additive (VQ p G) => lamLin vw.1 vw.2))}
+    { carrier := {w | Additive.ofMul w ∈ T}
       mul_mem' := fun {a b} ha hb => by
-        show Additive.ofMul a + Additive.ofMul b ∈ _
-        exact Submodule.add_mem _ ha hb
+        have ha' : Additive.ofMul a ∈ T := ha
+        have hb' : Additive.ofMul b ∈ T := hb
+        exact Submodule.add_mem T ha' hb'
       one_mem' := by
-        show (0 : Additive (WQ p G)) ∈ _
-        exact Submodule.zero_mem _
+        have h0 : (0 : Additive (WQ p G)) ∈ T := Submodule.zero_mem T
+        exact h0
       inv_mem' := fun {a} ha => by
-        show - Additive.ofMul a ∈ _
-        exact Submodule.neg_mem _ ha }
+        have ha' : Additive.ofMul a ∈ T := ha
+        have h1 : - Additive.ofMul a ∈ T := Submodule.neg_mem T ha'
+        exact h1 }
   have hle : Subgroup.closure (Set.range (fun vw : VQ p G × VQ p G => lamV vw.1 vw.2)) ≤ K := by
     rw [Subgroup.closure_le]
     rintro _ ⟨⟨v, w⟩, rfl⟩
@@ -402,7 +406,7 @@ theorem card_lcs_one_eq : Nat.card (lcs G 1) = Nat.card (pN p G) * p ^ r2 p G :=
   have h1 := Subgroup.card_mul_index ((pN p G).subgroupOf (lcs G 1))
   have h2 := Nat.card_congr (Subgroup.subgroupOfEquivOfLe (pN_le_lcs_one (G := G) p)).toEquiv
   have h3 : ((pN p G).subgroupOf (lcs G 1)).index = p ^ r2 p G := by
-    rw [← card_W]
+    rw [← card_W (p := p) (G := G)]
     exact card_W_eq_relindex.symm
   rw [h3, h2] at h1
   exact h1.symm
@@ -457,7 +461,7 @@ theorem frame_core_bounds {n : ℕ} (hG : Nat.card G = p ^ n) (s : ℕ) (x : ℕ
   have hp2 := hp.out.two_le
   refine ⟨?_, ?_⟩
   · have h := h1 hs
-    rw [card_lcs_one_eq, mul_comm (Nat.card (pN p G))] at h
+    rw [card_lcs_one_eq (p := p) (G := G), mul_comm (Nat.card (pN p G))] at h
     have hpos : 0 < Nat.card (pN p G) := Nat.card_pos
     rw [mul_comm (p ^ (s - 1)), mul_comm (p ^ r2 p G)] at h
     exact pow_le_pow_cancel hp2 (le_of_mul_le_mul_pos hpos h)
