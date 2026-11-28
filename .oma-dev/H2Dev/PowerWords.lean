@@ -150,11 +150,13 @@ theorem card_pwArrayOK_le :
   have e1 : {B : PWArray p c r a // pwArrayOK p a B} ≃
       ((k : SimsIdx c r) → {row : (h : SimsIdx c r) → Fin (p ^ a h) //
         ∀ h, pwAdm p k h (row h).val}) :=
-    Equiv.subtypePiEquivPi
+    @Equiv.subtypePiEquivPi (SimsIdx c r) (fun _ => (h : SimsIdx c r) → Fin (p ^ a h))
+      (fun k row => ∀ h, pwAdm p k h (row h).val)
   have e2 : ∀ k : SimsIdx c r, {row : (h : SimsIdx c r) → Fin (p ^ a h) //
       ∀ h, pwAdm p k h (row h).val} ≃
       ((h : SimsIdx c r) → {x : Fin (p ^ a h) // pwAdm p k h x.val}) :=
-    fun _ => Equiv.subtypePiEquivPi
+    fun k => @Equiv.subtypePiEquivPi (SimsIdx c r) (fun h => Fin (p ^ a h))
+      (fun h x => pwAdm p k h x.val)
   rw [Nat.card_congr e1, Nat.card_pi]
   calc ∏ k, Nat.card {row : (h : SimsIdx c r) → Fin (p ^ a h) // ∀ h, pwAdm p k h (row h).val}
         = ∏ k, ∏ h, Nat.card {x : Fin (p ^ a h) // pwAdm p k h x.val} := by
@@ -200,7 +202,7 @@ theorem sum_pwExp : ∑ k, ∑ h, pwExp a k h = pwBound1 a := by
   rw [← Fin.card_Ioi (a := v)]
   congr 1
   ext j
-  simp [Fin.lt_def]
+  simp
 
 /-- The second inequality of (47). -/
 theorem pwBound1_le_pwBound2 (ha : ∀ k, 1 ≤ a k) : pwBound1 a ≤ pwBound2 a := by
@@ -259,8 +261,8 @@ theorem dvd_of_prod_mem_frattini {Q : Type u} [Group Q] [Finite Q] (hQ : IsPGrou
     have h3 : ∏ w ∈ Finset.univ.erase v, (fratPi Q) (y w) ^ e w ∈
         (Subgroup.closure (y '' {w | w ≠ v})).map (fratPi Q) := by
       refine prod_mem fun w hw => ?_
-      exact pow_mem (Subgroup.mem_map_of_mem (fratPi Q)
-        (Subgroup.subset_closure ⟨w, Finset.ne_of_mem_erase hw, rfl⟩)) _
+      have hmem : y w ∈ y '' {w | w ≠ v} := ⟨w, Finset.ne_of_mem_erase hw, rfl⟩
+      exact pow_mem (Subgroup.mem_map_of_mem (fratPi Q) (Subgroup.subset_closure hmem)) _
     rw [eq_inv_of_mul_eq_one_left h2]
     exact inv_mem h3
   have hpow1 : (fratPi Q) (y v) ^ p = 1 := by
@@ -292,7 +294,8 @@ theorem dvd_of_prod_mem_frattini {Q : Type u} [Group Q] [Finite Q] (hQ : IsPGrou
     by_cases hw : w = v
     · rw [hw]
       exact hyK
-    · exact Subgroup.mem_sup_left (Subgroup.subset_closure ⟨w, hw, rfl⟩)
+    · have hmem : y w ∈ y '' {w | w ≠ v} := ⟨w, hw, rfl⟩
+      exact Subgroup.mem_sup_left (Subgroup.subset_closure hmem)
   exact hirr v (closure_eq_top_of_sup_frattini htop)
 
 /-- The layer argument of Theorem 3.1: if the images of `x` generate the finite p-group `H ⧸ N`
@@ -342,12 +345,12 @@ lemma deeper_mem {G : Type u} [Group G] {c : ℕ} {r : Fin c → ℕ} (g : SimsI
     (List.ofFn fun u : Fin c => if i < u then
       (List.ofFn fun v : Fin (r u) => g ⟨u, v⟩ ^ b ⟨u, v⟩).prod else 1).prod ∈
         lcs G ((i : ℕ) + 1) := by
-  refine Subgroup.list_prod_mem fun x hx => ?_
+  refine Subgroup.list_prod_mem _ fun x hx => ?_
   rw [List.mem_ofFn'] at hx
   obtain ⟨u, rfl⟩ := hx
   dsimp only
   split_ifs with hu
-  · refine Subgroup.list_prod_mem fun y hy => ?_
+  · refine Subgroup.list_prod_mem _ fun y hy => ?_
     rw [List.mem_ofFn'] at hy
     obtain ⟨v, rfl⟩ := hy
     exact Subgroup.pow_mem _ (lcs_antitone (Nat.succ_le_of_lt (hu : (i : ℕ) < u))
@@ -366,15 +369,15 @@ theorem SimsPowerData.dvd_same_layer {G : Type u} [Group G] [Finite G] (hG : IsP
         lcs G i := lcs_antitone (Nat.le_succ _) hdeep
   have hz : (⟨_, htail⟩ : lcs G i) ∈ (lcs G ((i : ℕ) + 1)).subgroupOf (lcs G i) :=
     Subgroup.mem_subgroupOf.mpr hdeep
-  have hrel : (⟨g ⟨i, j⟩, hd.mem _⟩ : lcs G i) ^ p ^ a ⟨i, j⟩ =
+  have hrel : (⟨g ⟨i, j⟩, hd.mem ⟨i, j⟩⟩ : lcs G i) ^ p ^ a ⟨i, j⟩ =
       (List.ofFn fun w : Fin (r i) =>
-        (⟨g ⟨i, w⟩, hd.mem _⟩ : lcs G i) ^ (B ⟨i, j⟩ ⟨i, w⟩).val).prod * ⟨_, htail⟩ := by
+        (⟨g ⟨i, w⟩, hd.mem ⟨i, w⟩⟩ : lcs G i) ^ (B ⟨i, j⟩ ⟨i, w⟩).val).prod * ⟨_, htail⟩ := by
     apply (lcs G i).subtype_injective
     rw [map_mul, map_pow, map_list_prod, List.map_ofFn]
     simp only [Function.comp_def, map_pow, Subgroup.coe_subtype]
     exact hd.pow i j
   exact dvd_of_power_relation ((lcs G ((i : ℕ) + 1)).subgroupOf (lcs G i)) hQ
-    (fun w => (⟨g ⟨i, w⟩, hd.mem _⟩ : lcs G i)) (hd.gen i) (hd.irr i) j (a ⟨i, j⟩)
+    (fun w => (⟨g ⟨i, w⟩, hd.mem ⟨i, w⟩⟩ : lcs G i)) (hd.gen i) (hd.irr i) j (a ⟨i, j⟩)
     (hd.pos _) (fun w => (B ⟨i, j⟩ ⟨i, w⟩).val) _ hz hrel v
 
 /-- Group-theoretic reduction of Theorem 3.1: a realised power word array is admissible. -/
