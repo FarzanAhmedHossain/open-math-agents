@@ -282,6 +282,38 @@ lemma ns_cubic (m r h : ℝ) (h0 : 0 ≤ h) (hr : h ≤ r) (hm : h ≤ m - r) :
     r ^ 2 / 2 * (m - r - h) + h * (m - r) ^ 2 / 4 + h * m ^ 2 / 20 ≤ 2 / 27 * m ^ 3 := by
   sorry
 
+/-- (lq-ma-reg helper) `4 a b ≤ n^2` for `a + b ≤ n`. -/
+lemma lqmareg_ab (a b n : ℕ) (h : a + b ≤ n) : (4 : ℝ) * ((a : ℝ) * b) ≤ (n : ℝ) ^ 2 := by
+  have h' : (a : ℝ) + b ≤ n := by exact_mod_cast h
+  have ha : (0 : ℝ) ≤ a := Nat.cast_nonneg a
+  have hb : (0 : ℝ) ≤ b := Nat.cast_nonneg b
+  have h2 : ((a : ℝ) + b) * ((a : ℝ) + b) ≤ (n : ℝ) * n :=
+    mul_le_mul h' h' (by positivity) (by linarith)
+  nlinarith [sq_nonneg ((a : ℝ) - b)]
+
+/-- (lq-ma-reg helper) `x y ≤ m^2` for `0 ≤ x, y ≤ m`. -/
+lemma lqmareg_mm (x y m : ℝ) (hx0 : 0 ≤ x) (hx : x ≤ m) (hy0 : 0 ≤ y) (hy : y ≤ m) :
+    x * y ≤ m ^ 2 := by
+  rw [sq]
+  exact mul_le_mul hx hy hy0 (hx0.trans hx)
+
+/-- (lq-ma-reg helper) The power word exponent, crude form:
+`PW ≤ r1 m2 + r1 d + r2 m3 + r2 e + m3^2 / 4`. -/
+lemma lqmareg_pw (r1 r2 r3 m2 m3 d e : ℕ) :
+    ((r1 * m2 + (r1 - 1) * d + (r2 * m3 + (r2 - 1) * e) + (r3 - 1) * (m3 - r3) : ℕ) : ℝ) ≤
+      (r1 : ℝ) * m2 + (r1 : ℝ) * d + (r2 : ℝ) * m3 + (r2 : ℝ) * e + (m3 : ℝ) ^ 2 / 4 := by
+  have h1 : ((r1 - 1 : ℕ) : ℝ) * d ≤ (r1 : ℝ) * d :=
+    mul_le_mul_of_nonneg_right (Nat.cast_le.mpr (Nat.sub_le r1 1)) (Nat.cast_nonneg d)
+  have h2 : ((r2 - 1 : ℕ) : ℝ) * e ≤ (r2 : ℝ) * e :=
+    mul_le_mul_of_nonneg_right (Nat.cast_le.mpr (Nat.sub_le r2 1)) (Nat.cast_nonneg e)
+  have h3 : (4 : ℝ) * (((r3 - 1 : ℕ) : ℝ) * ((m3 - r3 : ℕ) : ℝ)) ≤ (m3 : ℝ) ^ 2 := by
+    rcases Nat.eq_zero_or_pos (m3 - r3) with h | h
+    · rw [h, Nat.cast_zero, mul_zero, mul_zero]
+      positivity
+    · exact lqmareg_ab _ _ _ (by omega)
+  simp only [Nat.cast_add, Nat.cast_mul]
+  linarith
+
 /-- L4, nonsaturated assembly (class-three form of Theorem 11.3 (pp.69-71)): with
 `N_2 ≤ (r2 - s + 1) C(r1, 2) + Cn (r1^2 + r2^2)` (`H3`),
 `PW + B b2 ≤ (2/27) m^3 - (s - 1) m^2 / 20 + K m^2`.  Steps:
@@ -300,7 +332,82 @@ lemma ns_assembly (Cn : ℕ) : ∃ K : ℝ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, 
       ((r1.choose 2 : ℝ) - r2) * ((m2 : ℝ) - m3 - r2) + ((r1.choose 2 : ℝ) - r2) * m3 +
       (s : ℝ) * b2 * ((r2 : ℝ) + m3 - b2 + 1)) ≤
       2 / 27 * (m : ℝ) ^ 3 - ((s : ℝ) - 1) * (m : ℝ) ^ 2 / 20 + K * (m : ℝ) ^ 2 := by
-  sorry
+  refine ⟨2 * (Cn : ℝ) + 8, ?_⟩
+  intro m r1 r2 s s1 m2 m3 r3 b2 N hc hm hm32 hm3 _hb _hns hN
+  obtain ⟨hrs1, hs2, hsr1, hr2lo, -, hr2m, -, -⟩ := hc
+  have hpw := lqmareg_pw r1 r2 r3 m2 m3 (s1 - r1) (m2 - m3 - r2)
+  have hD : ((s1 - r1 : ℕ) : ℝ) = (s1 : ℝ) - r1 := Nat.cast_sub hrs1
+  have hE : ((m2 - m3 - r2 : ℕ) : ℝ) = (m2 : ℝ) - m3 - r2 := by
+    rw [Nat.cast_sub hr2m, Nat.cast_sub hm32]
+  rw [hD, hE] at hpw
+  have hC1 : ((r1.choose 2 : ℕ) : ℝ) = (r1 : ℝ) * (r1 - 1) / 2 := Nat.cast_choose_two ℝ r1
+  have hsub : ((r2 + 1 - s : ℕ) : ℝ) = (r2 : ℝ) + 1 - s := by
+    rw [Nat.cast_sub (by omega), Nat.cast_add, Nat.cast_one]
+  have e1 : (((r2 + 1 - s) * r1.choose 2 + Cn * (r1 ^ 2 + r2 ^ 2) : ℕ) : ℝ) =
+      ((r2 + 1 - s : ℕ) : ℝ) * ((r1.choose 2 : ℕ) : ℝ) +
+        (Cn : ℝ) * ((r1 : ℝ) ^ 2 + (r2 : ℝ) ^ 2) := by
+    simp only [Nat.cast_add, Nat.cast_mul, Nat.cast_pow]
+  rw [e1, hsub, hC1] at hN
+  rw [hC1]
+  have hmR : (m : ℝ) = s1 + m2 := by rw [← hm, Nat.cast_add]
+  have hs : (2 : ℝ) ≤ s := by exact_mod_cast hs2
+  have hsr : (s : ℝ) ≤ r1 := by exact_mod_cast hsr1
+  have hrs : (r1 : ℝ) ≤ s1 := by exact_mod_cast hrs1
+  have hm3' : (1 : ℝ) ≤ m3 := by exact_mod_cast hm3
+  have hrm : (r2 : ℝ) + m3 ≤ m2 := by
+    have h' : r2 + m3 ≤ m2 := by omega
+    exact_mod_cast h'
+  have hr2lo' : (s : ℝ) - 1 ≤ r2 := by
+    have h' : s ≤ r2 + 1 := by omega
+    have h'' : (s : ℝ) ≤ r2 + 1 := by exact_mod_cast h'
+    linarith
+  have hr20 : (0 : ℝ) ≤ r2 := Nat.cast_nonneg _
+  have hm20 : (0 : ℝ) ≤ m2 := Nat.cast_nonneg _
+  have hCn : (0 : ℝ) ≤ Cn := Nat.cast_nonneg _
+  have hb20 : (0 : ℝ) ≤ b2 := Nat.cast_nonneg _
+  have hm1 : (1 : ℝ) ≤ m := by linarith
+  have hr1m : (r1 : ℝ) ≤ m - m2 := by linarith
+  -- the power word part
+  have p1 := lqmareg_mm (r1 : ℝ) (m2 : ℝ) (m : ℝ) (by linarith) (by linarith) hm20 (by linarith)
+  have p2 := lqmareg_mm (r1 : ℝ) ((s1 : ℝ) - r1) (m : ℝ) (by linarith) (by linarith)
+    (by linarith) (by linarith)
+  have p3 := lqmareg_mm (r2 : ℝ) (m3 : ℝ) (m : ℝ) hr20 (by linarith) (by linarith) (by linarith)
+  have p4 := lqmareg_mm (r2 : ℝ) ((m2 : ℝ) - m3 - r2) (m : ℝ) hr20 (by linarith)
+    (by linarith) (by linarith)
+  have p5 := lqmareg_mm (m3 : ℝ) (m3 : ℝ) (m : ℝ) (by linarith) (by linarith) (by linarith)
+    (by linarith)
+  -- the leading-layer part
+  have hb' : N + ((r1 : ℝ) * (r1 - 1) / 2 - r2) * ((m2 : ℝ) - m3 - r2) +
+      ((r1 : ℝ) * (r1 - 1) / 2 - r2) * m3 ≤
+      (r1 : ℝ) * (r1 - 1) / 2 * (m2 - (s - 1)) + (Cn : ℝ) * ((r1 : ℝ) ^ 2 + (r2 : ℝ) ^ 2) := by
+    linarith [hN, mul_nonneg hr20 (by linarith : (0 : ℝ) ≤ m2 - r2)]
+  have hc' : (r1 : ℝ) * (r1 - 1) / 2 * (m2 - (s - 1)) ≤
+      (r1 : ℝ) ^ 2 / 2 * (m - r1 - (s - 1)) := by
+    linarith [mul_nonneg (sq_nonneg (r1 : ℝ)) (by linarith : (0 : ℝ) ≤ m - r1 - m2),
+      mul_nonneg (by linarith : (0 : ℝ) ≤ r1) (by linarith : (0 : ℝ) ≤ m2 - (s - 1))]
+  -- the breadth part
+  have q1 : (b2 : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) ≤ ((m2 : ℝ) + 1) ^ 2 / 4 := by
+    have hQ0 : (0 : ℝ) ≤ (r2 : ℝ) + m3 + 1 := by positivity
+    have hQ : (r2 : ℝ) + m3 + 1 ≤ m2 + 1 := by linarith
+    linarith [sq_nonneg ((r2 : ℝ) + m3 + 1 - 2 * b2),
+      mul_le_mul hQ hQ hQ0 (by linarith : (0 : ℝ) ≤ m2 + 1)]
+  have hd' := mul_le_mul_of_nonneg_left q1 (by linarith : (0 : ℝ) ≤ s)
+  have he' : (s : ℝ) * (((m2 : ℝ) + 1) ^ 2 / 4) ≤
+      ((s : ℝ) - 1) * ((m : ℝ) - r1) ^ 2 / 4 + 7 / 4 * (m : ℝ) ^ 2 := by
+    have k1 := mul_nonneg (mul_nonneg (by linarith : (0 : ℝ) ≤ s - 1)
+      (by linarith : (0 : ℝ) ≤ m - r1 - m2)) (by linarith : (0 : ℝ) ≤ m - r1 + m2)
+    have k2 := lqmareg_mm ((s : ℝ) - 1) (m2 : ℝ) (m : ℝ) (by linarith) (by linarith) hm20
+      (by linarith)
+    have k3 := mul_le_mul_of_nonneg_left hm1 (by linarith : (0 : ℝ) ≤ m)
+    have k4 := mul_le_mul (by linarith : (m2 : ℝ) + 1 ≤ 2 * m) (by linarith : (m2 : ℝ) + 1 ≤ 2 * m)
+      (by linarith) (by linarith)
+    linarith [k1, k2, k3, k4]
+  have hcub := ns_cubic (m : ℝ) (r1 : ℝ) ((s : ℝ) - 1) (by linarith) (by linarith) (by linarith)
+  have g1 := mul_nonneg hCn (sub_nonneg.mpr
+    (lqmareg_mm (r1 : ℝ) (r1 : ℝ) (m : ℝ) (by linarith) (by linarith) (by linarith) (by linarith)))
+  have g2 := mul_nonneg hCn (sub_nonneg.mpr
+    (lqmareg_mm (r2 : ℝ) (r2 : ℝ) (m : ℝ) hr20 (by linarith) hr20 (by linarith)))
+  linarith [hpw, p1, p2, p3, p4, p5, hb', hc', hd', he', hcub, g1, g2, sq_nonneg (m : ℝ)]
 
 /-- L5, the `A` term in the saturated regime (class-three form of Prop 12.1 (ii), (139)): if
 `P = C(r1 - s, 2) - s (m2 + 1) ≥ 3 s m2`, then
@@ -319,7 +426,63 @@ lemma sat_A_bound : ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ,
       (r1 : ℝ) ^ 2 * m2 / 2 + (r1 : ℝ) * m2 / 2 - (m2 : ℝ) ^ 2 - (r1 : ℝ) ^ 2 / 2 +
         2 * (m2 : ℝ) * ((m2 - m3 - r2 : ℕ) : ℝ) + (r1 : ℝ) * ((s1 - r1 : ℕ) : ℝ) +
         5 * (s : ℝ) * m := by
-  sorry
+  intro m r1 r2 s s1 m2 m3 r3 b2 hc hm hm32 hm3 hb hP
+  obtain ⟨hrs1, hs2, hsr1, -, -, hr2m, -, -⟩ := hc
+  obtain ⟨hb1, -, -⟩ := hb
+  have hpw := lqmareg_pw r1 r2 r3 m2 m3 (s1 - r1) (m2 - m3 - r2)
+  have hD : ((s1 - r1 : ℕ) : ℝ) = (s1 : ℝ) - r1 := Nat.cast_sub hrs1
+  have hE : ((m2 - m3 - r2 : ℕ) : ℝ) = (m2 : ℝ) - m3 - r2 := by
+    rw [Nat.cast_sub hr2m, Nat.cast_sub hm32]
+  have hC1 : ((r1.choose 2 : ℕ) : ℝ) = (r1 : ℝ) * (r1 - 1) / 2 := Nat.cast_choose_two ℝ r1
+  have hC2 : (((r1 - s).choose 2 : ℕ) : ℝ) = ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 := by
+    rw [Nat.cast_choose_two ℝ, Nat.cast_sub hsr1]
+  have hmR : (m : ℝ) = s1 + m2 := by rw [← hm, Nat.cast_add]
+  have hP' : 3 * (s : ℝ) * m2 + (s : ℝ) * (m2 + 1) ≤ (((r1 - s).choose 2 : ℕ) : ℝ) := by
+    exact_mod_cast hP
+  rw [hC2] at hP'
+  have hb1' : (m3 : ℝ) ≤ s * b2 := by exact_mod_cast hb1
+  have hb0 : (1 : ℝ) ≤ b2 := by
+    have h1 : 1 ≤ b2 := by
+      rcases Nat.eq_zero_or_pos b2 with h | h
+      · subst h
+        rw [Nat.mul_zero] at hb1
+        omega
+      · exact h
+    exact_mod_cast h1
+  have hrm : (r2 : ℝ) + m3 ≤ m2 := by
+    have h' : r2 + m3 ≤ m2 := by omega
+    exact_mod_cast h'
+  have hs : (2 : ℝ) ≤ s := by exact_mod_cast hs2
+  have hsr : (s : ℝ) ≤ r1 := by exact_mod_cast hsr1
+  have hrs : (r1 : ℝ) ≤ s1 := by exact_mod_cast hrs1
+  have hm3' : (1 : ℝ) ≤ m3 := by exact_mod_cast hm3
+  have hr20 : (0 : ℝ) ≤ r2 := Nat.cast_nonneg _
+  have hm20 : (0 : ℝ) ≤ m2 := Nat.cast_nonneg _
+  have hT : (s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 ≤
+      -(((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1)) := by
+    linarith [mul_nonneg (by linarith : (0 : ℝ) ≤ s) (by linarith : (0 : ℝ) ≤ m2 - r2 - m3),
+      mul_nonneg (by linarith : (0 : ℝ) ≤ s) (by linarith : (0 : ℝ) ≤ b2)]
+  have hX : (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) -
+      ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2) ≤
+      -(((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1)) -
+        3 * (m2 : ℝ) * (m3 - s) := by
+    have k1 := mul_le_mul_of_nonneg_left hT (by linarith : (0 : ℝ) ≤ b2)
+    have k2 := mul_nonneg (by linarith : (0 : ℝ) ≤ b2 - 1)
+      (by linarith : (0 : ℝ) ≤ ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1) -
+        3 * s * m2)
+    have k3 := mul_nonneg hm20 (by linarith : (0 : ℝ) ≤ s * b2 - m3)
+    linarith [k1, k2, k3]
+  rw [hC1, hC2]
+  rw [hD, hE] at hpw ⊢
+  rw [hmR]
+  have he0 : (0 : ℝ) ≤ (m2 : ℝ) - m3 - r2 := by linarith
+  have hd0 : (0 : ℝ) ≤ (s1 : ℝ) - r1 := by linarith
+  have hs0 : (0 : ℝ) ≤ s := by linarith
+  linarith [hpw, hX, sq_nonneg (m3 : ℝ), mul_nonneg hr20 (by linarith : (0 : ℝ) ≤ m3),
+    mul_nonneg he0 (by linarith : (0 : ℝ) ≤ m3), sq_nonneg ((m2 : ℝ) - m3 - r2),
+    mul_nonneg hs0 hd0, mul_nonneg (by linarith : (0 : ℝ) ≤ s - 2) (by linarith : (0 : ℝ) ≤ r1),
+    mul_nonneg hr20 hs0, mul_nonneg (by linarith : (0 : ℝ) ≤ m3) hs0, mul_nonneg he0 hs0,
+    mul_nonneg hs0 (by linarith : (0 : ℝ) ≤ s - 2)]
 
 /-- L6, the cubic for `Ψ` (class-three form of (145)-(146)), with `n = r1 + m2`:
 `Ψ ≤ (2/27) n^3 - (2/9) n^2 + n/24` and `Ψ - r1^2 ≤ (2/27) n^3 - (2/3) n^2 + 4 n`
@@ -362,7 +525,116 @@ lemma small_core : ∃ m0 : ℕ, ∀ m r1 r2 s s1 m2 m3 r3 b2 : ℕ, m0 ≤ m �
     (((r1.choose 2 : ℝ) - r2) * m2 +
       (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 - s).choose 2 : ℝ))) ≤
       2 / 27 * (m : ℝ) ^ 3 - (m : ℝ) ^ 2 := by
-  sorry
+  refine ⟨40000000, ?_⟩
+  intro m r1 r2 s s1 m2 m3 r3 b2 hm0 hc hm hm32 hm3 hb hs1 h7 h12
+  obtain ⟨-, hs2, hsr1, -, hr2hi, hr2m, he, -⟩ := hc
+  obtain ⟨hb1, -, -⟩ := hb
+  have hd0 : s1 - r1 = 0 := by omega
+  have hc0 : Nat.choose 0 2 = 0 := by decide
+  rw [hd0, hc0] at he
+  have he0 : m2 - m3 - r2 = 0 := by omega
+  have hpw := lqmareg_pw r1 r2 r3 m2 m3 (s1 - r1) (m2 - m3 - r2)
+  have hd0' : ((s1 - r1 : ℕ) : ℝ) = 0 := by rw [hd0, Nat.cast_zero]
+  have he0' : ((m2 - m3 - r2 : ℕ) : ℝ) = 0 := by rw [he0, Nat.cast_zero]
+  rw [hd0', he0'] at hpw
+  have hC1 : ((r1.choose 2 : ℕ) : ℝ) = (r1 : ℝ) * (r1 - 1) / 2 := Nat.cast_choose_two ℝ r1
+  have hC2 : (((r1 - s).choose 2 : ℕ) : ℝ) = ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 := by
+    rw [Nat.cast_choose_two ℝ, Nat.cast_sub hsr1]
+  have hm2e : (m2 : ℝ) = r2 + m3 := by
+    have h' : m2 = r2 + m3 := by omega
+    rw [h', Nat.cast_add]
+  have hmR : (m : ℝ) = r1 + r2 + m3 := by
+    have h' : m = r1 + r2 + m3 := by omega
+    rw [h', Nat.cast_add, Nat.cast_add]
+  have h7' : (m : ℝ) < 7 * r1 := by exact_mod_cast h7
+  have h12' : 12 * (s : ℝ) ^ 2 ≤ m := by exact_mod_cast h12
+  have hm0' : (40000000 : ℝ) ≤ m := by exact_mod_cast hm0
+  have hr2s : (r2 : ℝ) ≤ (s : ℝ) * (s - 1) / 2 := by
+    have h' := (Nat.cast_le (α := ℝ)).mpr hr2hi
+    rw [Nat.cast_choose_two] at h'
+    exact h'
+  have hs : (2 : ℝ) ≤ s := by exact_mod_cast hs2
+  have hsr : (s : ℝ) ≤ r1 := by exact_mod_cast hsr1
+  have hm3' : (1 : ℝ) ≤ m3 := by exact_mod_cast hm3
+  have hb1' : (m3 : ℝ) ≤ s * b2 := by exact_mod_cast hb1
+  have hr20 : (0 : ℝ) ≤ r2 := Nat.cast_nonneg _
+  have hb20 : (0 : ℝ) ≤ b2 := Nat.cast_nonneg _
+  have hm00 : (0 : ℝ) ≤ m := by linarith
+  -- size of `s` against `m`
+  have hs24 : 24 * (s : ℝ) ≤ m := by
+    linarith [mul_nonneg (by linarith : (0 : ℝ) ≤ s) (by linarith : (0 : ℝ) ≤ s - 2)]
+  have hmm : 40000000 * (m : ℝ) ≤ m * m := mul_le_mul_of_nonneg_right hm0' hm00
+  have hsq : (20000 * (s : ℝ)) ^ 2 ≤ (m : ℝ) ^ 2 := by linarith [hmm, h12', hm00]
+  have hms : 20000 * (s : ℝ) ≤ m := by
+    by_contra hlt
+    push_neg at hlt
+    linarith [mul_pos (sub_pos.2 hlt) (sub_pos.2 hlt),
+      mul_nonneg hm00 (sub_pos.2 hlt).le]
+  -- the core-outside binomial is large: `C(r1 - s, 2) ≥ 50 m s`
+  have hx : 17 * (m : ℝ) / 168 ≤ (r1 : ℝ) - s := by linarith
+  have hx2 := mul_le_mul hx hx (by linarith) (by linarith)
+  have hCs : 50 * (m : ℝ) * s ≤ ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 := by
+    linarith [mul_nonneg (by linarith : (0 : ℝ) ≤ (r1 : ℝ) - s)
+        (by linarith : (0 : ℝ) ≤ (r1 : ℝ) - s - 2),
+      mul_nonneg hm00 (by linarith : (0 : ℝ) ≤ m - 20000 * s),
+      mul_nonneg hm00 (by linarith : (0 : ℝ) ≤ s)]
+  have hm2m : (m2 : ℝ) + 1 ≤ 2 * m := by linarith
+  have hP : 48 * (m : ℝ) * s ≤
+      ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1) := by
+    linarith [mul_nonneg (by linarith : (0 : ℝ) ≤ s) (by linarith : (0 : ℝ) ≤ 2 * m - m2 - 1)]
+  have hsm : (s : ℝ) * m2 = s * (r2 + m3) := by rw [hm2e]
+  have hT : (s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 ≤
+      -(((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1)) := by
+    linarith [mul_nonneg (by linarith : (0 : ℝ) ≤ s) hb20]
+  have hP0 : (0 : ℝ) ≤ ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1) := by
+    linarith [mul_nonneg hm00 (by linarith : (0 : ℝ) ≤ s)]
+  have kT := mul_nonneg hb20 (by linarith : (0 : ℝ) ≤
+    -(((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1)) -
+      ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) - ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2))
+  rw [hC1, hC2]
+  rcases le_or_lt (m : ℝ) (24 * m3) with hA | hB
+  · -- `m3 ≥ m / 24`: the breadth term saves `2 m^2`
+    have kA : (s : ℝ) * (2 * (m : ℝ) ^ 2) ≤ (s : ℝ) * ((b2 : ℝ) *
+        (((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1))) := by
+      linarith [mul_nonneg (by linarith : (0 : ℝ) ≤ s * b2 - m3) hP0,
+        mul_nonneg (by linarith : (0 : ℝ) ≤ m3 - m / 24) hP0,
+        mul_nonneg hm00 (by linarith : (0 : ℝ) ≤
+          ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2 - (s : ℝ) * (m2 + 1) - 48 * m * s)]
+    have hbP := le_of_mul_le_mul_left kA (by linarith : (0 : ℝ) < s)
+    have hXA : (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) -
+        ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2) ≤ -2 * (m : ℝ) ^ 2 := by
+      linarith [kT, hbP]
+    rw [hmR] at hXA ⊢
+    rw [hm2e] at hpw ⊢
+    have hr10 : (0 : ℝ) ≤ r1 := by linarith
+    have hm30 : (0 : ℝ) ≤ m3 := by linarith
+    have gap := mul_nonneg (sq_nonneg ((r1 : ℝ) - 2 * ((r1 : ℝ) + r2 + m3) / 3))
+      (by linarith : (0 : ℝ) ≤ (r1 : ℝ) + ((r1 : ℝ) + r2 + m3) / 3)
+    linarith [hpw, hXA, gap, sq_nonneg (m3 : ℝ), mul_nonneg hm30 hr10, mul_nonneg hm30 hr20,
+      sq_nonneg (r1 : ℝ), mul_nonneg hr10 hr20, sq_nonneg (r2 : ℝ)]
+  · -- `m3 < m / 24`: then `m2 ≤ m / 12` and the cubic gap is `≥ m^3 / 32`
+    have hM2 : 12 * ((r2 : ℝ) + m3) ≤ m := by linarith
+    have hXB : (b2 : ℝ) * ((s : ℝ) * ((r2 : ℝ) + m3 - b2 + 1) -
+        ((r1 : ℝ) - s) * ((r1 : ℝ) - s - 1) / 2) ≤ 0 := by
+      linarith [kT, mul_nonneg hb20 hP0]
+    rw [hmR] at hM2 hm0'
+    rw [hm2e] at hpw ⊢
+    rw [hmR]
+    have hr10 : (0 : ℝ) ≤ r1 := by linarith
+    have hm30 : (0 : ℝ) ≤ m3 := by linarith
+    have hM0 : (0 : ℝ) ≤ (r1 : ℝ) + r2 + m3 := by linarith
+    have hy : ((r1 : ℝ) + r2 + m3) / 4 ≤ (r1 : ℝ) - 2 * ((r1 : ℝ) + r2 + m3) / 3 := by linarith
+    have hy2 := mul_le_mul hy hy (by linarith) (by linarith)
+    have k2 := mul_nonneg (by linarith : (0 : ℝ) ≤
+        ((r1 : ℝ) - 2 * ((r1 : ℝ) + r2 + m3) / 3) * ((r1 : ℝ) - 2 * ((r1 : ℝ) + r2 + m3) / 3) -
+          ((r1 : ℝ) + r2 + m3) / 4 * (((r1 : ℝ) + r2 + m3) / 4))
+      (by linarith : (0 : ℝ) ≤ (r1 : ℝ) + ((r1 : ℝ) + r2 + m3) / 3)
+    have k3 := mul_nonneg (sq_nonneg ((r1 : ℝ) + r2 + m3))
+      (by linarith : (0 : ℝ) ≤ (r1 : ℝ) + ((r1 : ℝ) + r2 + m3) / 3 - ((r1 : ℝ) + r2 + m3))
+    have k4 := mul_nonneg (sq_nonneg ((r1 : ℝ) + r2 + m3))
+      (by linarith : (0 : ℝ) ≤ (r1 : ℝ) + r2 + m3 - 40000000)
+    linarith [hpw, hXB, k2, k3, k4, sq_nonneg (m3 : ℝ), mul_nonneg hm30 hr10,
+      mul_nonneg hm30 hr20, sq_nonneg (r1 : ℝ), mul_nonneg hr10 hr20, sq_nonneg (r2 : ℝ)]
 
 /-- L10 (a): `C(s-1, 2) ≤ r2 ≤ m` gives `s^2 ≤ 8 m` (for `m ≥ 2`). -/
 lemma sq_le_of_sat (m s r2 : ℕ) (hm : 2 ≤ m) (h : (s - 1).choose 2 ≤ r2) (hr : r2 ≤ m) :
