@@ -978,7 +978,7 @@ theorem prop1010 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r
   -- the kernel vector `(β, γ)`
   let bv : Fin k → F := fun i => g (some (Sum.inr (Sum.inl i)))
   let gv : Fin k → F := fun i => g (some (Sum.inr (Sum.inr i)))
-  have hx_eq : ∀ j, ((1 + P u) *ᵥ bv + P v *ᵥ gv) j = 0 := by
+  have hx_eq : ∀ j, (((1 + P u : Matrix (Fin k) (Fin k) F) *ᵥ bv + P v *ᵥ gv : Fin k → F) j) = 0 := by
     intro j
     have h := congrArg (bF.coord (some (Sum.inr (Sum.inl j)))) hg2
     rw [map_sum, map_zero] at h
@@ -987,7 +987,7 @@ theorem prop1010 {k : ℕ} (β : Fin M → Matrix (Fin R) (Fin R) F) (hA : ∀ r
     show (∑ i, (1 + P u) j i * bv i) + (∑ i, P v j i * gv i) = 0
     refine Eq.trans ?_ h
     congr 1 <;> exact Finset.sum_congr rfl (fun i _ => mul_comm _ _)
-  have hy_eq : ∀ j, (Q u *ᵥ bv + (1 + Q v) *ᵥ gv) j = 0 := by
+  have hy_eq : ∀ j, ((Q u *ᵥ bv + (1 + Q v : Matrix (Fin k) (Fin k) F) *ᵥ gv : Fin k → F) j) = 0 := by
     intro j
     have h := congrArg (bF.coord (some (Sum.inr (Sum.inr j)))) hg2
     rw [map_sum, map_zero] at h
