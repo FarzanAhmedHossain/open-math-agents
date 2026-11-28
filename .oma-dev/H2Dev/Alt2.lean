@@ -955,10 +955,5 @@ theorem isoLocus_eq_empty {A : Matrix (Fin R) (Fin R) F} {h : ℕ}
 
 end Lemma81
 
-#print axioms prop72_iii
-#print axioms ncard_grass_le_pivot
-#print axioms ncard_alt_rank_le
-#print axioms N2_support
-#print axioms two_mul_finrank_le_of_isotropic
 
 end OMA.SimsLite.Alt2
